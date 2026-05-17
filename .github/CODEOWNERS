@@ -1,11 +1,11 @@
 # GitHub Code Owners - Pipe Joint Inspection App
 
 # Backend - Mavis
-src/services/                   @mavis
-src/db/                         @mavis
-src/workers/                    @mavis
-src/lib/                        @mavis
-src/utils/                      @mavis
+src/services/                   @MAVIS-creator
+src/db/                         @MAVIS-creator
+src/workers/                    @MAVIS-creator
+src/lib/                        @MAVIS-creator
+src/utils/                      @MAVIS-creator
 
 # Frontend - Vikky
 src/pages/                      @vikky
@@ -15,24 +15,24 @@ src/styles/                     @vikky
 src/assets/                     @vikky
 
 # Shared areas - Both developers
-src/hooks/                      @mavis @vikky
-src/types/                      @mavis @vikky
-src/App.tsx                     @mavis @vikky
-src/main.tsx                    @mavis @vikky
+src/hooks/                      @MAVIS-creator @vikky
+src/types/                      @MAVIS-creator @vikky
+src/App.tsx                     @MAVIS-creator @vikky
+src/main.tsx                    @MAVIS-creator @vikky
 
 # Project configuration - Both developers
-package.json                    @mavis @vikky
-tsconfig.json                   @mavis @vikky
-vite.config.ts                  @mavis @vikky
-.github/workflows/              @mavis @vikky
-.github/CODEOWNERS              @mavis @vikky
+package.json                    @MAVIS-creator @vikky
+tsconfig.json                   @MAVIS-creator @vikky
+vite.config.ts                  @MAVIS-creator @vikky
+.github/workflows/              @MAVIS-creator @vikky
+.github/CODEOWNERS              @MAVIS-creator @vikky
 
 # Version control and guidelines
-VERSION_CONTROL.md              @mavis @vikky
-COMMIT_GUIDELINES.md            @mavis @vikky
-BRANCH_PROTECTION_RULES.md      @mavis @vikky
-PULL_REQUEST_TEMPLATE.md        @mavis @vikky
+VERSION_CONTROL.md              @MAVIS-creator @vikky
+COMMIT_GUIDELINES.md            @MAVIS-creator @vikky
+BRANCH_PROTECTION_RULES.md      @MAVIS-creator @vikky
+PULL_REQUEST_TEMPLATE.md        @MAVIS-creator @vikky
 
 # Documentation
-README.md                       @mavis @vikky
-docs/                           @mavis @vikky
+README.md                       @MAVIS-creator @vikky
+docs/                           @MAVIS-creator @vikky
