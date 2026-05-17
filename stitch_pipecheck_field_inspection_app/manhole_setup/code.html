@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Manhole Setup - JointInspect</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary-container": "#ac8e5b",
+                      "inverse-surface": "#213145",
+                      "on-surface-variant": "#44474d",
+                      "on-tertiary": "#ffffff",
+                      "inverse-primary": "#b7c7eb",
+                      "secondary": "#0051d5",
+                      "on-secondary-container": "#fefcff",
+                      "primary-fixed-dim": "#b7c7eb",
+                      "surface-container-highest": "#d3e4fe",
+                      "secondary-fixed-dim": "#b4c5ff",
+                      "tertiary-fixed-dim": "#e3c28a",
+                      "surface-dim": "#cbdbf5",
+                      "secondary-fixed": "#dbe1ff",
+                      "on-primary-container": "#8393b5",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container": "#e5eeff",
+                      "surface-variant": "#d3e4fe",
+                      "on-error-container": "#93000a",
+                      "primary": "#041632",
+                      "secondary-container": "#316bf3",
+                      "error": "#ba1a1a",
+                      "tertiary": "#211500",
+                      "on-secondary-fixed": "#00174b",
+                      "surface-container-low": "#eff4ff",
+                      "outline": "#75777e",
+                      "error-container": "#ffdad6",
+                      "on-surface": "#0b1c30",
+                      "inverse-on-surface": "#eaf1ff",
+                      "surface": "#f8f9ff",
+                      "primary-fixed": "#d7e2ff",
+                      "on-primary": "#ffffff",
+                      "background": "#f8f9ff",
+                      "surface-bright": "#f8f9ff",
+                      "tertiary-fixed": "#ffdea7",
+                      "on-tertiary-fixed-variant": "#594317",
+                      "surface-tint": "#4f5e7e",
+                      "on-primary-fixed": "#091b37",
+                      "on-secondary": "#ffffff",
+                      "outline-variant": "#c5c6ce",
+                      "tertiary-container": "#3b2800",
+                      "on-tertiary-fixed": "#271900",
+                      "primary-container": "#1b2b48",
+                      "on-background": "#0b1c30",
+                      "on-primary-fixed-variant": "#374765",
+                      "surface-container-high": "#dce9ff",
+                      "on-error": "#ffffff",
+                      "on-secondary-fixed-variant": "#003ea8"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "touch-target-min": "48px",
+                      "margin-edge": "20px",
+                      "base": "8px",
+                      "gutter-desktop": "24px",
+                      "gutter-mobile": "16px"
+              },
+              "fontFamily": {
+                      "headline-md": ["Inter"],
+                      "status-label": ["Inter"],
+                      "body-sm": ["Inter"],
+                      "headline-lg": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "headline-lg-mobile": ["Inter"],
+                      "label-caps": ["Inter"]
+              },
+              "fontSize": {
+                      "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                      "status-label": ["13px", {"lineHeight": "18px", "fontWeight": "600"}],
+                      "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                      "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}]
+              }
+            },
+          },
+        }
+      </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen pb-32">
+<!-- Top App Bar -->
+<header class="w-full top-0 sticky bg-surface dark:bg-primary-container border-b-2 border-surface-container-highest dark:border-outline-variant z-50 flex justify-between items-center px-margin-edge h-touch-target-min transition-colors duration-200">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary dark:text-secondary-fixed" data-icon="precision_manufacturing">precision_manufacturing</span>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">JointInspect</h1>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary dark:text-secondary-fixed" data-icon="cloud_done">cloud_done</span>
+</div>
+</header>
+<!-- Content Canvas -->
+<main class="max-w-4xl mx-auto px-margin-edge py-8 space-y-8">
+<!-- Offline Sync Indicator -->
+<div class="bg-surface-container-high px-4 py-2 rounded-lg flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="sync">sync</span>
+<span class="font-status-label text-status-label text-on-surface-variant">Online - Synced</span>
+</div>
+<span class="font-label-caps text-label-caps text-secondary">V2.4.1</span>
+</div>
+<section class="space-y-2">
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary">Manhole Setup</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Technical configuration and material estimation for segment MH-7702.</p>
+</section>
+<!-- Configuration Form -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Input Column -->
+<div class="md:col-span-7 space-y-6">
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_2px_4px_rgba(4,22,50,0.05)] border border-surface-container-highest">
+<form class="space-y-6">
+<!-- Manhole ID -->
+<div class="space-y-2">
+<label class="block font-status-label text-status-label text-on-surface-variant px-1">MANHOLE ID</label>
+<input class="w-full h-touch-target-min px-4 rounded-lg border-2 border-outline-variant focus:border-secondary focus:ring-0 font-body-lg text-body-lg outline-none transition-colors" placeholder="Enter ID..." type="text" value="MH-7702-STK"/>
+</div>
+<!-- Type Dropdown -->
+<div class="space-y-2">
+<label class="block font-status-label text-status-label text-on-surface-variant px-1">INFRASTRUCTURE TYPE</label>
+<select class="w-full h-touch-target-min px-4 rounded-lg border-2 border-outline-variant focus:border-secondary focus:ring-0 font-body-lg text-body-lg outline-none appearance-none bg-surface-container-lowest transition-colors">
+<option>Foul Water</option>
+<option selected="">Surface Water</option>
+</select>
+</div>
+<!-- Meter Run -->
+<div class="space-y-2">
+<label class="block font-status-label text-status-label text-on-surface-variant px-1">TOTAL METER RUN (m)</label>
+<div class="relative">
+<input class="w-full h-touch-target-min px-4 rounded-lg border-2 border-outline-variant focus:border-secondary focus:ring-0 font-body-lg text-body-lg outline-none transition-colors" placeholder="0.00" type="number" value="22.5"/>
+<span class="absolute right-4 top-1/2 -translate-y-1/2 font-status-label text-on-surface-variant">METERS</span>
+</div>
+</div>
+<!-- Pipe Diameter -->
+<div class="space-y-2">
+<label class="block font-status-label text-status-label text-on-surface-variant px-1">PIPE SPECIFICATION &amp; DIAMETER</label>
+<select class="w-full h-touch-target-min px-4 rounded-lg border-2 border-outline-variant focus:border-secondary focus:ring-0 font-body-lg text-body-lg outline-none bg-surface-container-lowest transition-colors">
+<option>150mm Clay - 1.75m</option>
+<option selected="">225mm Clay - 2.0m</option>
+<option>300mm Concrete - 2.6m</option>
+<option>450mm Concrete - 2.6m</option>
+<option>600mm Concrete - 2.6m</option>
+<option>900mm Concrete</option>
+</select>
+</div>
+</form>
+</div>
+<div class="flex gap-4">
+<button class="flex-1 h-touch-target-min bg-secondary text-on-secondary rounded-lg font-status-label text-status-label hover:opacity-90 active:scale-95 transition-all">
+                        SAVE CONFIGURATION
+                    </button>
+<button class="h-touch-target-min px-6 border-2 border-primary text-primary rounded-lg font-status-label text-status-label hover:bg-surface-container transition-colors">
+                        RESET
+                    </button>
+</div>
+</div>
+<!-- Materials Estimate Card (Side / Summary) -->
+<div class="md:col-span-5">
+<div class="bg-primary text-on-primary p-6 rounded-xl shadow-lg sticky top-24 space-y-6">
+<div class="flex items-center justify-between">
+<h3 class="font-headline-md text-headline-md">Materials Estimate</h3>
+<span class="material-symbols-outlined text-secondary-fixed" data-icon="inventory">inventory</span>
+</div>
+<div class="space-y-4">
+<div class="bg-primary-container p-4 rounded-lg border border-on-primary-fixed-variant">
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm text-primary-fixed">Pipes needed</span>
+<span class="font-headline-md text-headline-md text-secondary-fixed">12</span>
+</div>
+<div class="w-full bg-on-primary-fixed-variant h-1 mt-3 rounded-full overflow-hidden">
+<div class="bg-secondary-fixed w-[85%] h-full"></div>
+</div>
+</div>
+<div class="bg-primary-container p-4 rounded-lg border border-on-primary-fixed-variant">
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm text-primary-fixed">Joints needed</span>
+<span class="font-headline-md text-headline-md text-secondary-fixed">11</span>
+</div>
+<div class="w-full bg-on-primary-fixed-variant h-1 mt-3 rounded-full overflow-hidden">
+<div class="bg-secondary-fixed w-[78%] h-full"></div>
+</div>
+</div>
+</div>
+<div class="pt-4 border-t border-on-primary-fixed-variant">
+<p class="font-body-sm text-body-sm text-on-primary-container italic">Calculated automatically based on meter run and pipe length specification.</p>
+</div>
+<div class="w-full aspect-video rounded-lg overflow-hidden relative group">
+<img class="w-full h-full object-cover grayscale opacity-50" data-alt="A macro architectural shot of industrial concrete sewer pipes stacked neatly on a professional construction site. The lighting is bright daylight, highlighting the rough textures of the concrete and the precision of the manufacturing. The color palette is dominated by muted greys and professional blues, reflecting a clean and modern civil engineering aesthetic. The composition emphasizes structural integrity and industrial scale." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6PfnuFVn4rg9R4Jfc-0bpCOeSW7vBnM7ZA0146NBh4ZEkX91LATsVDzEj59MzjQWWMZwBBzf2G3-E-4QOJoTMLGojN-FqaSC8PHZ9PpGWObody3CVv7n3AfZJ8tmCfpxhEeTe92CK1J01gPthiqmJIUjXYxpLtc04Dpw_GoSCz4G1N8HCWNRfx4p3YRWWm4RJCEXYq9wpzj_kx0GFjIFDoSD-SYr5YJQKMeSdg4J5JOsPTmhSj3kLWv0CqlE2M-prODmrWqYCTU8"/>
+<div class="absolute inset-0 bg-secondary/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-4xl" data-icon="straighten">straighten</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-4 py-2 pb-safe bg-surface dark:bg-primary-container shadow-[0px_-2px_4px_rgba(4,22,50,0.05)] rounded-t-xl md:hidden">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-fixed-variant px-6 py-2 transition-transform duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-status-label text-status-label">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary rounded-full px-6 py-2 transition-transform duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-status-label text-status-label">Projects</span>
+</a>
+</nav>
+<!-- Desktop Sidebar/Nav (Hidden on Mobile) -->
+<div class="hidden md:flex fixed left-0 top-0 h-full w-20 flex-col items-center py-8 bg-surface border-r-2 border-surface-container-highest z-40">
+<div class="flex flex-col gap-8">
+<div class="w-12 h-12 bg-secondary-container rounded-xl flex items-center justify-center text-on-secondary-container shadow-md cursor-pointer hover:bg-secondary transition-colors group">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform" data-icon="settings">settings</span>
+</div>
+<div class="w-12 h-12 rounded-xl flex items-center justify-center text-on-surface-variant cursor-pointer hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+</div>
+<div class="w-12 h-12 rounded-xl flex items-center justify-center text-on-surface-variant cursor-pointer hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+</div>
+</div>
+</div>
+</body></html>

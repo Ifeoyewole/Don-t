@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+                  "on-tertiary-container": "#ac8e5b",
+                  "inverse-surface": "#213145",
+                  "on-surface-variant": "#44474d",
+                  "on-tertiary": "#ffffff",
+                  "inverse-primary": "#b7c7eb",
+                  "secondary": "#0051d5",
+                  "on-secondary-container": "#fefcff",
+                  "primary-fixed-dim": "#b7c7eb",
+                  "surface-container-highest": "#d3e4fe",
+                  "secondary-fixed-dim": "#b4c5ff",
+                  "tertiary-fixed-dim": "#e3c28a",
+                  "surface-dim": "#cbdbf5",
+                  "secondary-fixed": "#dbe1ff",
+                  "on-primary-container": "#8393b5",
+                  "surface-container-lowest": "#ffffff",
+                  "surface-container": "#e5eeff",
+                  "surface-variant": "#d3e4fe",
+                  "on-error-container": "#93000a",
+                  "primary": "#041632",
+                  "secondary-container": "#316bf3",
+                  "error": "#ba1a1a",
+                  "tertiary": "#211500",
+                  "on-secondary-fixed": "#00174b",
+                  "surface-container-low": "#eff4ff",
+                  "outline": "#75777e",
+                  "error-container": "#ffdad6",
+                  "on-surface": "#0b1c30",
+                  "inverse-on-surface": "#eaf1ff",
+                  "surface": "#f8f9ff",
+                  "primary-fixed": "#d7e2ff",
+                  "on-primary": "#ffffff",
+                  "background": "#f8f9ff",
+                  "surface-bright": "#f8f9ff",
+                  "tertiary-fixed": "#ffdea7",
+                  "on-tertiary-fixed-variant": "#594317",
+                  "surface-tint": "#4f5e7e",
+                  "on-primary-fixed": "#091b37",
+                  "on-secondary": "#ffffff",
+                  "outline-variant": "#c5c6ce",
+                  "tertiary-container": "#3b2800",
+                  "on-tertiary-fixed": "#271900",
+                  "primary-container": "#1b2b48",
+                  "on-background": "#0b1c30",
+                  "on-primary-fixed-variant": "#374765",
+                  "surface-container-high": "#dce9ff",
+                  "on-error": "#ffffff",
+                  "on-secondary-fixed-variant": "#003ea8"
+          },
+          "borderRadius": {
+                  "DEFAULT": "0.25rem",
+                  "lg": "0.5rem",
+                  "xl": "0.75rem",
+                  "full": "9999px"
+          },
+          "spacing": {
+                  "touch-target-min": "48px",
+                  "margin-edge": "20px",
+                  "base": "8px",
+                  "gutter-desktop": "24px",
+                  "gutter-mobile": "16px"
+          },
+          "fontFamily": {
+                  "headline-md": ["Inter"],
+                  "status-label": ["Inter"],
+                  "body-sm": ["Inter"],
+                  "headline-lg": ["Inter"],
+                  "body-lg": ["Inter"],
+                  "headline-lg-mobile": ["Inter"],
+                  "label-caps": ["Inter"]
+          },
+          "fontSize": {
+                  "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                  "status-label": ["13px", {"lineHeight": "18px", "fontWeight": "600"}],
+                  "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                  "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                  "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                  "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                  "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface min-h-screen pb-24">
+<!-- Top Navigation Shell -->
+<header class="w-full top-0 sticky bg-surface border-b-2 border-surface-container-highest flex justify-between items-center px-margin-edge h-touch-target-min z-50 transition-colors duration-200">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 0;">precision_manufacturing</span>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">JointInspect</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 px-3 py-1 bg-surface-container-low rounded-full">
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant" style="font-variation-settings: 'FILL' 1;">cloud_done</span>
+<span class="font-status-label text-status-label text-on-surface-variant">Synced</span>
+</div>
+<span class="material-symbols-outlined text-secondary cursor-pointer hover:bg-surface-container-low transition-colors duration-200 p-2 rounded-full">search</span>
+</div>
+</header>
+<main class="max-w-5xl mx-auto px-4 py-8">
+<div class="mb-8">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary">Inspection Results</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-2">Section: Elevated Runway B-12 • Bridge Expansion Joints</p>
+</div>
+<!-- Layout Grid: Bento Style on Desktop -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Summary Dashboard Card -->
+<div class="md:col-span-4 flex flex-col gap-4">
+<div class="bg-white p-6 rounded-xl shadow-[0px_2px_4px_rgba(4,22,50,0.05)] border border-surface-container-highest">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-4">Inspection Summary</h3>
+<div class="space-y-4">
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm">Total Joints</span>
+<span class="font-headline-md text-headline-md">12</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-2">
+<div class="bg-secondary h-2 rounded-full" style="width: 75%"></div>
+</div>
+<div class="grid grid-cols-3 gap-2 pt-2">
+<div class="text-center">
+<div class="text-[12px] font-bold text-green-700 bg-green-100 py-1 rounded">8 PASS</div>
+</div>
+<div class="text-center">
+<div class="text-[12px] font-bold text-amber-700 bg-amber-100 py-1 rounded">2 REV</div>
+</div>
+<div class="text-center">
+<div class="text-[12px] font-bold text-red-700 bg-red-100 py-1 rounded">2 FAIL</div>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-primary-container text-on-primary-fixed p-6 rounded-xl shadow-lg border border-primary-container">
+<div class="flex items-start gap-3 mb-4">
+<span class="material-symbols-outlined text-secondary-fixed">info</span>
+<p class="font-body-sm text-body-sm leading-relaxed text-surface-bright">High-contrast mode active for field visibility. All measurements calibrated to ±0.1mm accuracy.</p>
+</div>
+<button class="w-full h-touch-target-min bg-secondary text-white font-bold rounded-lg hover:brightness-110 transition-all">
+            SUBMIT FINAL REPORT
+          </button>
+</div>
+</div>
+<!-- Main Inspection Feed -->
+<div class="md:col-span-8 flex flex-col gap-6">
+<!-- Inspection Card 1: PASS -->
+<article class="bg-white rounded-xl shadow-[0px_2px_4px_rgba(4,22,50,0.05)] border-l-4 border-l-green-500 overflow-hidden flex flex-col md:flex-row">
+<div class="md:w-48 h-48 md:h-auto relative overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="A macro close-up photograph of a metallic bridge expansion joint in a civil engineering site. The lighting is bright natural daylight, highlighting the texture of the weathered steel and the clean gap between structural sections. The image is sharp and industrial, emphasizing structural integrity and professional inspection standards within a modern infrastructure context." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCFpAcaNhlQEmY7z6cMU_PSM27ZWQsNy8GbL3jRxFz2nqpf1MlCkbzK5Pa9_vNvFta_IiUtHabD-9skOwNFjLwpi86i_Ur3SKxBa9h5eqBizQbH29NVm_8UjWDbdvwMCObwPqtiUe1POli-KNk49e3nkVQzwJw9tlFVDck2PUzSe2cMB4W_b6mLn4-u66wEF4CeK-0hQBhpCVRow_lpu0dL5t0fqAcuQqVS2N3Q__xfw9eJJBWlQFcgAH1DMjUD3dNc-leRC0Im2w"/>
+<div class="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">IMG_3421</div>
+</div>
+<div class="p-6 flex-grow flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-headline-md text-headline-md text-primary">Joint 1-2</h4>
+<span class="px-3 py-1 bg-green-100 text-green-800 font-bold text-[12px] rounded uppercase">PASS</span>
+</div>
+<div class="flex items-baseline gap-2 mb-4">
+<span class="font-headline-md text-headline-md text-secondary">4.5 mm</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant italic">Within tolerance</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface mb-4">Alignment verified against blueprint rev. C. Surface sealing intact.</p>
+</div>
+<div class="flex flex-col gap-4">
+<textarea class="w-full rounded-lg border-2 border-surface-container-highest focus:border-secondary focus:ring-0 font-body-sm p-3 h-20 resize-none" placeholder="Add user notes...">Standard measurement recorded.</textarea>
+<div class="flex items-center justify-between">
+<label class="flex items-center gap-3 cursor-pointer">
+<input class="w-5 h-5 rounded border-outline text-secondary focus:ring-secondary" type="checkbox"/>
+<span class="font-status-label text-status-label">Manual Override</span>
+</label>
+<button class="text-secondary font-bold text-[13px] hover:underline flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">history</span> History
+                </button>
+</div>
+</div>
+</div>
+</article>
+<!-- Inspection Card 2: FAIL -->
+<article class="bg-white rounded-xl shadow-[0px_2px_4px_rgba(4,22,50,0.05)] border-l-4 border-l-error overflow-hidden flex flex-col md:flex-row">
+<div class="md:w-48 h-48 md:h-auto relative overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="A detailed inspection photo of a cracked concrete joint in a construction zone. The high-contrast sunlight reveals deep shadows within the wide gap, showing clear signs of structural stress. The visual style is documentary and forensic, focusing on technical failure points. The overall tone is urgent and serious, reflecting the critical nature of civil engineering safety assessments." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAPWmCJfqg3Lwlvp8inQCCU4diC_iIz5G4CYViCzBPTsCPFu9X9z4jed6IqxiWz2RG3WMyR92dbqAxlSpxsTabZk0IzzbnUvDG2-tJUpij3dh-VexJtMNccsrXaYDYGGJOqUHHTvYtH_qOPjRVh3KzjrBPbJKEVp0pMYykbKxdEHOTTOcxSguvMK3vKHmbjUQ1WU295B_j1jhm_g0XyvYI-5k0Wkn52CEX2p6S1d7e8K2MAUQmwxDPE55QUguGZU8g9YHL8kU1puLo"/>
+<div class="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">IMG_3422</div>
+</div>
+<div class="p-6 flex-grow flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-headline-md text-headline-md text-primary">Joint 1-3</h4>
+<span class="px-3 py-1 bg-red-100 text-red-800 font-bold text-[12px] rounded uppercase">FAIL</span>
+</div>
+<div class="flex items-baseline gap-2 mb-4">
+<span class="font-headline-md text-headline-md text-error">9.2 mm</span>
+<span class="font-body-sm text-body-sm text-error font-bold">Gap exceeding limit</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface mb-4">Visible spalling on north edge. Requires immediate resealing and expansion check.</p>
+</div>
+<div class="flex flex-col gap-4">
+<textarea class="w-full rounded-lg border-2 border-error/30 focus:border-error focus:ring-0 font-body-sm p-3 h-20 resize-none" placeholder="Add user notes...">Alert sent to structural lead for secondary review.</textarea>
+<div class="flex items-center justify-between">
+<label class="flex items-center gap-3 cursor-pointer">
+<input class="w-5 h-5 rounded border-outline text-secondary focus:ring-secondary" type="checkbox"/>
+<span class="font-status-label text-status-label">Manual Override</span>
+</label>
+<div class="flex gap-2">
+<button class="px-4 h-touch-target-min border-2 border-secondary text-secondary font-bold rounded-lg text-sm">RE-MEASURE</button>
+</div>
+</div>
+</div>
+</div>
+</article>
+<!-- Inspection Card 3: REVIEW -->
+<article class="bg-white rounded-xl shadow-[0px_2px_4px_rgba(4,22,50,0.05)] border-l-4 border-l-amber-500 overflow-hidden flex flex-col md:flex-row">
+<div class="md:w-48 h-48 md:h-auto relative overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="A photograph of a structural expansion joint partially covered in debris and construction dust. The lighting is slightly shadowed, suggesting an overcast day on a bridge site. The image focuses on the ambiguity of the measurement due to site conditions, requiring professional review. The palette is dominated by grey concrete and dusty textures with soft daylight." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA8Jgiv6AwweTFt7DPVxpYHdv99XdocvL1T13Bn4JvrHabjXKv1EBOlEFTTAtspLmzwiTCiHuOlpZsUNhr7-k-jECQVv5_adAQ9dLeTtZ54yR_WJkzv1hLM690zEX3uNn1p5bgCEc9HpXGU2Rq5fg6-xkWv4AxKIeNVgltYUThDD8B5KAGK01hUp7cnwxuuyRzp820R91D2iRgDI7oac8qtM3QOO2DF4PQNdQYDfqfSEkELMqLFM1ALqpIOlbe75lSKQw_os4nOgjA"/>
+<div class="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">IMG_3423</div>
+</div>
+<div class="p-6 flex-grow flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-headline-md text-headline-md text-primary">Joint 1-4</h4>
+<span class="px-3 py-1 bg-amber-100 text-amber-800 font-bold text-[12px] rounded uppercase">REVIEW</span>
+</div>
+<div class="flex items-baseline gap-2 mb-4">
+<span class="font-headline-md text-headline-md text-amber-700">6.1 mm</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant italic">Near upper limit</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface mb-4">Obstruction present during initial measurement. Needs cleaning and verification.</p>
+</div>
+<div class="flex flex-col gap-4">
+<textarea class="w-full rounded-lg border-2 border-surface-container-highest focus:border-secondary focus:ring-0 font-body-sm p-3 h-20 resize-none" placeholder="User notes..."></textarea>
+<div class="flex items-center justify-between">
+<label class="flex items-center gap-3 cursor-pointer">
+<input class="w-5 h-5 rounded border-outline text-secondary focus:ring-secondary" type="checkbox"/>
+<span class="font-status-label text-status-label">Manual Override</span>
+</label>
+<button class="bg-surface-container-high px-4 py-2 rounded-lg font-bold text-on-surface text-[13px]">FLAG FOR LATER</button>
+</div>
+</div>
+</div>
+</article>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Shell -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-4 py-2 pb-safe bg-surface shadow-[0px_-2px_4px_rgba(4,22,50,0.05)] rounded-t-xl transition-transform duration-150">
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-6 py-2 hover:bg-surface-container-high transition-colors active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">dashboard</span>
+<span class="font-status-label text-status-label">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-6 py-2 active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+<span class="font-status-label text-status-label">Projects</span>
+</a>
+</nav>
+<!-- Persistent Floating Action Button (FAB) for primary task context -->
+<button class="fixed bottom-24 right-6 w-14 h-14 bg-secondary text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-40">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 0;">photo_camera</span>
+</button>
+</body></html>

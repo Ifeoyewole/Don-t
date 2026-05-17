@@ -1,57 +1,182 @@
-# ROADMAP — General Implementation Roadmap
+# ROADMAP — MVP Delivery Roadmap
 
-This file outlines high-level milestones, dependencies, timelines, and CI alignment for the MVP.
+This document is the high-level implementation roadmap for the Pipe Joint Inspection App MVP.
+
+It has been aligned to the current repo state as of May 17, 2026:
+
+- the repo is currently a single Vite + React + TypeScript app rooted at `src/`
+- the `stitch_pipecheck_field_inspection_app/` folder contains the screen handoff for the frontend build
+- the MVP is offline-first, so the primary "endpoints" are local service contracts, not cloud APIs
+
+## Repo Audit Snapshot
+
+### Current State
+
+- `src/App.tsx` is still the default Vite starter and has not yet been replaced with product screens
+- `src/main.tsx` is the standard React mount entry
+- `package.json` currently includes only core React/Vite dependencies
+- no `src/pages/`, `src/components/`, `src/services/`, `src/db/`, `src/workers/`, or `src/types/` folders exist yet
+- Stitch handoff screens exist for:
+  - dashboard
+  - create project
+  - manhole setup
+  - photo upload
+  - inspection results
+  - inspection summary
+
+### Main Documentation Drift Found
+
+- earlier docs described a future monorepo layout with `frontend/`, `backend/`, and `shared/`
+- the actual repo is not yet scaffolded that way
+- some wording implied cloud sync and multi-device sync, which conflicts with the offline-first MVP brief
+- "backend" work in this MVP is mostly client-side logic, storage, CV processing, and export
+
+## Delivery Principles
+
+- Keep the MVP fully offline-capable
+- Treat IndexedDB plus Web Workers as the primary runtime platform
+- Build the UI from the Stitch handoff, but align labels and logic to the pipe inspection domain
+- Keep service contracts stable so frontend and logic work can proceed in parallel
+- Prefer local async services that could later be mirrored by optional HTTP endpoints if needed
+
+## Screen Flow From Stitch
+
+1. Dashboard
+   - overview metrics
+   - recent projects
+   - CTA to create a project
+
+2. Create Project
+   - create project record
+   - capture project name, site name, created date
+
+3. Manhole Setup
+   - create or edit a manhole within a project
+   - capture meter run, type, pipe spec
+   - show estimator output
+
+4. Photo Upload
+   - upload or capture multiple images
+   - assign sequential labels
+   - queue files for processing
+
+5. Inspection Results
+   - review calculated measurements
+   - add notes
+   - trigger re-measure
+   - apply manual override
+
+6. Inspection Summary
+   - aggregate PASS/REVIEW/FAIL totals
+   - flag critical joints
+   - export evidence pack
+
+## MVP Service Contract Map
+
+These are the frontend-facing local service endpoints for the MVP.
+
+### Project Services
+
+- `projectService.listProjects(): Promise<ProjectSummary[]>`
+- `projectService.getProject(projectId: string): Promise<ProjectDetail | null>`
+- `projectService.createProject(input: CreateProjectInput): Promise<Project>`
+- `projectService.updateProject(projectId: string, input: UpdateProjectInput): Promise<Project>`
+- `projectService.deleteProject(projectId: string): Promise<void>`
+
+### Manhole Services
+
+- `manholeService.listByProject(projectId: string): Promise<Manhole[]>`
+- `manholeService.getManhole(manholeId: string): Promise<Manhole | null>`
+- `manholeService.createManhole(input: CreateManholeInput): Promise<Manhole>`
+- `manholeService.updateManhole(manholeId: string, input: UpdateManholeInput): Promise<Manhole>`
+- `manholeService.deleteManhole(manholeId: string): Promise<void>`
+
+### Estimator Services
+
+- `estimatorService.calculate(input: EstimateMaterialsInput): Promise<EstimateMaterialsResult>`
+
+### Inspection Queue Services
+
+- `inspectionQueue.addFiles(input: QueueFilesInput): Promise<QueuedInspectionImage[]>`
+- `inspectionQueue.removeFile(imageId: string): Promise<void>`
+- `inspectionQueue.clearManholeQueue(manholeId: string): Promise<void>`
+- `inspectionQueue.listQueue(manholeId: string): Promise<QueuedInspectionImage[]>`
+
+### Processing Services
+
+- `processor.processQueuedImages(manholeId: string, options?: ProcessOptions): Promise<ProcessBatchResult>`
+- `processor.remeasureInspection(inspectionId: string): Promise<InspectionResult>`
+- `processor.subscribe(listener: (event: ProcessingEvent) => void): Unsubscribe`
+
+### Inspection Result Services
+
+- `inspectionService.listByManhole(manholeId: string): Promise<InspectionResult[]>`
+- `inspectionService.getInspection(inspectionId: string): Promise<InspectionResult | null>`
+- `inspectionService.saveInspectorNote(inspectionId: string, note: string): Promise<InspectionResult>`
+- `inspectionService.applyOverride(input: ApplyOverrideInput): Promise<InspectionResult>`
+- `inspectionService.clearOverride(inspectionId: string): Promise<InspectionResult>`
+
+### Summary Services
+
+- `summaryService.getProjectSummary(projectId: string): Promise<ProjectInspectionSummary>`
+- `summaryService.getManholeSummary(manholeId: string): Promise<ManholeInspectionSummary>`
+
+### Export Services
+
+- `exportService.exportJson(projectId: string): Promise<Blob>`
+- `exportService.exportPdf(projectId: string): Promise<Blob>`
+- `exportService.exportEvidenceZip(projectId: string): Promise<Blob>`
 
 ## Milestones
 
-1. Scaffolding & Types (0.5–1 day)
-  - Create `frontend/`, `shared/`, `backend/` folders
-  - Add root `package.json` workspace and shared types
+1. Foundation and Folder Scaffolding
+   - replace starter app structure with product folders under `src/`
+   - add routing, shared types, and service interfaces
 
-2. Frontend UI Skeleton (1–2 days)
-  - Pages and routes
-  - Placeholder components and mock fixtures
+2. Dashboard and Project Flow
+   - implement dashboard and create-project screen from Stitch
+   - wire project CRUD to IndexedDB
 
-3. Storage & Estimator (1–2 days)
-  - IndexedDB schema (Dexie)
-  - Materials estimator and unit tests
+3. Manhole Setup and Estimator
+   - implement manhole form
+   - implement materials estimation logic and tests
 
-4. CV Worker Prototype (3–5 days)
-  - Implement worker pipeline with OpenCV.js
-  - Create deterministic test images
+4. Upload Queue and Sequential Mapping
+   - implement image intake, local storage, queue state, and joint labels
 
-5. Export & PWA (2–3 days)
-  - Implement PDF/JSON/ZIP export
-  - Add PWA manifest and service worker caching
+5. CV Processing Worker
+   - implement Web Worker processing contract
+   - persist measurements and classifications
 
-6. Tests & CI (1–2 days)
-  - Unit tests for shared logic
-  - CI job for lint/build/test
+6. Results, Overrides, and Notes
+   - implement inspection results screen
+   - add manual override and re-measure flows
 
-7. Polish & UX (1–2 days)
-  - Accessibility, error flows, manual override UX
+7. Summary and Export
+   - implement inspection summary
+   - generate JSON, PDF, and ZIP evidence bundle
 
-8. Handoff & Documentation (0.5 day)
-  - Final README, developer guides, and demonstration video
+8. PWA, Reliability, and QA
+   - add PWA support
+   - validate offline use, mobile layout, and export completeness
 
-## Dependencies & Risks
+## Dependencies and Risks
 
-- OpenCV.js in browser may require tuning and may not be perfectly deterministic across platforms; include a small backend test harness for reliable CI tests.
-- Large images on mobile may need client-side resizing and memory management.
-- Offline storage limits vary by browser; provide export options frequently.
+- OpenCV.js may need tuning for accuracy and mobile performance
+- browser storage limits may require image compression and export guidance
+- large image batches may require concurrency caps and memory cleanup
+- some Stitch copy references cloud sync; this must be rewritten to local offline-first wording in the product UI
 
-## CI Alignment
+## Definition of Done
 
-- Ensure root `package.json` or workflow updates so `.github/workflows/ci.yml` can run `npm ci`, `npm run build`, and `npm run test` successfully.
-- Add slow integration job for CV tests that can be skipped in quick runs.
+- core flow works: project -> manhole -> upload -> process -> review -> export
+- service contracts are documented and implemented consistently
+- no screen depends on a remote server for MVP success
+- exported evidence includes required project, manhole, image, measurement, and disclaimer data
+- the UI matches the intended Stitch flow rather than the default Vite starter
 
-## Release Checklist
+## Immediate Next Actions
 
-- All unit tests passing
-- Core flows (upload → process → export) verified on mobile viewport
-- Manual override and persistence validated
-- Exports contain required metadata and images
-
-## Next Actions
-
-- Choose one scaffold target: `scaffold workspace`, `prototype cvWorker`, or `add test images and CLI harness`.
+1. Scaffold real app folders under `src/`
+2. Replace `src/App.tsx` starter content with route shell and screen placeholders
+3. Implement the service contracts documented here before deep UI wiring

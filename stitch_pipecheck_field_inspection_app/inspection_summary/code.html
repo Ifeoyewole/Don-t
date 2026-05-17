@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Inspection Summary - JointInspect</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+                  "on-tertiary-container": "#ac8e5b",
+                  "inverse-surface": "#213145",
+                  "on-surface-variant": "#44474d",
+                  "on-tertiary": "#ffffff",
+                  "inverse-primary": "#b7c7eb",
+                  "secondary": "#0051d5",
+                  "on-secondary-container": "#fefcff",
+                  "primary-fixed-dim": "#b7c7eb",
+                  "surface-container-highest": "#d3e4fe",
+                  "secondary-fixed-dim": "#b4c5ff",
+                  "tertiary-fixed-dim": "#e3c28a",
+                  "surface-dim": "#cbdbf5",
+                  "secondary-fixed": "#dbe1ff",
+                  "on-primary-container": "#8393b5",
+                  "surface-container-lowest": "#ffffff",
+                  "surface-container": "#e5eeff",
+                  "surface-variant": "#d3e4fe",
+                  "on-error-container": "#93000a",
+                  "primary": "#041632",
+                  "secondary-container": "#316bf3",
+                  "error": "#ba1a1a",
+                  "tertiary": "#211500",
+                  "on-secondary-fixed": "#00174b",
+                  "surface-container-low": "#eff4ff",
+                  "outline": "#75777e",
+                  "error-container": "#ffdad6",
+                  "on-surface": "#0b1c30",
+                  "inverse-on-surface": "#eaf1ff",
+                  "surface": "#f8f9ff",
+                  "primary-fixed": "#d7e2ff",
+                  "on-primary": "#ffffff",
+                  "background": "#f8f9ff",
+                  "surface-bright": "#f8f9ff",
+                  "tertiary-fixed": "#ffdea7",
+                  "on-tertiary-fixed-variant": "#594317",
+                  "surface-tint": "#4f5e7e",
+                  "on-primary-fixed": "#091b37",
+                  "on-secondary": "#ffffff",
+                  "outline-variant": "#c5c6ce",
+                  "tertiary-container": "#3b2800",
+                  "on-tertiary-fixed": "#271900",
+                  "primary-container": "#1b2b48",
+                  "on-background": "#0b1c30",
+                  "on-primary-fixed-variant": "#374765",
+                  "surface-container-high": "#dce9ff",
+                  "on-error": "#ffffff",
+                  "on-secondary-fixed-variant": "#003ea8"
+          },
+          "borderRadius": {
+                  "DEFAULT": "0.25rem",
+                  "lg": "0.5rem",
+                  "xl": "0.75rem",
+                  "full": "9999px"
+          },
+          "spacing": {
+                  "touch-target-min": "48px",
+                  "margin-edge": "20px",
+                  "base": "8px",
+                  "gutter-desktop": "24px",
+                  "gutter-mobile": "16px"
+          },
+          "fontFamily": {
+                  "headline-md": ["Inter"],
+                  "status-label": ["Inter"],
+                  "body-sm": ["Inter"],
+                  "headline-lg": ["Inter"],
+                  "body-lg": ["Inter"],
+                  "headline-lg-mobile": ["Inter"],
+                  "label-caps": ["Inter"]
+          },
+          "fontSize": {
+                  "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                  "status-label": ["13px", {"lineHeight": "18px", "fontWeight": "600"}],
+                  "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                  "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                  "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                  "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                  "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    body { font-family: 'Inter', sans-serif; }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="w-full top-0 sticky bg-surface border-b-2 border-surface-container-highest flex justify-between items-center px-margin-edge h-touch-target-min z-50 transition-colors duration-200">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">precision_manufacturing</span>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">JointInspect</h1>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant">cloud_done</span>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="flex-grow p-gutter-mobile md:p-gutter-desktop max-w-7xl mx-auto w-full">
+<!-- Hero Header Section -->
+<div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<span class="font-label-caps text-label-caps text-secondary mb-2 block">PROJECT ID: #JI-2023-089</span>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary">Inspection Summary</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">North Basin Structural Joint Assessment - Phase 1</p>
+</div>
+<button class="h-[48px] px-6 bg-secondary text-on-secondary rounded-lg font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-sm">
+<span class="material-symbols-outlined">download</span>
+        Export Evidence Pack
+      </button>
+</div>
+<!-- Stats Bento Grid -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_2px_4px_rgba(4,22,50,0.05)] border border-surface-container-highest">
+<p class="font-label-caps text-label-caps text-on-surface-variant mb-1">TOTAL JOINTS</p>
+<p class="font-headline-lg text-headline-lg text-primary">12</p>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_2px_4px_rgba(4,22,50,0.05)] border-l-4 border-l-[#22C55E]">
+<p class="font-label-caps text-label-caps text-on-surface-variant mb-1">PASS</p>
+<p class="font-headline-lg text-headline-lg text-[#15803D]">10</p>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_2px_4px_rgba(4,22,50,0.05)] border-l-4 border-l-[#F59E0B]">
+<p class="font-label-caps text-label-caps text-on-surface-variant mb-1">REVIEW</p>
+<p class="font-headline-lg text-headline-lg text-[#B45309]">1</p>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_2px_4px_rgba(4,22,50,0.05)] border-l-4 border-l-[#EF4444]">
+<p class="font-label-caps text-label-caps text-on-surface-variant mb-1">FAIL</p>
+<p class="font-headline-lg text-headline-lg text-[#B91C1C]">1</p>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter-desktop">
+<!-- Flagged Joints List (Primary Focus) -->
+<div class="lg:col-span-2 space-y-4">
+<div class="flex items-center justify-between mb-2">
+<h3 class="font-headline-md text-headline-md text-primary">Flagged Items (2)</h3>
+<span class="font-label-caps text-label-caps text-error bg-error-container px-3 py-1 rounded-full">Attention Required</span>
+</div>
+<!-- Flagged Item 1: FAIL -->
+<div class="bg-white rounded-xl border-2 border-error-container overflow-hidden shadow-sm">
+<div class="flex flex-col md:flex-row">
+<div class="w-full md:w-48 h-48 md:h-auto overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional close-up photograph of a metallic structural joint with visible corrosion and a hairline fracture. The lighting is bright and industrial, highlighting the texture of the weathered metal and the failing weld points. The shot is captured from a field inspection perspective, emphasizing a clean, documentary aesthetic that aligns with a high-stakes engineering report." src="https://lh3.googleusercontent.com/aida-public/AB6AXuChJGY7y9scQzjIrnUIhhEE3EZINGp7E3r0BbMxLrzp-ZD5bHb9owt-WTxqU6BECWFvRGyJ-ofSxJc5BNWOirtIaGpwiKnH5tdomnnpRt3M5L2XF8l8ikySVALGpXnYmDrm8bdYFKwA1yKEcEZBX3ey1ylvlHasdOIPelBA5n6N_SmA6xR5VqHsfvEt6vHolkAfFB5LsYRIT8tOg12c3-5JY4CPryPUEbcuE36D4-na7z53K_EQ1BM9rbtpYrm10GUQ--Lsed1-b0U"/>
+</div>
+<div class="flex-grow p-6">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h4 class="font-headline-md text-headline-md text-primary">Joint ID: J-204</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Location: Section A-4, Outer Perimeter</p>
+</div>
+<span class="px-3 py-1 bg-error-container text-on-error-container rounded font-status-label text-status-label border border-error">FAIL</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface mb-4">Critical failure identified: Transverse fatigue crack detected along the primary weld seam. Structural integrity compromised. Immediate remediation recommended.</p>
+<div class="flex gap-4">
+<button class="font-status-label text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">history</span> View Logs
+                </button>
+<button class="font-status-label text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">edit</span> Add Note
+                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Flagged Item 2: REVIEW -->
+<div class="bg-white rounded-xl border border-surface-container-highest overflow-hidden shadow-sm">
+<div class="flex flex-col md:flex-row">
+<div class="w-full md:w-48 h-48 md:h-auto overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A detailed macro photograph of a concrete expansion joint showing minor surface spalling and sealant degradation. The lighting is natural and even, showcasing the granular texture of the concrete and the gray industrial sealant. The composition is focused and technical, suitable for a professional civil engineering inspection report with a clean, modern aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0OEeaftp-Lt02K9TX33Tt2At2fvPg0vcVZ-708371S4cZ-keR9efmClUAva_zx_skFEBEqgsH7vc2cgCd4hN_yTDTWlgAI7W8JbCuWfcOqg6mnAe7pLB4HH73EPN6mRK2qkMSLw14LdMEYD5tRsAEirA6sgXVWXAXP93d_-A8ewFwV5G3iRKw6sS6IDvdJSVknMg3FSW7B_Sm_5qiQ48uhWDnlcBivhNWLZqWxuQ6PKLYO1vX39YhyDjYZxo1QB2lU9gWVFIREWQ"/>
+</div>
+<div class="flex-grow p-6">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h4 class="font-headline-md text-headline-md text-primary">Joint ID: J-109</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Location: Gate Entrance, Main Deck</p>
+</div>
+<span class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed-variant rounded font-status-label text-status-label border border-on-tertiary-container">REVIEW</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface mb-4">Sealant degradation noted. Depth of joint is within tolerance but surface pitting suggests early-stage weathering. Re-inspect during next quarterly cycle.</p>
+<div class="flex gap-4">
+<button class="font-status-label text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">history</span> View Logs
+                </button>
+<button class="font-status-label text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">edit</span> Add Note
+                </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Detail Sidebar -->
+<div class="space-y-6">
+<!-- Site Map -->
+<div class="bg-surface-container-low rounded-xl p-4 border border-surface-container-highest">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant mb-3 uppercase tracking-widest">Inspection Location</h3>
+<div class="aspect-video rounded-lg overflow-hidden relative">
+<img class="w-full h-full object-cover" data-alt="A clean, high-contrast aerial map view of an industrial construction site or port facility. The map features minimalist design with clear blue water, white concrete surfaces, and precise navy line-work for infrastructure. Subtle red and yellow markers indicate the locations of joints that require attention, maintaining a professional and technical visualization style." data-location="Chicago" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3DWPTAH6PvP-DIBEPWr5t8tGE3lRB_xCMnoyXS62359w26qbQFDXYPouO_l9GXStDlG1NpxwFInh9ZMRD-aM_uXbtHwgJRsWp-erKP92kGfAo_R0uWTXpzrMSNBwstbkQQA2m730irTdit6rNk8V-sQCvBFAY09icQLY6anD6IGezoluifxXkCTZjeC3yNoLYSyYs-OO2J4zxyI34oo9YEeoKSzti9fNk7CYIzc-2dltu2FyC83IC1pFLMV1H8xufYbVYT2_kq9M"/>
+<div class="absolute inset-0 bg-primary/10 pointer-events-none"></div>
+</div>
+<p class="mt-3 font-body-sm text-body-sm text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-secondary">location_on</span>
+            North Basin Docks, Terminal 4
+          </p>
+</div>
+<!-- Certification Box -->
+<div class="bg-primary text-on-primary rounded-xl p-6 shadow-lg">
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-secondary-fixed">verified</span>
+<h4 class="font-headline-md text-headline-md">Inspector Log</h4>
+</div>
+<div class="space-y-4">
+<div class="border-b border-primary-container pb-2">
+<p class="font-label-caps text-label-caps opacity-70">LEAD INSPECTOR</p>
+<p class="font-body-lg text-body-lg">Sarah Jenkins, Senior P.E.</p>
+</div>
+<div class="border-b border-primary-container pb-2">
+<p class="font-label-caps text-label-caps opacity-70">TIMESTAMP</p>
+<p class="font-body-lg text-body-lg">Oct 24, 2023 · 14:42 GMT</p>
+</div>
+<div class="pt-2">
+<p class="font-label-caps text-label-caps opacity-70 mb-2">DIGITAL SIGNATURE</p>
+<div class="h-16 bg-white/10 rounded flex items-center justify-center italic text-white/50 border border-white/20">
+                [Jenkins_Signature_Encrypted]
+              </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Disclaimer -->
+<footer class="mt-12 py-8 border-t border-surface-container-highest text-center">
+<p class="font-body-sm text-body-sm text-on-surface-variant max-w-2xl mx-auto italic">
+        Guidance only — not a formal adoption assessment. This summary is generated from field data and requires secondary verification by a structural engineer before final adoption of civil assets.
+      </p>
+</footer>
+</main>
+<!-- Navigation Shell (BottomNavBar for Mobile) -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 flex justify-around items-center px-4 py-2 pb-safe bg-surface shadow-[0px_-2px_4px_rgba(4,22,50,0.05)] rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-6 py-2 transition-transform duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-status-label text-status-label mt-1">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-6 py-2 transition-transform duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+<span class="font-status-label text-status-label mt-1">Projects</span>
+</a>
+</nav>
+<!-- Floating Action Button Suppression - Focused Summary View -->
+</body></html>
