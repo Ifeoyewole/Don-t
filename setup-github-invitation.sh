@@ -5,8 +5,8 @@
 # Usage: bash setup-github-invitation.sh
 
 # Configuration
-REPO_OWNER="yourorg"  # Change to your GitHub organization
-REPO_NAME="pipe-joint-inspect"
+REPO_OWNER="Ifeoyewole"  # Change to your GitHub organization
+REPO_NAME="Don-t"
 MAVIS_USERNAME="MAVIS-creator"
 MAVIS_EMAIL="akintunde.dolapo1@gmail.com"
 MAIN_OWNER="Ifeoyewole"
