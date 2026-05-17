@@ -1,11 +1,11 @@
 # GitHub Code Owners - Pipe Joint Inspection App
 
-# Backend - Mavis
-src/services/                   @MAVIS-creator
-src/db/                         @MAVIS-creator
-src/workers/                    @MAVIS-creator
-src/lib/                        @MAVIS-creator
-src/utils/                      @MAVIS-creator
+# Backend - Mavis (requires Ifeoyewole review)
+src/services/                   @MAVIS-creator @Ifeoyewole
+src/db/                         @MAVIS-creator @Ifeoyewole
+src/workers/                    @MAVIS-creator @Ifeoyewole
+src/lib/                        @MAVIS-creator @Ifeoyewole
+src/utils/                      @MAVIS-creator @Ifeoyewole
 
 # Frontend - Vikky
 src/pages/                      @vikky
@@ -14,25 +14,25 @@ src/layouts/                    @vikky
 src/styles/                     @vikky
 src/assets/                     @vikky
 
-# Shared areas - Both developers
-src/hooks/                      @MAVIS-creator @vikky
-src/types/                      @MAVIS-creator @vikky
-src/App.tsx                     @MAVIS-creator @vikky
-src/main.tsx                    @MAVIS-creator @vikky
+# Shared areas - All developers
+src/hooks/                      @MAVIS-creator @vikky @Ifeoyewole
+src/types/                      @MAVIS-creator @vikky @Ifeoyewole
+src/App.tsx                     @MAVIS-creator @vikky @Ifeoyewole
+src/main.tsx                    @MAVIS-creator @vikky @Ifeoyewole
 
-# Project configuration - Both developers
-package.json                    @MAVIS-creator @vikky
-tsconfig.json                   @MAVIS-creator @vikky
-vite.config.ts                  @MAVIS-creator @vikky
-.github/workflows/              @MAVIS-creator @vikky
-.github/CODEOWNERS              @MAVIS-creator @vikky
+# Project configuration - Main owner reviews all
+package.json                    @Ifeoyewole
+tsconfig.json                   @Ifeoyewole
+vite.config.ts                  @Ifeoyewole
+.github/workflows/              @Ifeoyewole
+.github/CODEOWNERS              @Ifeoyewole
 
 # Version control and guidelines
-VERSION_CONTROL.md              @MAVIS-creator @vikky
-COMMIT_GUIDELINES.md            @MAVIS-creator @vikky
-BRANCH_PROTECTION_RULES.md      @MAVIS-creator @vikky
-PULL_REQUEST_TEMPLATE.md        @MAVIS-creator @vikky
+VERSION_CONTROL.md              @Ifeoyewole
+COMMIT_GUIDELINES.md            @Ifeoyewole
+BRANCH_PROTECTION_RULES.md      @Ifeoyewole
+PULL_REQUEST_TEMPLATE.md        @Ifeoyewole
 
-# Documentation
-README.md                       @MAVIS-creator @vikky
-docs/                           @MAVIS-creator @vikky
+# Documentation - Main owner reviews
+README.md                       @Ifeoyewole
+docs/                           @Ifeoyewole
