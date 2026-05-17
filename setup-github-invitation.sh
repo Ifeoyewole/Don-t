@@ -10,7 +10,7 @@ REPO_NAME="pipe-joint-inspect"
 MAVIS_USERNAME="MAVIS-creator"
 MAVIS_EMAIL="akintunde.dolapo1@gmail.com"
 MAIN_OWNER="Ifeoyewole"
-VIKKY_USERNAME="vikky"  # Change if different
+IFEOYEWOLE_USERNAME="Ifeoyewole"  # Frontend developer
 
 # Colors
 RED='\033[0;31m'
@@ -62,12 +62,12 @@ fi
 
 echo ""
 
-# Step 3: Add Vikky if needed
-echo -e "${YELLOW}👤 Checking Vikky's access...${NC}"
-if gh repo invite "$REPO_OWNER/$REPO_NAME" "$VIKKY_USERNAME" --permission maintain 2>/dev/null; then
-    echo -e "${GREEN}✅ Invitation sent to $VIKKY_USERNAME${NC}"
+# Step 3: Verify both developers have access
+echo -e "${YELLOW}👤 Verifying $IFEOYEWOLE_USERNAME frontend access...${NC}"
+if gh repo invite "$REPO_OWNER/$REPO_NAME" "$IFEOYEWOLE_USERNAME" --permission maintain 2>/dev/null; then
+    echo -e "${GREEN}✅ Invitation sent to $IFEOYEWOLE_USERNAME${NC}"
 else
-    echo -e "${GREEN}✅ $VIKKY_USERNAME already has access${NC}"
+    echo -e "${GREEN}✅ $IFEOYEWOLE_USERNAME already has access${NC}"
 fi
 
 echo ""
@@ -136,7 +136,7 @@ echo -e "${CYAN}📊 Configuration Summary:${NC}"
 echo "   Repository: $REPO_OWNER/$REPO_NAME"
 echo "   Main Owner: $MAIN_OWNER"
 echo "   Backend Dev: $MAVIS_USERNAME ($MAVIS_EMAIL)"
-echo "   Frontend Dev: $VIKKY_USERNAME"
+echo "   Frontend Dev: $IFEOYEWOLE_USERNAME"
 echo ""
 
 echo -e "${CYAN}🔐 Branch Protection:${NC}"
@@ -148,8 +148,8 @@ echo ""
 
 echo -e "${CYAN}👥 Code Ownership:${NC}"
 echo "   Backend (src/services/, src/db/, etc.) → $MAVIS_USERNAME + $MAIN_OWNER review"
-echo "   Frontend (src/pages/, src/components/, etc.) → $VIKKY_USERNAME"
-echo "   Shared files (src/hooks/, src/types/, etc.) → Both developers + $MAIN_OWNER"
+echo "   Frontend (src/pages/, src/components/, etc.) → $IFEOYEWOLE_USERNAME"
+echo "   Shared files (src/hooks/, src/types/, etc.) → Both developers"
 echo "   Project config → $MAIN_OWNER review required"
 echo ""
 

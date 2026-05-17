@@ -76,10 +76,10 @@ Before running the script, update these values in the script file:
 ```powershell
 $REPO_OWNER = "yourorg"           # Change to your GitHub organization/username
 $REPO_NAME = "pipe-joint-inspect"  # Your repository name
-$MAVIS_USERNAME = "MAVIS-creator"  # Mavis's GitHub username
+$MAVIS_USERNAME = "MAVIS-creator"  # Mavis's GitHub username (Backend)
 $MAVIS_EMAIL = "akintunde.dolapo1@gmail.com"  # Mavis's email
-$MAIN_OWNER = "Ifeoyewole"         # Main owner's GitHub username
-$VIKKY_USERNAME = "vikky"          # Vikky's GitHub username (if different)
+$MAIN_OWNER = "Ifeoyewole"         # Main owner's GitHub username (Frontend)
+$IFEOYEWOLE_USERNAME = "Ifeoyewole"  # Frontend developer
 ```
 
 ### Bash Script (`setup-github-invitation.sh`)
@@ -87,10 +87,10 @@ $VIKKY_USERNAME = "vikky"          # Vikky's GitHub username (if different)
 ```bash
 REPO_OWNER="yourorg"           # Change to your GitHub organization/username
 REPO_NAME="pipe-joint-inspect"  # Your repository name
-MAVIS_USERNAME="MAVIS-creator"  # Mavis's GitHub username
+MAVIS_USERNAME="MAVIS-creator"  # Mavis's GitHub username (Backend)
 MAVIS_EMAIL="akintunde.dolapo1@gmail.com"  # Mavis's email
-MAIN_OWNER="Ifeoyewole"         # Main owner's GitHub username
-VIKKY_USERNAME="vikky"          # Vikky's GitHub username (if different)
+MAIN_OWNER="Ifeoyewole"         # Main owner's GitHub username (Frontend)
+IFEOYEWOLE_USERNAME="Ifeoyewole"  # Frontend developer
 ```
 
 ## Usage
@@ -183,8 +183,8 @@ Shows the complete setup including:
    Role: Maintainer (can review PRs and merge)
 ✅ Invitation sent to MAVIS-creator
 
-👤 Checking Vikky's access...
-✅ vikky already has access
+👤 Verifying Ifeoyewole frontend access...
+✅ Ifeoyewole already has access
 
 🔒 Configuring branch protections...
    Setting up 'main' branch protection...
@@ -200,7 +200,7 @@ Shows the complete setup including:
    Repository: yourorg/pipe-joint-inspect
    Main Owner: Ifeoyewole
    Backend Dev: MAVIS-creator (akintunde.dolapo1@gmail.com)
-   Frontend Dev: vikky
+   Frontend Dev: Ifeoyewole
 
 🔐 Branch Protection:
    ✅ main: Requires PR review + status checks + code owner review
@@ -210,8 +210,8 @@ Shows the complete setup including:
 
 👥 Code Ownership:
    Backend → MAVIS-creator + Ifeoyewole review
-   Frontend → vikky
-   Shared files → Both developers + Ifeoyewole
+   Frontend → Ifeoyewole
+   Shared files → Both developers
    Project config → Ifeoyewole review required
 
 📝 Next Steps:

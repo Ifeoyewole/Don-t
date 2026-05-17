@@ -9,7 +9,7 @@ $REPO_NAME = "pipe-joint-inspect"
 $MAVIS_USERNAME = "MAVIS-creator"
 $MAVIS_EMAIL = "akintunde.dolapo1@gmail.com"
 $MAIN_OWNER = "Ifeoyewole"
-$VIKKY_USERNAME = "vikky"  # Change if different
+$IFEOYEWOLE_USERNAME = "Ifeoyewole"  # Frontend developer
 
 Write-Host "🚀 Pipe Joint Inspection App - GitHub Setup Script" -ForegroundColor Cyan
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
@@ -61,17 +61,17 @@ try {
 
 Write-Host ""
 
-# Step 3: Add Vikky if needed
-Write-Host "👤 Checking Vikky's access..." -ForegroundColor Yellow
+# Step 3: Verify both developers have access
+Write-Host "👤 Verifying $IFEOYEWOLE_USERNAME frontend access..." -ForegroundColor Yellow
 try {
-    gh repo invite "$REPO_OWNER/$REPO_NAME" "$VIKKY_USERNAME" --permission maintain 2>$null
+    gh repo invite "$REPO_OWNER/$REPO_NAME" "$IFEOYEWOLE_USERNAME" --permission maintain 2>$null
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✅ Invitation sent to $VIKKY_USERNAME" -ForegroundColor Green
+        Write-Host "✅ Invitation sent to $IFEOYEWOLE_USERNAME" -ForegroundColor Green
     } else {
-        Write-Host "✅ $VIKKY_USERNAME already has access" -ForegroundColor Green
+        Write-Host "✅ $IFEOYEWOLE_USERNAME already has access" -ForegroundColor Green
     }
 } catch {
-    Write-Host "✅ $VIKKY_USERNAME already has access" -ForegroundColor Green
+    Write-Host "✅ $IFEOYEWOLE_USERNAME already has access" -ForegroundColor Green
 }
 
 Write-Host ""
@@ -139,7 +139,7 @@ Write-Host "📊 Configuration Summary:" -ForegroundColor Cyan
 Write-Host "   Repository: $REPO_OWNER/$REPO_NAME" -ForegroundColor White
 Write-Host "   Main Owner: $MAIN_OWNER" -ForegroundColor White
 Write-Host "   Backend Dev: $MAVIS_USERNAME ($MAVIS_EMAIL)" -ForegroundColor White
-Write-Host "   Frontend Dev: $VIKKY_USERNAME" -ForegroundColor White
+Write-Host "   Frontend Dev: $IFEOYEWOLE_USERNAME" -ForegroundColor White
 Write-Host ""
 
 Write-Host "🔐 Branch Protection:" -ForegroundColor Cyan
@@ -151,8 +151,8 @@ Write-Host ""
 
 Write-Host "👥 Code Ownership:" -ForegroundColor Cyan
 Write-Host "   Backend (src/services/, src/db/, etc.) → $MAVIS_USERNAME + $MAIN_OWNER review" -ForegroundColor White
-Write-Host "   Frontend (src/pages/, src/components/, etc.) → $VIKKY_USERNAME" -ForegroundColor White
-Write-Host "   Shared files (src/hooks/, src/types/, etc.) → Both developers + $MAIN_OWNER" -ForegroundColor White
+Write-Host "   Frontend (src/pages/, src/components/, etc.) → $IFEOYEWOLE_USERNAME" -ForegroundColor White
+Write-Host "   Shared files (src/hooks/, src/types/, etc.) → Both developers" -ForegroundColor White
 Write-Host "   Project config → $MAIN_OWNER review required" -ForegroundColor White
 Write-Host ""
 

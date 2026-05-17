@@ -7,18 +7,18 @@ src/workers/                    @MAVIS-creator @Ifeoyewole
 src/lib/                        @MAVIS-creator @Ifeoyewole
 src/utils/                      @MAVIS-creator @Ifeoyewole
 
-# Frontend - Vikky
-src/pages/                      @vikky
-src/components/                 @vikky
-src/layouts/                    @vikky
-src/styles/                     @vikky
-src/assets/                     @vikky
+# Frontend - Ifeoyewole (main owner)
+src/pages/                      @Ifeoyewole
+src/components/                 @Ifeoyewole
+src/layouts/                    @Ifeoyewole
+src/styles/                     @Ifeoyewole
+src/assets/                     @Ifeoyewole
 
-# Shared areas - All developers
-src/hooks/                      @MAVIS-creator @vikky @Ifeoyewole
-src/types/                      @MAVIS-creator @vikky @Ifeoyewole
-src/App.tsx                     @MAVIS-creator @vikky @Ifeoyewole
-src/main.tsx                    @MAVIS-creator @vikky @Ifeoyewole
+# Shared areas - Both developers
+src/hooks/                      @MAVIS-creator @Ifeoyewole
+src/types/                      @MAVIS-creator @Ifeoyewole
+src/App.tsx                     @MAVIS-creator @Ifeoyewole
+src/main.tsx                    @MAVIS-creator @Ifeoyewole
 
 # Project configuration - Main owner reviews all
 package.json                    @Ifeoyewole
