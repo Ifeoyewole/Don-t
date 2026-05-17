@@ -5,7 +5,7 @@
 This repository contains the complete version control and development workflow setup for the **Pipe Joint Inspection App**, a collaborative project between two specialized developers:
 
 - **Mavis** — Backend/System Engineering
-- **Vikky** — Frontend/UI Engineering
+- **Vikky / Ifeoyewole** — Frontend/UI Engineering and repository owner
 
 ## 📁 Repository Structure
 
@@ -56,7 +56,7 @@ main (Production)
 | `main` | Production-ready code | Both (PR required) | 🔒 Protected |
 | `develop` | Integration & testing | Both | 🟡 Protected |
 | `mavis-backend` | Backend features | Mavis | ⚪ Unprotected |
-| `vikky-frontend` | Frontend features | Vikky | ⚪ Unprotected |
+| `vikky-frontend` | Frontend features | Vikky / Ifeoyewole | ⚪ Unprotected |
 
 ## 📚 Documentation Files
 
@@ -118,7 +118,7 @@ git remote add origin https://github.com/yourorg/pipe-joint-inspect.git
 git push -u origin main develop mavis-backend vikky-frontend
 
 # Configure GitHub
-# - Set default branch to 'develop'
+# - Keep 'main' as the default branch unless you intentionally want release work centered on 'develop'
 # - Enable branch protection for 'main' and 'develop'
 # - Configure CODEOWNERS at .github/CODEOWNERS
 ```
@@ -156,26 +156,25 @@ git checkout mavis-backend        # Mavis
 git checkout vikky-frontend       # Vikky
 git merge develop
 
-# Start developing features
-git checkout -b feature/new-feature
-
 # Commit with proper format
 git commit -m "feat: add new feature"
 
-# Push and create PR to develop
-git push origin feature/new-feature
+# Push your branch and create PR to develop
+git push origin mavis-backend
+# OR
+git push origin vikky-frontend
 ```
 
 ## 🔄 Workflow Overview
 
 ### Feature Development
 
-1. **Create feature branch** from personal branch
-2. **Develop & commit** with proper commit messages
-3. **Push to personal branch** (e.g., `mavis-backend`)
+1. **Develop on your assigned branch**
+2. **Commit** with proper commit messages
+3. **Push your branch** (`mavis-backend` or `vikky-frontend`)
 4. **Create PR** to `develop`
-5. **Code review & testing**
-6. **Merge to develop** when approved
+5. **Ifeoyewole reviews** the PR and requests fixes if needed
+6. **Merge to develop** after approval
 
 ### Integration Testing
 
@@ -188,8 +187,8 @@ git push origin feature/new-feature
 
 1. **All tests pass** on `develop`
 2. **Create PR** from `develop` to `main`
-3. **Final review** from both developers
-4. **Merge to main** (production)
+3. **Final review** by `Ifeoyewole`
+4. **Merge to main** by `Ifeoyewole`
 5. **Tag release** with version number
 
 ## 📋 Key Rules
@@ -233,7 +232,7 @@ git push origin feature/new-feature
 - PDF & JSON export
 - PWA & offline support
 
-### Vikky (Frontend/UI Engineering)
+### Vikky / Ifeoyewole (Frontend/UI Engineering)
 
 **Owned Folders:**
 - `src/pages/` — Page components
@@ -269,22 +268,20 @@ git checkout develop && git pull origin develop
 # 2. Update backend branch
 git checkout mavis-backend && git merge develop
 
-# 3. Create feature branch
-git checkout -b feature/gap-classification
-
-# 4. Develop and commit
+# 3. Develop and commit
 git add src/services/gapClassification.ts
 git commit -m "feat(backend): implement tolerance classification engine"
 
-# 5. Push to personal branch
+# 4. Push to personal branch
 git push origin mavis-backend
 
-# 6. Create PR in GitHub
+# 5. Create PR in GitHub
 # - From: mavis-backend
 # - To: develop
+# - Reviewed by: Ifeoyewole
 # - Include testing confirmation
 
-# 7. After review and approval, merge
+# 6. Address review comments if needed, then Ifeoyewole merges
 ```
 
 ### Vikky Creating Upload Interface
@@ -296,22 +293,20 @@ git checkout develop && git pull origin develop
 # 2. Update frontend branch
 git checkout vikky-frontend && git merge develop
 
-# 3. Create feature branch
-git checkout -b feature/upload-interface
-
-# 4. Develop and commit
+# 3. Develop and commit
 git add src/components/UploadForm.tsx
 git commit -m "feat(frontend): build upload inspection interface"
 
-# 5. Push to personal branch
+# 4. Push to personal branch
 git push origin vikky-frontend
 
-# 6. Create PR in GitHub
+# 5. Create PR in GitHub
 # - From: vikky-frontend
 # - To: develop
+# - Reviewed by: Ifeoyewole
 # - Include screenshots
 
-# 7. After review and approval, merge
+# 6. Address review comments if needed, then Ifeoyewole merges
 ```
 
 ## 🐛 Troubleshooting
@@ -392,7 +387,7 @@ All checks must pass before merging to `develop` or `main`.
 - ✅ Require PR creation
 - ✅ Require status checks to pass
 - ✅ Require branch to be up to date
-- ⚪ Optional: Code owner review
+- ✅ Review by `Ifeoyewole` before merge
 
 ## 📞 Support & Questions
 

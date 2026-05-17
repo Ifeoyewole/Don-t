@@ -83,20 +83,21 @@ This document outlines the recommended GitHub branch protection rules for the Pi
 
 **Rationale:** Prevents race conditions when multiple PRs are merged simultaneously.
 
-## Develop Branch Protection (Recommended)
+## Develop Branch Protection
 
 ### Branch: `develop`
 
-**Status:** 🟡 Protected - Moderate enforcement
+**Status:** 🟡 Protected - Integration branch with owner review
 
 ### Protection Rules
 
 #### 1. Require Pull Request Reviews
 
-- **Require approvals:** No (optional)
-- **Number of required approvals:** 0
+- **Require approvals:** Yes
+- **Number of required approvals:** 1
+- **Reviewer expectation:** `Ifeoyewole` reviews before merge
 
-**Rationale:** Faster integration for testing, but PRs still required to maintain history.
+**Rationale:** Keeps `develop` stable while matching the actual repo-owner review workflow.
 
 #### 2. Require PR for All Changes
 
@@ -118,17 +119,19 @@ This document outlines the recommended GitHub branch protection rules for the Pi
 
 #### 5. Require Status Checks
 
-- **Enabled:** Yes (optional)
+- **Enabled:** Yes
 - **Required status checks:**
-  - `test` (if test suite is fast)
+  - CI build
+  - lint
+  - tests when present
 
-**Rationale:** Catches obvious errors before merge.
+**Rationale:** Catches obvious errors before merge and protects the shared integration branch.
 
 ## Personal Development Branch Rules (Optional)
 
 ### Branches: `mavis-backend`, `vikky-frontend`
 
-**Status:** ⚪ Unprotected - Developer discretion
+**Status:** ⚪ Unprotected - working branches for assigned developers
 
 ### Optional Protection Rules
 
@@ -151,30 +154,30 @@ Create `.github/CODEOWNERS` file:
 
 ```
 # Backend
-src/services/                   @mavis
-src/db/                         @mavis
-src/workers/                    @mavis
-src/lib/                        @mavis
-src/utils/                      @mavis
+src/services/                   @MAVIS-creator @Ifeoyewole
+src/db/                         @MAVIS-creator @Ifeoyewole
+src/workers/                    @MAVIS-creator @Ifeoyewole
+src/lib/                        @MAVIS-creator @Ifeoyewole
+src/utils/                      @MAVIS-creator @Ifeoyewole
 
-# Frontend
-src/pages/                      @vikky
-src/components/                 @vikky
-src/layouts/                    @vikky
-src/styles/                     @vikky
-src/assets/                     @vikky
+# Frontend (Vikky is Ifeoyewole)
+src/pages/                      @Ifeoyewole
+src/components/                 @Ifeoyewole
+src/layouts/                    @Ifeoyewole
+src/styles/                     @Ifeoyewole
+src/assets/                     @Ifeoyewole
 
-# Shared areas (require both)
-src/hooks/                      @mavis @vikky
-src/types/                      @mavis @vikky
-src/App.tsx                     @mavis @vikky
-src/main.tsx                    @mavis @vikky
+# Shared areas
+src/hooks/                      @MAVIS-creator @Ifeoyewole
+src/types/                      @MAVIS-creator @Ifeoyewole
+src/App.tsx                     @MAVIS-creator @Ifeoyewole
+src/main.tsx                    @MAVIS-creator @Ifeoyewole
 
-# Project config (both must review)
-package.json                    @mavis @vikky
-tsconfig.json                   @mavis @vikky
-vite.config.ts                  @mavis @vikky
-.github/workflows/              @mavis @vikky
+# Project config
+package.json                    @Ifeoyewole
+tsconfig.json                   @Ifeoyewole
+vite.config.ts                  @Ifeoyewole
+.github/workflows/              @Ifeoyewole
 ```
 
 ## GitHub Status Checks
@@ -215,9 +218,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20.19.0'
       - run: npm ci
       - run: npm run build
       - run: npm run test
@@ -228,7 +231,7 @@ jobs:
 
 ### General
 
-- **Default branch:** `develop`
+- **Default branch:** `main`
 - **Branch and pull request auto-deletion:** Enabled
 - **Allow auto-merge:** Enabled
 - **Require status checks to pass:** Yes
@@ -238,8 +241,8 @@ jobs:
 | Role | Branches | Permissions |
 |------|----------|-------------|
 | Admin | All | Full control |
-| Mavis | mavis-backend, develop, main | Push, PR, merge |
-| Vikky | vikky-frontend, develop, main | Push, PR, merge |
+| Mavis | mavis-backend | Push, PR |
+| Ifeoyewole | main, develop, vikky-frontend | Push, PR, merge |
 
 ## Setup Instructions
 

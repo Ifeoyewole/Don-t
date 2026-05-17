@@ -5,7 +5,7 @@
 The project will use a structured Git-based version control workflow to support collaborative development between two developers:
 
 - **Mavis** (Backend/System Engineering)
-- **Vikky** (Frontend/UI Engineering)
+- **Vikky / Ifeoyewole** (Frontend/UI Engineering and repository owner)
 
 The workflow is designed to:
 
@@ -117,7 +117,7 @@ This branch is used to:
 
 **Branch Name:** `vikky-frontend`
 
-**Assigned Developer:** Vikky
+**Assigned Developer:** Vikky (`Ifeoyewole` on GitHub)
 
 **Responsibilities**
 
@@ -162,6 +162,14 @@ The following files are considered shared integration files:
 - Avoid simultaneous modifications
 - Pull latest develop branch before changes
 
+## Review and Merge Authority
+
+- **Mavis** works on backend changes and pushes to `mavis-backend`
+- **Vikky / Ifeoyewole** works on frontend changes and owns the repository
+- Pull requests should be opened into `develop`
+- `Ifeoyewole` reviews incoming changes, requests fixes where needed, and approves merges into `develop`
+- After integration is stable on `develop`, `Ifeoyewole` promotes `develop` into `main`
+
 ## Development Workflow
 
 ### Daily Workflow
@@ -197,37 +205,37 @@ This ensures both branches remain synchronized with the latest integrated codeba
 
 ```bash
 git checkout mavis-backend
-```
 
-Develop feature: Gap classification engine
-
-Commit changes:
-
-```bash
+# develop feature work on backend-owned files
 git add .
-git commit -m "feat: implement tolerance classification engine"
+git commit -m "feat(backend): implement tolerance classification engine"
 git push origin mavis-backend
 ```
 
-Create Pull Request: `mavis-backend → develop`
+Create Pull Request: `mavis-backend -> develop`
+
+Review flow:
+- `Ifeoyewole` reviews the PR
+- Mavis fixes requested issues on `mavis-backend`
+- `Ifeoyewole` merges the PR into `develop`
 
 #### Frontend Workflow Example
 
 ```bash
 git checkout vikky-frontend
-```
 
-Develop feature: Inspection upload interface
-
-Commit changes:
-
-```bash
+# develop feature work on frontend-owned files
 git add .
-git commit -m "feat: build upload inspection page"
+git commit -m "feat(frontend): build upload inspection page"
 git push origin vikky-frontend
 ```
 
-Create Pull Request: `vikky-frontend → develop`
+Create Pull Request: `vikky-frontend -> develop`
+
+Review flow:
+- `Ifeoyewole` reviews the PR as repo owner
+- fixes are pushed back to `vikky-frontend` if needed
+- `Ifeoyewole` merges approved work into `develop`
 
 ## Merge Strategy
 
@@ -245,7 +253,7 @@ When:
 - Testing passes
 - Integration issues are resolved
 
-The develop branch is merged into: `main`
+The `develop` branch is merged into `main` by `Ifeoyewole` after review, validation, and readiness confirmation.
 
 ## Commit Message Convention
 
@@ -291,12 +299,17 @@ To minimize merge conflicts:
 
 ### Branch Protection
 
-**Protect:** `main`
+**Protect:** `main` and `develop`
 
-**Rules:**
+**Rules for `main`:**
 - No direct pushes
 - Pull request required
 - Review required before merge
+
+**Rules for `develop`:**
+- Pull request required
+- Status checks required
+- `Ifeoyewole` should review before merge
 
 ### Pull Request Requirements
 
@@ -322,6 +335,6 @@ The workflow separates:
 - **Production** (`main`)
 - **Integration** (`develop`)
 - **Backend Development** (`mavis-backend`)
-- **Frontend Development** (`vikky-frontend`)
+- **Frontend Development** (`vikky-frontend`, owned by `Ifeoyewole`)
 
 Creating a clean and scalable collaborative engineering structure for the Pipe Joint Inspection App.

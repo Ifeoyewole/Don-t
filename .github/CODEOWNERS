@@ -7,14 +7,14 @@ src/workers/                    @MAVIS-creator @Ifeoyewole
 src/lib/                        @MAVIS-creator @Ifeoyewole
 src/utils/                      @MAVIS-creator @Ifeoyewole
 
-# Frontend - Ifeoyewole (main owner)
+# Frontend - Vikky is Ifeoyewole (repo owner)
 src/pages/                      @Ifeoyewole
 src/components/                 @Ifeoyewole
 src/layouts/                    @Ifeoyewole
 src/styles/                     @Ifeoyewole
 src/assets/                     @Ifeoyewole
 
-# Shared areas - Both developers
+# Shared areas - Mavis + Ifeoyewole coordinate here
 src/hooks/                      @MAVIS-creator @Ifeoyewole
 src/types/                      @MAVIS-creator @Ifeoyewole
 src/App.tsx                     @MAVIS-creator @Ifeoyewole

@@ -13,9 +13,9 @@
    git push -u origin vikky-frontend
    ```
 
-2. **Set default branch to `develop`:**
-   - Go to GitHub → Settings → Repositories → Default branch
-   - Change from `main` to `develop`
+2. **Default branch choice:**
+   - Keep `main` as the default branch unless you intentionally want the repository centered on staging work
+   - Use `develop` as the integration branch for pull requests and testing
 
 3. **Configure branch protection rules:**
    - Follow instructions in [BRANCH_PROTECTION_RULES.md](../BRANCH_PROTECTION_RULES.md)
@@ -42,8 +42,8 @@
 
    Expected output:
    ```
-   * develop
-     main
+     develop
+   * main
      mavis-backend
      remotes/origin/develop
      remotes/origin/main
@@ -90,9 +90,6 @@ git merge develop
 #### During Development
 
 ```bash
-# Create feature branch (optional, for complex features)
-git checkout -b feature/gap-classification-engine
-
 # Make changes to your owned folders:
 # - src/services/
 # - src/db/
@@ -106,8 +103,6 @@ git commit -m "feat(backend): implement tolerance classification engine"
 
 # Push to your branch
 git push origin mavis-backend
-# OR if using feature branch:
-git push origin feature/gap-classification-engine
 ```
 
 #### Creating a Pull Request
@@ -116,8 +111,9 @@ git push origin feature/gap-classification-engine
 2. Create PR: `mavis-backend` → `develop`
 3. Fill out [PR template](../PULL_REQUEST_TEMPLATE.md)
 4. Add testing confirmation
-5. Request review from Vikky for shared files
-6. Merge after approval
+5. Request review from Ifeoyewole for shared files
+6. If review changes are requested, push fixes to `mavis-backend`
+7. Ifeoyewole merges approved work into `develop`
 
 #### When Working on Shared Files
 
@@ -131,17 +127,13 @@ git push origin feature/gap-classification-engine
 git checkout develop
 git pull origin develop
 
-# 3. Create feature branch for shared work
-git checkout -b feature/shared-type-updates
-git merge develop
-
-# 4. Make minimal changes to shared file
-# 5. Commit and push immediately
+# 3. Make minimal changes to shared file
+# 4. Commit and push immediately
 git add src/types/
 git commit -m "feat(types): add inspection data types"
-git push origin feature/shared-type-updates
+git push origin mavis-backend
 
-# 6. Create PR and request review from Vikky
+# 5. Create PR to develop and request review from Ifeoyewole
 ```
 
 ### Vikky (Frontend Developer)
@@ -161,9 +153,6 @@ git merge develop
 #### During Development
 
 ```bash
-# Create feature branch (optional, for complex features)
-git checkout -b feature/inspection-upload-interface
-
 # Make changes to your owned folders:
 # - src/pages/
 # - src/components/
@@ -177,8 +166,6 @@ git commit -m "feat(frontend): build upload inspection interface"
 
 # Push to your branch
 git push origin vikky-frontend
-# OR if using feature branch:
-git push origin feature/inspection-upload-interface
 ```
 
 #### Creating a Pull Request
@@ -188,8 +175,8 @@ git push origin feature/inspection-upload-interface
 3. Fill out [PR template](../PULL_REQUEST_TEMPLATE.md)
 4. Add screenshots of UI changes
 5. Add testing confirmation
-6. Request review from Mavis for shared files
-7. Merge after approval
+6. For shared files, notify Mavis as well
+7. Ifeoyewole merges approved work into `develop`
 
 #### When Working on Shared Files
 
@@ -414,7 +401,7 @@ When feature set is complete and tested on develop:
 2. **Create PR:** `develop` → `main`
 3. **Add release notes in PR description**
 4. **Request review from both developers**
-5. **After approval, merge to main**
+5. **After approval, Ifeoyewole merges to main**
 6. **Tag the release:** `git tag -a v1.0.0 -m "Release v1.0.0"`
 7. **Push tag:** `git push origin v1.0.0`
 
