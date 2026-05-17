@@ -16,28 +16,39 @@ jobs:
         node-version: [18.x, 20.x]
 
     steps:
+      - name: Check for Node project
+        id: check-node
+        run: |
+          if [ -f package.json ]; then echo "has_node=true" >> $GITHUB_ENV; else echo "has_node=false" >> $GITHUB_ENV; fi
+
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: env.has_node == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
       - name: Install dependencies
+        if: env.has_node == 'true'
         run: npm ci
 
       - name: Build project
+        if: env.has_node == 'true'
         run: npm run build
 
       - name: Run linter
+        if: env.has_node == 'true'
         run: npm run lint
 
       - name: Run tests
+        if: env.has_node == 'true'
         run: npm run test
 
       - name: Upload coverage
+        if: env.has_node == 'true'
         uses: codecov/codecov-action@v3
         with:
           files: ./coverage/coverage-final.json
