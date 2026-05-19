@@ -5,7 +5,7 @@ import type {
   ProcessingEvent,
   ProcessOptions,
 } from '../types'
-import { classifyGap } from '../utils'
+import { measureWithCv } from '../lib'
 import { createId, createTimestamp } from '../utils/identity'
 
 const listeners = new Set<(event: ProcessingEvent) => void>()
@@ -22,16 +22,6 @@ function wait(ms: number): Promise<void> {
   })
 }
 
-function deriveGapMm(seed: string, orderIndex: number): number {
-  const hash = Array.from(seed).reduce((acc, char, index) => {
-    return acc + char.charCodeAt(0) * (index + 1)
-  }, 0)
-
-  const base = (hash % 260) / 10
-  const offset = (orderIndex % 3) * 0.4
-  return Number((base + offset).toFixed(1))
-}
-
 async function processImage(imageId: string): Promise<string | null> {
   const image = await db.inspectionImages.get(imageId)
   if (!image) {
@@ -43,6 +33,8 @@ async function processImage(imageId: string): Promise<string | null> {
     return null
   }
 
+  const blobRecord = await db.inspectionBlobs.get(image.blobKey)
+
   emit({ type: 'started', imageId })
 
   await db.inspectionImages.put({
@@ -52,11 +44,16 @@ async function processImage(imageId: string): Promise<string | null> {
 
   emit({ type: 'progress', imageId, progress: 25, message: 'Preparing image' })
   await wait(20)
-  emit({ type: 'progress', imageId, progress: 60, message: 'Measuring joint gap' })
+  emit({ type: 'progress', imageId, progress: 60, message: 'Running CV pipeline' })
   await wait(20)
 
-  const originalGapMm = deriveGapMm(image.fileName, image.orderIndex)
-  const classification = classifyGap(originalGapMm)
+  const measurement = await measureWithCv({
+    imageId: image.id,
+    fileName: image.fileName,
+    orderIndex: image.orderIndex,
+    blob: blobRecord?.blob,
+  })
+
   const resultId = createId()
   const result: InspectionResult = {
     id: resultId,
@@ -64,10 +61,10 @@ async function processImage(imageId: string): Promise<string | null> {
     projectId: image.projectId,
     manholeId: image.manholeId,
     jointLabel: image.jointLabel,
-    originalGapMm,
-    finalGapMm: originalGapMm,
-    status: classification.status,
-    confidence: 0.72,
+    originalGapMm: measurement.originalGapMm,
+    finalGapMm: measurement.originalGapMm,
+    status: measurement.status,
+    confidence: measurement.confidence,
     processedAt: createTimestamp(),
     overrideApplied: false,
   }
@@ -162,19 +159,26 @@ export const processor = {
       throw new Error(`Queued image not found for inspection: ${inspectionId}`)
     }
 
+    const blobRecord = await db.inspectionBlobs.get(image.blobKey)
+
     emit({ type: 'started', imageId: image.id, inspectionId })
-    emit({ type: 'progress', imageId: image.id, inspectionId, progress: 40, message: 'Re-measuring joint gap' })
+    emit({ type: 'progress', imageId: image.id, inspectionId, progress: 40, message: 'Re-running CV measurement' })
     await wait(20)
 
-    const originalGapMm = Number((deriveGapMm(image.fileName, image.orderIndex) + 0.2).toFixed(1))
-    const classification = classifyGap(originalGapMm)
+    const measurement = await measureWithCv({
+      imageId: image.id,
+      fileName: image.fileName,
+      orderIndex: image.orderIndex,
+      blob: blobRecord?.blob,
+    })
+
     const updated: InspectionResult = {
       ...existing,
-      originalGapMm,
-      finalGapMm: existing.overrideApplied ? existing.finalGapMm : originalGapMm,
-      status: existing.overrideApplied ? existing.status : classification.status,
+      originalGapMm: measurement.originalGapMm,
+      finalGapMm: existing.overrideApplied ? existing.finalGapMm : measurement.originalGapMm,
+      status: existing.overrideApplied ? existing.status : measurement.status,
       processedAt: createTimestamp(),
-      confidence: 0.78,
+      confidence: measurement.confidence,
     }
 
     await db.inspectionResults.put(updated)

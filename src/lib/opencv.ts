@@ -1,32 +1,35 @@
-import cv from '@techstark/opencv-js'
+type OpenCvModule = typeof import('@techstark/opencv-js')
 
-let cvReadyPromise: Promise<typeof cv> | null = null
+let cvReadyPromise: Promise<OpenCvModule> | null = null
 
-function isOpenCvReady(instance: typeof cv): boolean {
-  return typeof instance?.Mat === 'function'
+function isOpenCvReady(instance: OpenCvModule): boolean {
+  return typeof (instance as { Mat?: unknown })?.Mat === 'function'
 }
 
-export function loadOpenCv(): Promise<typeof cv> {
+export async function loadOpenCv(): Promise<OpenCvModule> {
   if (cvReadyPromise) {
     return cvReadyPromise
   }
 
-  cvReadyPromise = new Promise((resolve, reject) => {
+  cvReadyPromise = new Promise(async (resolve, reject) => {
     try {
+      const importedModule = await import('@techstark/opencv-js')
+      const cv = (
+        'default' in importedModule ? importedModule.default : importedModule
+      ) as OpenCvModule
+
       if (isOpenCvReady(cv)) {
         resolve(cv)
         return
       }
 
-      const onRuntimeInitialized = () => {
-        resolve(cv)
-      }
-
-      const moduleLike = cv as typeof cv & {
+      const moduleLike = cv as OpenCvModule & {
         onRuntimeInitialized?: () => void
       }
 
-      moduleLike.onRuntimeInitialized = onRuntimeInitialized
+      moduleLike.onRuntimeInitialized = () => {
+        resolve(cv)
+      }
 
       setTimeout(() => {
         if (isOpenCvReady(cv)) {
