@@ -34,6 +34,7 @@ async function processImage(imageId: string): Promise<string | null> {
   }
 
   const blobRecord = await db.inspectionBlobs.get(image.blobKey)
+  const manhole = await db.manholes.get(image.manholeId)
 
   emit({ type: 'started', imageId })
 
@@ -52,6 +53,7 @@ async function processImage(imageId: string): Promise<string | null> {
     fileName: image.fileName,
     orderIndex: image.orderIndex,
     blob: blobRecord?.blob,
+    pipeDiameterMm: manhole?.pipeDiameterMm,
   })
 
   const resultId = createId()
@@ -160,6 +162,7 @@ export const processor = {
     }
 
     const blobRecord = await db.inspectionBlobs.get(image.blobKey)
+    const manhole = await db.manholes.get(image.manholeId)
 
     emit({ type: 'started', imageId: image.id, inspectionId })
     emit({ type: 'progress', imageId: image.id, inspectionId, progress: 40, message: 'Re-running CV measurement' })
@@ -170,6 +173,7 @@ export const processor = {
       fileName: image.fileName,
       orderIndex: image.orderIndex,
       blob: blobRecord?.blob,
+      pipeDiameterMm: manhole?.pipeDiameterMm,
     })
 
     const updated: InspectionResult = {
