@@ -1,3 +1,6 @@
 export * from './estimatorService'
+export * from './inspectionQueue'
+export * from './inspectionService'
 export * from './manholeService'
 export * from './projectService'
+export * from './summaryService'

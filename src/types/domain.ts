@@ -86,6 +86,15 @@ export interface InspectionImage {
   createdAt: string
 }
 
+export interface InspectionBlob {
+  id: string
+  imageId: string
+  fileName: string
+  mimeType: string
+  blob: Blob
+  createdAt: string
+}
+
 export interface QueuedInspectionImage extends InspectionImage {
   progress?: number
   errorMessage?: string

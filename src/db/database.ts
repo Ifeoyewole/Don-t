@@ -1,10 +1,17 @@
 import Dexie, { type Table } from 'dexie'
-import type { InspectionImage, InspectionResult, Manhole, Project } from '../types'
+import type {
+  InspectionBlob,
+  InspectionImage,
+  InspectionResult,
+  Manhole,
+  Project,
+} from '../types'
 
 export class PipeInspectionDatabase extends Dexie {
   projects!: Table<Project, string>
   manholes!: Table<Manhole, string>
   inspectionImages!: Table<InspectionImage, string>
+  inspectionBlobs!: Table<InspectionBlob, string>
   inspectionResults!: Table<InspectionResult, string>
 
   constructor() {
@@ -14,6 +21,14 @@ export class PipeInspectionDatabase extends Dexie {
       projects: 'id, name, createdAt, updatedAt',
       manholes: 'id, projectId, manholeId, type, pipeType, createdAt, updatedAt',
       inspectionImages: 'id, projectId, manholeId, orderIndex, jointLabel, queueStatus, createdAt',
+      inspectionResults: 'id, imageId, projectId, manholeId, jointLabel, status, processedAt, overrideApplied',
+    })
+
+    this.version(2).stores({
+      projects: 'id, name, createdAt, updatedAt',
+      manholes: 'id, projectId, manholeId, type, pipeType, createdAt, updatedAt',
+      inspectionImages: 'id, projectId, manholeId, orderIndex, jointLabel, queueStatus, createdAt',
+      inspectionBlobs: 'id, imageId, createdAt',
       inspectionResults: 'id, imageId, projectId, manholeId, jointLabel, status, processedAt, overrideApplied',
     })
   }
