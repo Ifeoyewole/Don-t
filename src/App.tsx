@@ -557,7 +557,7 @@ function App() {
                   originalGapMm: nextGap,
                   finalGapMm: finalGap,
                   status: classifyGap(finalGap),
-                  confidence: Number(Math.min(0.99, item.confidence + 0.03).toFixed(2)),
+                  confidence: Number(Math.min(0.99, (item.confidence ?? 0) + 0.03).toFixed(2)),
                 }
               }),
             }))

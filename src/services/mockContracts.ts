@@ -439,7 +439,7 @@ export const createMockServices = ({ getStore, updateStore, emit }: StoreContext
           originalGapMm: adjustedValue,
           finalGapMm: inspection.overrideApplied ? inspection.finalGapMm : adjustedValue,
           status: classifyGap(inspection.overrideApplied ? inspection.finalGapMm : adjustedValue),
-          confidence: Number(Math.min(0.99, inspection.confidence + 0.03).toFixed(2)),
+          confidence: Number(Math.min(0.99, (inspection.confidence ?? 0) + 0.03).toFixed(2)),
           processedAt: new Date().toISOString(),
         }
         return {

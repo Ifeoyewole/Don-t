@@ -23,7 +23,7 @@ export const DashboardPage = ({
 }: Props) => {
   const visibleProjects = showAllProjects ? projects : projects.slice(0, 3)
   const totalFailures = projects.reduce((sum, project) => sum + project.failCount + project.reviewCount, 0)
-  const totalInspections = projects.reduce((sum, project) => sum + project.completedInspections, 0)
+  const totalInspections = projects.reduce((sum, project) => sum + (project.completedInspections ?? 0), 0)
 
   return (
     <div className="page-grid">
@@ -97,8 +97,8 @@ export const DashboardPage = ({
               <span>Updated {formatRelativeTime(project.updatedAt)}</span>
             </div>
             <div className="project-meta">
-              <StatusBadge status={project.status} />
-              <span>{project.completedInspections}/{Math.max(project.totalJoints, 1)} measured</span>
+              <StatusBadge status={project.status ?? 'IN PROGRESS'} />
+              <span>{project.completedInspections ?? 0}/{Math.max(project.totalJoints ?? 0, 1)} measured</span>
             </div>
           </button>
         ))}

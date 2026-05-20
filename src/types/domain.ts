@@ -7,10 +7,11 @@ export type PipeType =
   | '450mm-concrete'
   | '600mm-concrete'
 
+export type InspectionCaptureSource = 'upload' | 'camera'
 export type QueueStatus = 'queued' | 'processing' | 'completed' | 'failed'
 export type InspectionStatus = 'PASS' | 'REVIEW' | 'FAIL'
 
-export type Project = {
+export interface Project {
   id: string
   name: string
   siteName?: string
@@ -18,7 +19,32 @@ export type Project = {
   updatedAt: string
 }
 
-export type Manhole = {
+export interface ProjectSummary extends Project {
+  manholeCount?: number
+  inspectionCount?: number
+  failCount: number
+  reviewCount: number
+  totalManholes?: number
+  totalJoints?: number
+  completedInspections?: number
+  status?: InspectionStatus | 'IN PROGRESS'
+}
+
+export interface ProjectDetail extends Project {
+  manholes: Manhole[]
+}
+
+export interface CreateProjectInput {
+  name: string
+  siteName?: string
+}
+
+export interface UpdateProjectInput {
+  name?: string
+  siteName?: string
+}
+
+export interface Manhole {
   id: string
   projectId: string
   manholeId: string
@@ -33,7 +59,22 @@ export type Manhole = {
   updatedAt: string
 }
 
-export type InspectionImage = {
+export interface CreateManholeInput {
+  projectId: string
+  manholeId: string
+  type: ManholeType
+  meterRun: number
+  pipeType: PipeType
+}
+
+export interface UpdateManholeInput {
+  manholeId?: string
+  type?: ManholeType
+  meterRun?: number
+  pipeType?: PipeType
+}
+
+export interface InspectionImage {
   id: string
   projectId: string
   manholeId: string
@@ -42,7 +83,7 @@ export type InspectionImage = {
   blobKey: string
   orderIndex: number
   jointLabel: string
-  captureSource: 'upload' | 'camera'
+  captureSource: InspectionCaptureSource
   queueStatus: QueueStatus
   createdAt: string
   previewUrl?: string
@@ -50,7 +91,24 @@ export type InspectionImage = {
   errorMessage?: string
 }
 
-export type InspectionResult = {
+export interface InspectionBlob {
+  id: string
+  imageId: string
+  fileName: string
+  mimeType: string
+  blob: Blob
+  createdAt: string
+}
+
+export type QueuedInspectionImage = InspectionImage
+
+export interface QueueFilesInput {
+  projectId: string
+  manholeId: string
+  files: File[]
+}
+
+export interface InspectionResult {
   id: string
   imageId: string
   projectId: string
@@ -59,8 +117,8 @@ export type InspectionResult = {
   originalGapMm: number
   finalGapMm: number
   status: InspectionStatus
-  confidence: number
-  notes: string
+  confidence?: number
+  notes?: string
   processedAt: string
   overrideApplied: boolean
   overrideReason?: string
@@ -68,93 +126,26 @@ export type InspectionResult = {
   overrideAt?: string
 }
 
-export type FlaggedJoint = {
-  inspectionId: string
-  jointLabel: string
-  status: InspectionStatus
-  finalGapMm: number
-  note: string
-}
-
-export type ProjectSummary = {
-  id: string
-  name: string
-  siteName?: string
-  createdAt: string
-  updatedAt: string
-  totalManholes: number
-  totalJoints: number
-  completedInspections: number
-  failCount: number
-  reviewCount: number
-  status: InspectionStatus | 'IN PROGRESS'
-}
-
-export type ProjectInspectionSummary = {
-  projectId: string
-  totalJoints: number
-  passCount: number
-  reviewCount: number
-  failCount: number
-  overriddenCount: number
-  flaggedJoints: FlaggedJoint[]
-}
-
-export type ManholeInspectionSummary = ProjectInspectionSummary & {
-  manholeId: string
-}
-
-export type EstimateMaterialsInput = {
-  meterRun: number
-  pipeType: PipeType
-}
-
-export type EstimateMaterialsResult = {
-  unitLengthM: number
-  pipesNeeded: number
-  jointsNeeded: number
-}
-
-export type CreateProjectInput = {
-  name: string
-  siteName?: string
-}
-
-export type UpdateProjectInput = Partial<CreateProjectInput>
-
-export type CreateManholeInput = {
-  projectId: string
-  manholeId: string
-  type: ManholeType
-  meterRun: number
-  pipeType: PipeType
-}
-
-export type UpdateManholeInput = Partial<CreateManholeInput>
-
-export type QueueFilesInput = {
-  projectId: string
-  manholeId: string
-  files: File[]
-}
-
-export type ApplyOverrideInput = {
+export interface ApplyOverrideInput {
   inspectionId: string
   overrideValueMm: number
   overrideReason: string
 }
 
-export type ProcessOptions = {
-  failAtImageId?: string
+export interface EstimateMaterialsInput {
+  meterRun: number
+  pipeType: PipeType
 }
 
-export type ProcessBatchResult = {
-  manholeId: string
-  processed: number
-  failed: number
+export interface EstimateMaterialsResult {
+  unitLengthM: number
+  pipesNeeded: number
+  jointsNeeded: number
+  pipeType?: PipeType
+  pipeDiameterMm?: number
 }
 
-export type ProcessingEvent = {
+export interface ProcessingEvent {
   type: 'queued' | 'started' | 'progress' | 'completed' | 'failed'
   imageId: string
   inspectionId?: string
@@ -162,7 +153,51 @@ export type ProcessingEvent = {
   message?: string
 }
 
-export type AppStore = {
+export interface ProcessOptions {
+  concurrency?: number
+  failAtImageId?: string
+}
+
+export interface ProcessBatchResult {
+  manholeId: string
+  failed: number
+  total?: number
+  completed?: number
+  inspectionIds?: string[]
+  processed?: number
+}
+
+export interface FlaggedInspectionSummary {
+  inspectionId: string
+  jointLabel: string
+  status: InspectionStatus
+  finalGapMm: number
+  overrideApplied?: boolean
+  note?: string
+}
+
+export interface ProjectInspectionSummary {
+  projectId: string
+  totalJoints: number
+  passCount: number
+  reviewCount: number
+  failCount: number
+  overriddenCount: number
+  flaggedJoints: FlaggedInspectionSummary[]
+}
+
+export interface ManholeInspectionSummary {
+  projectId?: string
+  manholeId: string
+  totalJoints: number
+  passCount: number
+  reviewCount: number
+  failCount: number
+  overriddenCount: number
+  flaggedJoints: FlaggedInspectionSummary[]
+}
+
+export interface AppStore {
   projects: Project[]
   manholes: Manhole[]
   queueImages: InspectionImage[]

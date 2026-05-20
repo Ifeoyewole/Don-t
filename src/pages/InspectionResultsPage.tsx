@@ -33,7 +33,7 @@ const ResultCard = ({
   onApplyOverride: (inspectionId: string, overrideValueMm: number, overrideReason: string) => Promise<void>
   onClearOverride: (inspectionId: string) => Promise<void>
 }) => {
-  const [note, setNote] = useState(item.notes)
+  const [note, setNote] = useState(item.notes ?? '')
   const [overrideDraft, setOverrideDraft] = useState<DraftOverride>({
     value: item.overrideValueMm?.toString() ?? item.finalGapMm.toString(),
     reason: item.overrideReason ?? '',
@@ -77,7 +77,7 @@ const ResultCard = ({
           </div>
           <div>
             <span>Confidence</span>
-            <strong>{Math.round(item.confidence * 100)}%</strong>
+            <strong>{Math.round((item.confidence ?? 0) * 100)}%</strong>
           </div>
         </div>
 
