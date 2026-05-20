@@ -4,6 +4,14 @@ Owner focus: screens, routing, interactions, async states, and Stitch-to-React i
 
 This document maps the Stitch handoff screens to real product pages and shows exactly which local service contracts each screen should call.
 
+## Scope Note
+
+This frontend pass is UI-only.
+
+- implement the screens, shell, navigation, touch targets, and async UI states
+- use local demo state for interaction flow where needed
+- do not treat backend/service wiring as part of frontend done for this phase
+
 ## Current Audit
 
 ### What Exists
