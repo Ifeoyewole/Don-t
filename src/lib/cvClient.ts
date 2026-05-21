@@ -1,4 +1,4 @@
-import { runCvMeasurement, type CvWorkerRequest, type CvWorkerResponse } from './cvMeasurement'
+import type { CvWorkerRequest, CvWorkerResponse } from './cvMeasurement'
 
 interface CvWorkerErrorResponse {
   kind: 'error'
@@ -20,8 +20,8 @@ function isBrowserWorkerAvailable(): boolean {
   return typeof Worker !== 'undefined' && typeof URL !== 'undefined'
 }
 
-const CV_WORKER_TIMEOUT_MS = 15000
-const CV_WORKER_WARMUP_TIMEOUT_MS = 30000
+const CV_WORKER_TIMEOUT_MS = 8000
+const CV_WORKER_WARMUP_TIMEOUT_MS = 5000
 let sharedWorker: Worker | null = null
 let workerReadyPromise: Promise<void> | null = null
 let workerReadyState: 'idle' | 'warming' | 'ready' = 'idle'
@@ -97,13 +97,7 @@ function ensureWorker(): Worker {
     pendingRequests.delete(payload.imageId)
 
     if (payload.kind === 'error') {
-      runCvMeasurement(
-        pending.request,
-        {
-          skipOpenCv: true,
-          fallbackNote: `Estimated result shown because the CV worker failed: ${payload.error}`,
-        },
-      ).then(pending.resolve).catch(pending.reject)
+      pending.reject(new Error(`OpenCV worker failed: ${payload.error}`))
       return
     }
 
@@ -157,23 +151,22 @@ export async function measureWithCv(request: CvWorkerRequest): Promise<CvWorkerR
   try {
     await warmUpWorker()
   } catch (error) {
-    return runCvMeasurement(request, {
-      skipOpenCv: true,
-      fallbackNote:
-        error instanceof Error
-          ? `Estimated result shown because the CV engine could not warm up: ${error.message}`
-          : 'Estimated result shown because the CV engine could not warm up.',
-    })
+    throw new Error(
+      error instanceof Error
+        ? `OpenCV warmup failed: ${error.message}`
+        : 'OpenCV warmup failed.',
+    )
   }
 
   return new Promise<CvWorkerResponse>((resolve, reject) => {
     const worker = ensureWorker()
     const timeoutId: ReturnType<typeof setTimeout> = setTimeout(() => {
       pendingRequests.delete(request.imageId)
-      runCvMeasurement(request, {
-        skipOpenCv: true,
-        fallbackNote: `Estimated result shown after the CV worker timed out at ${Math.round(CV_WORKER_TIMEOUT_MS / 1000)} seconds.`,
-      }).then(resolve).catch(reject)
+      reject(
+        new Error(
+          `OpenCV processing timed out after ${Math.round(CV_WORKER_TIMEOUT_MS / 1000)} seconds.`,
+        ),
+      )
     }, CV_WORKER_TIMEOUT_MS)
 
     pendingRequests.set(request.imageId, {
@@ -189,10 +182,7 @@ export async function measureWithCv(request: CvWorkerRequest): Promise<CvWorkerR
       clearTimeout(timeoutId)
       pendingRequests.delete(request.imageId)
       destroySharedWorker()
-      runCvMeasurement(request, {
-        skipOpenCv: true,
-        fallbackNote: 'Estimated result shown because the CV worker could not start.',
-      }).then(resolve).catch(reject)
+      reject(new Error('OpenCV worker could not start.'))
     }
   })
 }

@@ -12,46 +12,49 @@ export const inspectionQueue = {
   async addFiles(input: QueueFilesInput): Promise<QueuedInspectionImage[]> {
     const existingCount = await db.inspectionImages.where('manholeId').equals(input.manholeId).count()
     const labels = createJointLabels(input.files.length, existingCount + 1)
+    const validations = await Promise.all(input.files.map((file) => validateGuidedPhoto(file)))
+    const queuedImages: QueuedInspectionImage[] = input.files.map((file, index) => {
+      const timestamp = createTimestamp()
+      const imageId = createId()
+      const blobKey = createId()
+      const validation = validations[index]
 
-    const queuedImages: QueuedInspectionImage[] = []
-
-    await db.transaction('rw', db.inspectionImages, db.inspectionBlobs, async () => {
-      for (const [index, file] of input.files.entries()) {
-        const timestamp = createTimestamp()
-        const imageId = createId()
-        const blobKey = createId()
-        const validation = await validateGuidedPhoto(file)
-        const queuedImage: QueuedInspectionImage = {
-          id: imageId,
-          projectId: input.projectId,
-          manholeId: input.manholeId,
-          fileName: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          blobKey,
-          orderIndex: existingCount + index,
-          jointLabel: labels[index],
-          captureSource: inferCaptureSource(file),
-          queueStatus: 'queued',
-          createdAt: timestamp,
-          progress: 0,
-          validationStatus: validation.status,
-          validationMessage: validation.message,
-          validationScore: validation.score,
-        }
-
-        await db.inspectionImages.add(queuedImage)
-        await db.inspectionBlobs.add({
-          id: blobKey,
-          imageId,
-          fileName: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          blob: file,
-          createdAt: timestamp,
-        })
-
-        queuedImages.push(queuedImage)
+      return {
+        id: imageId,
+        projectId: input.projectId,
+        manholeId: input.manholeId,
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        blobKey,
+        orderIndex: existingCount + index,
+        jointLabel: labels[index],
+        captureSource: inferCaptureSource(file),
+        queueStatus: 'queued',
+        createdAt: timestamp,
+        progress: 0,
+        validationStatus: validation.status,
+        validationMessage: validation.message,
+        validationScore: validation.score,
       }
     })
+
+    const blobRecords = input.files.map((file, index) => ({
+      id: queuedImages[index].blobKey,
+      imageId: queuedImages[index].id,
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      blob: file,
+      createdAt: queuedImages[index].createdAt,
+    }))
+
+    try {
+      await db.inspectionImages.bulkAdd(queuedImages)
+      await db.inspectionBlobs.bulkAdd(blobRecords)
+    } catch (error) {
+      await Promise.allSettled(queuedImages.map((image) => db.inspectionImages.delete(image.id)))
+      await Promise.allSettled(blobRecords.map((record) => db.inspectionBlobs.delete(record.id)))
+      throw error
+    }
 
     return queuedImages
   },

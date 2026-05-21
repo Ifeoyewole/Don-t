@@ -9,16 +9,8 @@ type Props = {
 
 export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
   const [form, setForm] = useState<CreateProjectInput>({ name: '', siteName: '' })
-  const [startDate, setStartDate] = useState(todayValue)
-  const [focusAreas, setFocusAreas] = useState(['Joint Integrity'])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-
-  const toggleFocus = (label: string) => {
-    setFocusAreas((current) =>
-      current.includes(label) ? current.filter((item) => item !== label) : [...current, label],
-    )
-  }
 
   const handleSubmit = async () => {
     if (!form.name.trim()) {
@@ -50,13 +42,13 @@ export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
           <header className="page-hero left-aligned">
             <div>
               <h1>Create New Project</h1>
-              <p className="lead">Initialize a new structural inspection framework for site-wide monitoring.</p>
+              <p className="lead">Set up a project before adding manholes and uploading joint inspection photos.</p>
             </div>
           </header>
 
           <section className="stitch-form-card">
             <div className="stitch-section-head">
-              <h2>General Information</h2>
+              <h2>Project Details</h2>
             </div>
 
             <label className="field">
@@ -64,7 +56,7 @@ export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
               <input
                 value={form.name}
                 onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                placeholder="e.g., Terminal 4 Expansion"
+                placeholder="e.g., Riverside Plot A"
               />
             </label>
 
@@ -74,34 +66,14 @@ export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
                 <input
                   value={form.siteName}
                   onChange={(event) => setForm((current) => ({ ...current, siteName: event.target.value }))}
-                  placeholder="Zone B-12"
+                  placeholder="Optional"
                 />
               </label>
 
               <label className="field">
-                <span>Inspection Start Date</span>
-                <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+                <span>Date</span>
+                <input type="text" value={todayValue} readOnly />
               </label>
-            </div>
-          </section>
-
-          <section className="stitch-form-card">
-            <div className="stitch-section-head">
-              <h2>Inspection Parameters</h2>
-            </div>
-
-            <div className="focus-grid">
-              {['Joint Integrity', 'Material Grade', 'Surface Finish'].map((label) => (
-                <button
-                  key={label}
-                  className={focusAreas.includes(label) ? 'focus-chip is-selected' : 'focus-chip'}
-                  type="button"
-                  onClick={() => toggleFocus(label)}
-                >
-                  <span className="focus-chip-box" aria-hidden="true" />
-                  {label}
-                </button>
-              ))}
             </div>
 
             {error ? <p className="form-error">{error}</p> : null}
@@ -121,24 +93,24 @@ export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
           <article className="info-visual-card">
             <div className="info-visual-image" />
             <div className="info-visual-copy">
-              <strong>Global Coordinates</strong>
-              <p>Location data will be attached once the first manhole and image capture are saved.</p>
+              <strong>Project First</strong>
+              <p>Create the project first, then add the manholes to start the joint inspection workflow.</p>
             </div>
           </article>
 
           <article className="info-note-card is-blue">
-            <strong>Traceable Records</strong>
-            <p>Every joint entry is timestamped and linked to the project workspace for reporting continuity.</p>
+            <strong>Required Field</strong>
+            <p>Project Name is required before you can continue to manhole setup.</p>
           </article>
 
           <article className="info-note-card is-gold">
-            <strong>Compliance Ready</strong>
-            <p>Exported evidence packs stay aligned with inspection records and override history.</p>
+            <strong>Optional Field</strong>
+            <p>Site Name can be added now or left blank if you want to keep the setup simple.</p>
           </article>
 
           <article className="info-tip-card">
-            <strong>Field Tip</strong>
-            <p>Use clear Site IDs so uploaded inspection images stay easy to match during review.</p>
+            <strong>Auto Date</strong>
+            <p>The date is generated automatically for the project record.</p>
           </article>
         </aside>
       </section>

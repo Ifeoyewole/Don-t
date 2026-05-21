@@ -551,6 +551,7 @@ function createFallbackMeasurement(
 export async function runCvMeasurement(
   request: CvWorkerRequest,
   options?: {
+    disableOpenCv?: boolean
     skipOpenCv?: boolean
     fallbackNote?: string
   },
@@ -560,15 +561,17 @@ export async function runCvMeasurement(
     return createFallbackMeasurement(request, pipeDiameterMm, options.fallbackNote)
   }
 
-  const openCvMeasured = await tryMeasureWithOpenCv(request.blob, pipeDiameterMm)
-  if (openCvMeasured) {
-    return {
-      imageId: request.imageId,
-      originalGapMm: openCvMeasured.gapMm,
-      status: classifyGap(openCvMeasured.gapMm).status,
-      confidence: openCvMeasured.confidence,
-      measurementSource: 'cv',
-      measurementNote: openCvMeasured.note,
+  if (!options?.disableOpenCv) {
+    const openCvMeasured = await tryMeasureWithOpenCv(request.blob, pipeDiameterMm)
+    if (openCvMeasured) {
+      return {
+        imageId: request.imageId,
+        originalGapMm: openCvMeasured.gapMm,
+        status: classifyGap(openCvMeasured.gapMm).status,
+        confidence: openCvMeasured.confidence,
+        measurementSource: 'cv',
+        measurementNote: openCvMeasured.note,
+      }
     }
   }
 
