@@ -39,7 +39,7 @@ export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
 
   return (
     <div className="page-grid create-project-page">
-      <div className="projects-sync-banner">Online - synced workspace ready for field capture</div>
+      <div className="projects-sync-banner">Online - local workspace ready for field capture</div>
 
       <section className="split-page-shell">
         <div className="split-main-column">
@@ -127,7 +127,7 @@ export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
           </article>
 
           <article className="info-note-card is-blue">
-            <strong>Precision Sync</strong>
+            <strong>Traceable Records</strong>
             <p>Every joint entry is timestamped and linked to the project workspace for reporting continuity.</p>
           </article>
 

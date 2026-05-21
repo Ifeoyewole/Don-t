@@ -1,6 +1,7 @@
 import type { Manhole, ProjectInspectionSummary } from '../types/domain'
 
 type Props = {
+  online: boolean
   projectName: string
   projectId: string
   projectSiteName?: string
@@ -24,6 +25,7 @@ const formatDateTime = (value?: string) =>
     : 'Not yet processed'
 
 export const InspectionSummaryPage = ({
+  online,
   projectName,
   projectId,
   projectSiteName,
@@ -133,7 +135,7 @@ export const InspectionSummaryPage = ({
                     <p>
                       {item.note ||
                         `${item.finalGapMm.toFixed(1)} mm measured gap ${
-                          item.measurementSource === 'fallback' ? 'estimated from fallback analysis.' : 'recorded from CV measurement.'
+                          item.measurementSource === 'fallback' ? 'estimated from fallback measurement.' : 'recorded from CV measurement.'
                         }`}
                     </p>
                     <div className="flagged-anomaly-meta">
@@ -191,7 +193,7 @@ export const InspectionSummaryPage = ({
                 <span>{formatDateTime(lastUpdatedAt)}</span>
               </div>
               <div className="session-log-item is-primary">
-                <strong>{summary?.totalJoints ?? 0} Joints Synchronized</strong>
+                <strong>{summary?.totalJoints ?? 0} Joints Recorded</strong>
                 <span>{formatDateTime(flagged[0]?.processedAt ?? lastUpdatedAt)}</span>
               </div>
               <div className="session-log-item">
@@ -201,16 +203,20 @@ export const InspectionSummaryPage = ({
             </div>
             <div className="session-log-meta">
               <div>
-                <span>Weather Conditions</span>
-                <strong>14°C, Clear</strong>
+                <span>Project ID</span>
+                <strong>{projectId}</strong>
               </div>
               <div>
-                <span>Hardware Used</span>
-                <strong>Field Tablet</strong>
+                <span>Manhole Count</span>
+                <strong>{manholes.length}</strong>
               </div>
               <div>
-                <span>Sync Status</span>
-                <strong>Fully Synced</strong>
+                <span>Flagged Joints</span>
+                <strong>{flagged.length}</strong>
+              </div>
+              <div>
+                <span>Overrides</span>
+                <strong>{summary?.overriddenCount ?? 0}</strong>
               </div>
             </div>
           </article>
@@ -218,9 +224,9 @@ export const InspectionSummaryPage = ({
       </section>
 
       <div className="summary-bottom-sync">
-        <span>Online - all changes synced to server</span>
+        <span>{online ? 'Online - local inspection data ready for export' : 'Offline - local inspection data preserved'}</span>
         <button className="button button-ghost" type="button" onClick={() => void onExport('zip')}>
-          Force Sync
+          Export Again
         </button>
       </div>
     </div>

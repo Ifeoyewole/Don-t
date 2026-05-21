@@ -3,6 +3,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import type { InspectionResult, ManholeInspectionSummary } from '../types/domain'
 
 type Props = {
+  online: boolean
   projectId: string
   projectName: string
   siteName?: string
@@ -151,6 +152,7 @@ const ResultCard = ({
 }
 
 export const InspectionResultsPage = ({
+  online,
   projectId,
   projectName,
   siteName,
@@ -169,12 +171,18 @@ export const InspectionResultsPage = ({
   const fail = summary?.failCount ?? results.filter((item) => item.status === 'FAIL').length
   const review = summary?.reviewCount ?? results.filter((item) => item.status === 'REVIEW').length
   const completion = total ? Math.round((results.length / total) * 100) : 0
+  const latestProcessedAt = results[results.length - 1]?.processedAt
 
   return (
     <div className="page-grid results-page">
       <div className="page-status-strip">
-        <span>Online - all data synced with server</span>
-        <span>Last sync: 2 min ago</span>
+        <span>{online ? 'Online - measurements saved locally' : 'Offline - measurements stored on device'}</span>
+        <span>
+          Last updated:{' '}
+          {latestProcessedAt
+            ? new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }).format(new Date(latestProcessedAt))
+            : 'Not processed yet'}
+        </span>
       </div>
 
       <section className="results-summary-hero">

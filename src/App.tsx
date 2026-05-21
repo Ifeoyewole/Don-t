@@ -483,6 +483,7 @@ function App() {
     if (route.key === 'upload') {
       return (
         <PhotoUploadPage
+          online={online}
           projectName={currentProject?.name ?? 'Untitled project'}
           manholeLabel={currentManhole?.manholeId ?? 'Unassigned manhole'}
           queue={currentQueue}
@@ -538,6 +539,7 @@ function App() {
     if (route.key === 'results') {
       return (
         <InspectionResultsPage
+          online={online}
           projectId={route.projectId}
           projectName={currentProject?.name ?? 'Untitled project'}
           siteName={currentProject?.siteName}
@@ -572,6 +574,7 @@ function App() {
     if (route.key === 'summary') {
       return (
         <InspectionSummaryPage
+          online={online}
           projectName={currentProject?.name ?? 'Untitled project'}
           projectId={route.projectId}
           projectSiteName={currentProject?.siteName}

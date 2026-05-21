@@ -49,7 +49,7 @@ export const AppShell = ({
       <div className="topbar-actions">
         <div className={`sync-pill ${online ? 'is-online' : 'is-offline'}`}>
           <span className="sync-dot" aria-hidden="true" />
-          <span>{online ? 'Online - Synced' : 'Offline'}</span>
+          <span>{online ? 'Online' : 'Offline'}</span>
         </div>
 
         <button className="topbar-icon-button" type="button" aria-label="Sync status">
@@ -65,7 +65,7 @@ export const AppShell = ({
     </header>
 
     <div className={`offline-banner ${online ? 'is-hidden' : ''}`}>
-      Connection lost. Inspection edits stay on this device until sync is restored.
+      Connection lost. Inspection edits stay on this device until connection returns.
     </div>
 
     <main className="app-content">{children}</main>

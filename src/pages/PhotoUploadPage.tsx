@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
 import type { InspectionImage, ProcessBatchResult } from '../types/domain'
 
 type Props = {
+  online: boolean
   projectName: string
   manholeLabel: string
   queue: InspectionImage[]
@@ -18,11 +19,12 @@ type Props = {
 const phaseLabel = (image: InspectionImage) => {
   if (image.queueStatus === 'failed') return image.errorMessage ?? 'Needs replacement'
   if (image.queueStatus === 'processing') return `Uploading ${image.progress ?? 0}%`
-  if (image.queueStatus === 'completed') return `AI analysis ${(Math.round((image.progress ?? 100) * 0.98) || 98)}% confidence`
+  if (image.queueStatus === 'completed') return 'Measurement ready for review'
   return `${image.progress ?? 0}% complete`
 }
 
 export const PhotoUploadPage = ({
+  online,
   projectName,
   manholeLabel,
   queue,
@@ -37,8 +39,34 @@ export const PhotoUploadPage = ({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const [reportedDownlink, setReportedDownlink] = useState<number | null>(null)
 
   const completedCount = useMemo(() => queue.filter((image) => image.queueStatus === 'completed').length, [queue])
+  const processingCount = useMemo(() => queue.filter((image) => image.queueStatus === 'processing').length, [queue])
+  const queueCompletion = useMemo(() => {
+    if (!queue.length) return 0
+    const weighted = queue.reduce((sum, image) => sum + (image.progress ?? 0), 0)
+    return Math.round(weighted / queue.length)
+  }, [queue])
+
+  useEffect(() => {
+    const connection = (navigator as Navigator & { connection?: { downlink?: number; addEventListener?: (type: string, listener: () => void) => void; removeEventListener?: (type: string, listener: () => void) => void } }).connection
+    const syncConnection = () => setReportedDownlink(typeof connection?.downlink === 'number' ? connection.downlink : null)
+    syncConnection()
+    connection?.addEventListener?.('change', syncConnection)
+    return () => connection?.removeEventListener?.('change', syncConnection)
+  }, [])
+
+  const networkLabel = !online
+    ? 'Offline'
+    : busy || processingCount > 0
+      ? 'Processing'
+      : queue.length
+        ? 'Ready'
+        : 'Idle'
+
+  const throughputValue = reportedDownlink !== null ? `${reportedDownlink.toFixed(1)} Mbps` : `${queueCompletion}% queue progress`
+  const throughputCaption = reportedDownlink !== null ? 'Reported device link' : 'Live queue throughput'
 
   const handleFileSelection = async (files: FileList | null) => {
     if (!files?.length) return
@@ -83,7 +111,7 @@ export const PhotoUploadPage = ({
           <h1>Upload Inspection Evidence</h1>
           <p className="lead">
             Ensure all joint segments are clearly visible. High-resolution photos are required for structural integrity
-            validation and AI-assisted defect detection.
+            validation, joint gap measurement, and tolerance review.
           </p>
         </div>
         <button className="button button-primary dashboard-cta" type="button" onClick={() => void handleStart()} disabled={!queue.length || busy}>
@@ -111,7 +139,7 @@ export const PhotoUploadPage = ({
               <span>Or click to browse your workstation. Support JPG, PNG up to 25MB.</span>
               <div className="upload-tag-row">
                 <span>4K Resolution</span>
-                <span>Geo-tagged</span>
+                <span>Upload Order Locked</span>
               </div>
             </label>
           </section>
@@ -119,16 +147,18 @@ export const PhotoUploadPage = ({
           <section className="network-card">
             <div className="network-head">
               <strong>Network Integrity</strong>
-              <span>Stable</span>
+              <span>{networkLabel}</span>
             </div>
             <div className="network-meter-row">
-              <span>Upload Bandwidth</span>
-              <strong>45 MB/s</strong>
+              <span>{throughputCaption}</span>
+              <strong>{throughputValue}</strong>
             </div>
             <div className="progress-rail">
-              <div className="progress-fill" style={{ width: '75%' }} />
+              <div className="progress-fill" style={{ width: `${Math.max(queueCompletion, online ? 12 : 4)}%` }} />
             </div>
-            <p>Offline caching stays enabled, so inspection data persists locally if connection drops.</p>
+            <p>
+              Offline caching stays enabled, so project data persists locally if connection drops while photos remain in upload order.
+            </p>
             <div className="action-row">
               <button className="button button-secondary" type="button" onClick={() => void onLoadSample()} disabled={busy}>
                 Load Sample
@@ -199,7 +229,7 @@ export const PhotoUploadPage = ({
                 Clear all
               </button>
               <button className="button button-primary" type="button" onClick={() => void handleStart()} disabled={!queue.length || busy}>
-                {busy ? 'Processing Queue...' : 'Verify All'}
+                {busy ? 'Processing Queue...' : 'Start Inspection'}
               </button>
             </div>
           </div>
