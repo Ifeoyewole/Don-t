@@ -162,13 +162,34 @@ function loadOpenCv() {
   }
 
   cvReady = new Promise((resolve, reject) => {
+    let settled = false
     const timeout = setTimeout(() => {
+      cleanupTimers()
       reject(new Error(`OpenCV timeout at stage: ${lastStage}`))
     }, 25000)
+    const pollInterval = setInterval(() => {
+      if (settled) {
+        return
+      }
+
+      const candidate = cvModule || self.cv
+      if (candidate && candidate.Mat) {
+        debug('runtime-ready-via-poll')
+        finalizeReady(candidate)
+      }
+    }, 100)
+
+    const cleanupTimers = () => {
+      clearTimeout(timeout)
+      clearInterval(pollInterval)
+    }
 
     const finalizeReady = (cvInstance) => {
+      if (settled) {
+        return
+      }
       if (!cvInstance || !cvInstance.Mat) {
-        clearTimeout(timeout)
+        cleanupTimers()
         reject(new Error('OpenCV runtime initialized but cv.Mat missing'))
         return
       }
@@ -176,10 +197,11 @@ function loadOpenCv() {
       const mat = new cvInstance.Mat()
       mat.delete()
 
+      settled = true
       cvModule = cvInstance
       self.cv = cvInstance
       debug('mat-warmup-ok')
-      clearTimeout(timeout)
+      cleanupTimers()
       resolve()
     }
 
@@ -195,10 +217,10 @@ function loadOpenCv() {
         },
         onRuntimeInitialized() {
           debug('runtime-initialized')
-          finalizeReady(self.cv)
+          finalizeReady(cvModule || self.cv)
         },
         onAbort(message) {
-          clearTimeout(timeout)
+          cleanupTimers()
           reject(new Error(`OpenCV aborted: ${message}`))
         },
       }
@@ -225,7 +247,7 @@ function loadOpenCv() {
             finalizeReady(resolvedCv)
           },
           (error) => {
-            clearTimeout(timeout)
+            cleanupTimers()
             reject(error instanceof Error ? error : new Error(String(error)))
           },
         )
@@ -240,7 +262,7 @@ function loadOpenCv() {
 
       debug('opencv-global-present-without-mat-or-then')
     } catch (error) {
-      clearTimeout(timeout)
+      cleanupTimers()
       reject(error)
     }
   })
