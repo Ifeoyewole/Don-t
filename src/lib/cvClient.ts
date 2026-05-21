@@ -1,4 +1,4 @@
-import type { CvWorkerRequest, CvWorkerResponse } from './cvMeasurement'
+import { runCvMeasurement, type CvWorkerRequest, type CvWorkerResponse } from './cvMeasurement'
 
 interface CvWorkerErrorResponse {
   kind: 'error'
@@ -10,11 +10,17 @@ interface CvWorkerReadyResponse {
   kind: 'ready'
 }
 
+interface CvWorkerDebugResponse {
+  kind: 'debug'
+  imageId: string
+  message: string
+}
+
 interface CvWorkerMeasureResponse extends CvWorkerResponse {
   kind: 'measure'
 }
 
-type CvWorkerMessage = CvWorkerReadyResponse | CvWorkerMeasureResponse | CvWorkerErrorResponse
+type CvWorkerMessage = CvWorkerReadyResponse | CvWorkerMeasureResponse | CvWorkerErrorResponse | CvWorkerDebugResponse
 
 function isBrowserWorkerAvailable(): boolean {
   return typeof Worker !== 'undefined' && typeof URL !== 'undefined'
@@ -28,6 +34,7 @@ let workerReadyState: 'idle' | 'warming' | 'ready' = 'idle'
 let resolveWorkerReady: (() => void) | null = null
 let rejectWorkerReady: ((reason?: unknown) => void) | null = null
 let workerWarmupTimeoutId: ReturnType<typeof setTimeout> | null = null
+let latestWorkerDebugMessage = 'worker not started'
 
 type PendingRequest = {
   reject: (reason?: unknown) => void
@@ -53,6 +60,7 @@ function destroySharedWorker(): void {
   workerReadyState = 'idle'
   resolveWorkerReady = null
   rejectWorkerReady = null
+  latestWorkerDebugMessage = 'worker not started'
 }
 
 function ensureWorker(): Worker {
@@ -60,12 +68,19 @@ function ensureWorker(): Worker {
     return sharedWorker
   }
 
+  latestWorkerDebugMessage = 'worker constructed'
   sharedWorker = new Worker(new URL('../workers/cvWorker.ts', import.meta.url), {
     type: 'module',
   })
 
   sharedWorker.onmessage = (event: MessageEvent<CvWorkerMessage>) => {
     const payload = event.data
+
+    if (payload.kind === 'debug') {
+      latestWorkerDebugMessage = payload.message
+      console.info(`[cv-worker] ${payload.imageId}: ${payload.message}`)
+      return
+    }
 
     if (payload.kind === 'ready') {
       if (workerWarmupTimeoutId) {
@@ -87,7 +102,7 @@ function ensureWorker(): Worker {
           clearTimeout(workerWarmupTimeoutId)
           workerWarmupTimeoutId = null
         }
-        rejectWorkerReady?.(new Error(payload.error))
+        rejectWorkerReady?.(new Error(`${payload.error} | debug trail: ${latestWorkerDebugMessage}`))
         destroySharedWorker()
       }
       return
@@ -97,7 +112,7 @@ function ensureWorker(): Worker {
     pendingRequests.delete(payload.imageId)
 
     if (payload.kind === 'error') {
-      pending.reject(new Error(`OpenCV worker failed: ${payload.error}`))
+      pending.reject(new Error(`OpenCV worker failed: ${payload.error} | debug trail: ${latestWorkerDebugMessage}`))
       return
     }
 
@@ -111,7 +126,7 @@ function ensureWorker(): Worker {
 
     for (const [, pending] of inflight) {
       clearTimeout(pending.timeoutId)
-      pending.reject(new Error('CV worker could not continue processing.'))
+      pending.reject(new Error(`CV worker could not continue processing. Last stage: ${latestWorkerDebugMessage}`))
     }
   }
 
@@ -134,7 +149,11 @@ async function warmUpWorker(): Promise<void> {
     resolveWorkerReady = resolve
     rejectWorkerReady = reject
     workerWarmupTimeoutId = setTimeout(() => {
-      reject(new Error(`CV worker warmup timed out after ${Math.round(CV_WORKER_WARMUP_TIMEOUT_MS / 1000)} seconds.`))
+      reject(
+        new Error(
+          `CV worker warmup timed out after ${Math.round(CV_WORKER_WARMUP_TIMEOUT_MS / 1000)} seconds. Last stage: ${latestWorkerDebugMessage}`,
+        ),
+      )
       destroySharedWorker()
     }, CV_WORKER_WARMUP_TIMEOUT_MS)
   })
@@ -151,11 +170,9 @@ export async function measureWithCv(request: CvWorkerRequest): Promise<CvWorkerR
   try {
     await warmUpWorker()
   } catch (error) {
-    throw new Error(
-      error instanceof Error
-        ? `OpenCV warmup failed: ${error.message}`
-        : 'OpenCV warmup failed.',
-    )
+    throw new Error(error instanceof Error ? `OpenCV warmup failed: ${error.message}` : 'OpenCV warmup failed.', {
+      cause: error,
+    })
   }
 
   return new Promise<CvWorkerResponse>((resolve, reject) => {
@@ -164,7 +181,7 @@ export async function measureWithCv(request: CvWorkerRequest): Promise<CvWorkerR
       pendingRequests.delete(request.imageId)
       reject(
         new Error(
-          `OpenCV processing timed out after ${Math.round(CV_WORKER_TIMEOUT_MS / 1000)} seconds.`,
+          `OpenCV processing timed out after ${Math.round(CV_WORKER_TIMEOUT_MS / 1000)} seconds. Last stage: ${latestWorkerDebugMessage}`,
         ),
       )
     }, CV_WORKER_TIMEOUT_MS)
@@ -182,7 +199,7 @@ export async function measureWithCv(request: CvWorkerRequest): Promise<CvWorkerR
       clearTimeout(timeoutId)
       pendingRequests.delete(request.imageId)
       destroySharedWorker()
-      reject(new Error('OpenCV worker could not start.'))
+      reject(new Error(`OpenCV worker could not start. Last stage: ${latestWorkerDebugMessage}`))
     }
   })
 }

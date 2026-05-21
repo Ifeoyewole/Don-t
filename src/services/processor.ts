@@ -142,11 +142,15 @@ export const processor = {
           try {
             return await processImage(image.id)
           } catch (error) {
-            await db.inspectionImages.update(image.id, { queueStatus: 'failed' })
+            const message = error instanceof Error ? error.message : 'Processing failed'
+            await db.inspectionImages.update(image.id, {
+              queueStatus: 'failed',
+              errorMessage: message,
+            })
             emit({
               type: 'failed',
               imageId: image.id,
-              message: error instanceof Error ? error.message : 'Processing failed',
+              message,
             })
             return null
           }
