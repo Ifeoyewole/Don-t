@@ -31,8 +31,6 @@ export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
 
   return (
     <div className="page-grid create-project-page">
-      <div className="projects-sync-banner">Online - local workspace ready for field capture</div>
-
       <section className="split-page-shell">
         <div className="split-main-column">
           <button className="page-back-link" type="button" onClick={onBack}>
@@ -42,7 +40,7 @@ export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
           <header className="page-hero left-aligned">
             <div>
               <h1>Create New Project</h1>
-              <p className="lead">Set up a project before adding manholes and uploading joint inspection photos.</p>
+              <p className="lead">Create a project record before adding manholes and uploading joint inspection photos.</p>
             </div>
           </header>
 
@@ -62,7 +60,7 @@ export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
 
             <div className="stitch-two-up">
               <label className="field">
-                <span>Site Name / ID</span>
+                <span>Site Name</span>
                 <input
                   value={form.siteName}
                   onChange={(event) => setForm((current) => ({ ...current, siteName: event.target.value }))}
@@ -94,7 +92,7 @@ export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
             <div className="info-visual-image" />
             <div className="info-visual-copy">
               <strong>Project First</strong>
-              <p>Create the project first, then add the manholes to start the joint inspection workflow.</p>
+              <p>Create the project first, then add manholes and start capturing joint photos.</p>
             </div>
           </article>
 
@@ -105,7 +103,7 @@ export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
 
           <article className="info-note-card is-gold">
             <strong>Optional Field</strong>
-            <p>Site Name can be added now or left blank if you want to keep the setup simple.</p>
+            <p>Site Name is optional and can be left blank.</p>
           </article>
 
           <article className="info-tip-card">

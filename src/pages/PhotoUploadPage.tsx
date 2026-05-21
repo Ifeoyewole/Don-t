@@ -17,7 +17,7 @@ type Props = {
 }
 
 const validationTone = (image: InspectionImage) =>
-  image.validationStatus === 'retake' ? 'Needs retake' : 'Guided angle ready'
+  image.validationStatus === 'retake' ? 'Needs retake' : 'Ready for inspection'
 
 const phaseLabel = (image: InspectionImage) => {
   if (image.queueStatus === 'failed') return image.errorMessage ?? 'Needs replacement'
@@ -117,8 +117,7 @@ export const PhotoUploadPage = ({
         <div>
           <h1>Upload Inspection Evidence</h1>
           <p className="lead">
-            Ensure all joint segments are clearly visible. High-resolution photos are required for structural integrity
-            validation, joint gap measurement, and tolerance review.
+            Ensure each joint is clearly visible. Upload photos in order so the app can measure each gap and assign a tolerance status.
           </p>
         </div>
         <button
@@ -150,15 +149,15 @@ export const PhotoUploadPage = ({
               <strong>Drag photos here</strong>
               <span>Or click to browse your workstation. Support JPG, PNG up to 25MB.</span>
               <div className="upload-tag-row">
-                <span>4K Resolution</span>
-                <span>Upload Order Locked</span>
+                <span>Photos only</span>
+                <span>Upload order kept</span>
               </div>
             </label>
           </section>
 
           <section className="network-card">
             <div className="network-head">
-              <strong>Network Integrity</strong>
+              <strong>Inspection Run</strong>
               <span>{networkLabel}</span>
             </div>
             <div className="network-meter-row">
@@ -169,7 +168,7 @@ export const PhotoUploadPage = ({
               <div className="progress-fill" style={{ width: `${Math.max(queueCompletion, online ? 12 : 4)}%` }} />
             </div>
             <p>
-              Offline caching stays enabled, so project data persists locally if connection drops while photos remain in upload order.
+              Project data stays on this device, and queued photos keep their upload order while you work.
             </p>
             <p>{invalidCount ? `${invalidCount} photo(s) need a retake before measurement can start.` : 'All queued photos are eligible for measurement.'}</p>
             <div className="action-row">
@@ -215,7 +214,7 @@ export const PhotoUploadPage = ({
                   <div className="asset-body">
                     <div className="upload-title-row">
                       <strong>{image.fileName}</strong>
-                      <span className="segment-pill">{image.jointLabel} SEG</span>
+                      <span className="segment-pill">{image.jointLabel}</span>
                     </div>
                     <div className="asset-meta-row">
                       <StatusBadge status={image.queueStatus} />

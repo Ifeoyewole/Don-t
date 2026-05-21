@@ -105,11 +105,12 @@ const inspections: InspectionResult[] = [
 ]
 
 export const pipeSpecs: Record<PipeType, { label: string; unitLengthM: number; diameterMm: number }> = {
-  '150mm-clay': { label: '150mm Clay', unitLengthM: 1.75, diameterMm: 150 },
-  '225mm-clay': { label: '225mm Clay', unitLengthM: 2, diameterMm: 225 },
-  '300mm-concrete': { label: '300mm Concrete', unitLengthM: 2.6, diameterMm: 300 },
-  '450mm-concrete': { label: '450mm Concrete', unitLengthM: 2.6, diameterMm: 450 },
-  '600mm-concrete': { label: '600mm Concrete', unitLengthM: 2.6, diameterMm: 600 },
+  '150mm-clay': { label: '150 mm (clay) - 1.75m', unitLengthM: 1.75, diameterMm: 150 },
+  '225mm-clay': { label: '225 mm (clay) - 2m', unitLengthM: 2, diameterMm: 225 },
+  '300mm-concrete': { label: '300 mm (concrete) - 2.6m', unitLengthM: 2.6, diameterMm: 300 },
+  '450mm-concrete': { label: '450 mm (concrete) - 2.6m', unitLengthM: 2.6, diameterMm: 450 },
+  '600mm-concrete': { label: '600 mm (concrete) - 2.6m', unitLengthM: 2.6, diameterMm: 600 },
+  '900mm-concrete': { label: '900 mm (concrete)', unitLengthM: 2.6, diameterMm: 900 },
 }
 
 export const createInitialStore = (): AppStore => ({

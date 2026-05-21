@@ -6,6 +6,7 @@ export type PipeType =
   | '300mm-concrete'
   | '450mm-concrete'
   | '600mm-concrete'
+  | '900mm-concrete'
 
 export type InspectionCaptureSource = 'upload' | 'camera'
 export type QueueStatus = 'queued' | 'processing' | 'completed' | 'failed'

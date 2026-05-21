@@ -5,8 +5,8 @@ export function estimateMaterials(
   input: EstimateMaterialsInput,
 ): EstimateMaterialsResult {
   const spec = getPipeSpec(input.pipeType)
-  const pipesNeeded = Math.ceil(input.meterRun / spec.unitLengthM)
-  const jointsNeeded = pipesNeeded + 2
+  const pipesNeeded = Math.max(1, Math.ceil(input.meterRun / spec.unitLengthM))
+  const jointsNeeded = Math.max(1, pipesNeeded - 1)
 
   return {
     pipeType: spec.type,

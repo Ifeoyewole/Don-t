@@ -25,9 +25,7 @@ const formatDateTime = (value?: string) =>
     : 'Not yet processed'
 
 export const InspectionSummaryPage = ({
-  online,
   projectName,
-  projectId,
   projectSiteName,
   manholes,
   lastUpdatedAt,
@@ -37,7 +35,8 @@ export const InspectionSummaryPage = ({
   onOpenFlagged,
 }: Props) => {
   const flagged = summary?.flaggedJoints ?? []
-  const latestManhole = manholes[0]?.manholeId ?? 'No manholes yet'
+  const overallStatus =
+    (summary?.failCount ?? 0) > 0 ? 'FAIL' : (summary?.reviewCount ?? 0) > 0 ? 'REVIEW' : (summary?.totalJoints ?? 0) > 0 ? 'PASS' : 'NO RESULTS'
 
   return (
     <div className="page-grid summary-page">
@@ -53,10 +52,10 @@ export const InspectionSummaryPage = ({
 
       <section className="page-hero">
         <div>
-          <h1>{projectName}</h1>
+          <h1>Inspection Summary</h1>
           <p className="lead">
-            Last updated: {formatDateTime(lastUpdatedAt)}
-            {projectSiteName ? ` • Site: ${projectSiteName}` : ''}
+            {projectName}
+            {projectSiteName ? ` • ${projectSiteName}` : ''} • Last updated: {formatDateTime(lastUpdatedAt)}
           </p>
         </div>
         <div className="export-actions">
@@ -74,9 +73,9 @@ export const InspectionSummaryPage = ({
 
       <section className="summary-kpi-grid">
         <article className="summary-kpi-card">
-          <span>Total Joints</span>
-          <strong>{summary?.totalJoints ?? 0}</strong>
-          <p>100% inspected</p>
+          <span>Overall Status</span>
+          <strong>{overallStatus}</strong>
+          <p>Project outcome</p>
         </article>
         <article className="summary-kpi-card is-pass">
           <span>Pass</span>
@@ -86,27 +85,19 @@ export const InspectionSummaryPage = ({
         <article className="summary-kpi-card is-review">
           <span>Review</span>
           <strong>{summary?.reviewCount ?? 0}</strong>
-          <p>Action required</p>
+          <p>Needs checking</p>
         </article>
         <article className="summary-kpi-card is-fail">
           <span>Fail</span>
           <strong>{summary?.failCount ?? 0}</strong>
-          <p>Critical issues</p>
+          <p>Outside tolerance</p>
         </article>
       </section>
 
       <section className="summary-bento-grid">
         <div className="flagged-anomalies-card">
           <div className="flagged-card-head">
-            <h2>Flagged Anomalies</h2>
-            <div className="flagged-head-actions">
-              <button className="button button-secondary" type="button">
-                Filter
-              </button>
-              <button className="button button-secondary" type="button">
-                Search
-              </button>
-            </div>
+            <h2>Flagged Joints</h2>
           </div>
 
           <div className="flagged-anomalies-list">
@@ -124,19 +115,17 @@ export const InspectionSummaryPage = ({
                   <div className="flagged-anomaly-copy">
                     <div className="flagged-anomaly-top">
                       <div>
-                        <strong>Joint #{item.jointLabel}</strong>
+                        <strong>Joint {item.jointLabel}</strong>
                         <span>
-                          {item.manholeLabel || latestManhole}
+                          {item.manholeLabel || 'Manhole'}
                           {projectSiteName ? ` • ${projectSiteName}` : ''}
                         </span>
                       </div>
                       <span className={`mini-status-pill is-${item.status.toLowerCase()}`}>{item.status}</span>
                     </div>
                     <p>
-                      {item.note ||
-                        `${item.finalGapMm.toFixed(1)} mm measured gap ${
-                          item.measurementSource === 'fallback' ? 'estimated from fallback measurement.' : 'recorded from CV measurement.'
-                        }`}
+                      {item.finalGapMm.toFixed(1)} mm gap
+                      {item.note ? ` • ${item.note}` : ''}
                     </p>
                     <div className="flagged-anomaly-meta">
                       <span>Log: {formatDateTime(item.processedAt)}</span>
@@ -150,7 +139,7 @@ export const InspectionSummaryPage = ({
               ))
             ) : (
               <article className="empty-state">
-                <strong>No flagged anomalies</strong>
+                <strong>No flagged joints</strong>
                 <p>All measured joints are currently inside the pass band.</p>
               </article>
             )}
@@ -158,7 +147,7 @@ export const InspectionSummaryPage = ({
 
           <div className="flagged-footer">
             <button className="button button-ghost" type="button" onClick={() => onOpenFlagged()}>
-              View All Flagged Items ({flagged.length})
+              View Flagged Results ({flagged.length})
             </button>
           </div>
         </div>
@@ -166,15 +155,11 @@ export const InspectionSummaryPage = ({
         <aside className="summary-side-panels">
           <article className="location-panel">
             <div className="location-panel-head">
-              <h3>Location</h3>
-              <span>⌖</span>
-            </div>
-            <div className="location-map">
-              <div className="location-map-badge">{latestManhole}</div>
+              <h3>Project Record</h3>
             </div>
             <div className="location-details">
               <p>
-                <strong>Project:</strong> {projectId}
+                <strong>Project:</strong> {projectName}
               </p>
               <p>
                 <strong>Site:</strong> {projectSiteName || 'Not provided'}
@@ -182,53 +167,32 @@ export const InspectionSummaryPage = ({
               <p>
                 <strong>Manholes:</strong> {manholes.length}
               </p>
+              <p>
+                <strong>Joints Captured:</strong> {summary?.totalJoints ?? 0}
+              </p>
             </div>
           </article>
 
           <article className="session-log-panel">
-            <h3>Session Log</h3>
+            <h3>Summary Notes</h3>
             <div className="session-log-timeline">
-              <div className="session-log-item is-good">
-                <strong>Session Finalized</strong>
-                <span>{formatDateTime(lastUpdatedAt)}</span>
+              <div className="session-log-item">
+                <strong>Pass count</strong>
+                <span>{summary?.passCount ?? 0}</span>
               </div>
               <div className="session-log-item is-primary">
-                <strong>{summary?.totalJoints ?? 0} Joints Recorded</strong>
-                <span>{formatDateTime(flagged[0]?.processedAt ?? lastUpdatedAt)}</span>
+                <strong>Review count</strong>
+                <span>{summary?.reviewCount ?? 0}</span>
               </div>
-              <div className="session-log-item">
-                <strong>Inspection Started</strong>
-                <span>{formatDateTime(manholes[0]?.createdAt)}</span>
-              </div>
-            </div>
-            <div className="session-log-meta">
-              <div>
-                <span>Project ID</span>
-                <strong>{projectId}</strong>
-              </div>
-              <div>
-                <span>Manhole Count</span>
-                <strong>{manholes.length}</strong>
-              </div>
-              <div>
-                <span>Flagged Joints</span>
-                <strong>{flagged.length}</strong>
-              </div>
-              <div>
-                <span>Overrides</span>
-                <strong>{summary?.overriddenCount ?? 0}</strong>
+              <div className="session-log-item is-good">
+                <strong>Fail count</strong>
+                <span>{summary?.failCount ?? 0}</span>
               </div>
             </div>
+            <p className="lead">Guidance only - not a formal adoption assessment.</p>
           </article>
         </aside>
       </section>
-
-      <div className="summary-bottom-sync">
-        <span>{online ? 'Online - local inspection data ready for export' : 'Offline - local inspection data preserved'}</span>
-        <button className="button button-ghost" type="button" onClick={() => void onExport('zip')}>
-          Export Again
-        </button>
-      </div>
     </div>
   )
 }

@@ -65,8 +65,8 @@ export const DashboardPage = ({
     <div className="page-grid dashboard-page">
       <section className="page-hero">
         <div>
-          <h1>Field Overview</h1>
-          <p className="lead">Manage ongoing site inspections and joint integrity data.</p>
+          <h1>Projects</h1>
+          <p className="lead">Create a project, add a manhole, upload joint photos, and review measured gaps.</p>
         </div>
         <button className="button button-primary dashboard-cta" type="button" onClick={onNewProject}>
           + New Project
@@ -77,16 +77,16 @@ export const DashboardPage = ({
         <article className="dashboard-stat-card">
           <div className="dashboard-stat-icon">A</div>
           <div>
-            <span className="stat-label">Active Projects</span>
+            <span className="stat-label">Projects</span>
             <strong>{projects.length}</strong>
-            <p className="success-copy">+{Math.max(projects.length - 1, 1)} this week</p>
+            <p className="success-copy">Current records</p>
           </div>
         </article>
 
         <article className="dashboard-stat-card">
           <div className="dashboard-stat-icon">I</div>
           <div>
-            <span className="stat-label">Inspections Today</span>
+            <span className="stat-label">Inspected Joints</span>
             <strong>{totalInspections}</strong>
             <p>{completionRate}% completion</p>
           </div>
@@ -95,9 +95,9 @@ export const DashboardPage = ({
         <article className="dashboard-stat-card is-alert">
           <div className="dashboard-stat-icon is-alert">!</div>
           <div>
-            <span className="stat-label">Failed/Review</span>
+            <span className="stat-label">Review / Fail</span>
             <strong>{totalFailures.toString().padStart(2, '0')}</strong>
-            <p className="danger-copy">Immediate action required</p>
+            <p className="danger-copy">Flagged results</p>
           </div>
         </article>
       </section>
@@ -106,7 +106,7 @@ export const DashboardPage = ({
         <div className="dashboard-table-header">
           <div>
             <h2>Recent Projects</h2>
-            <p>{filteredProjects.length} project{filteredProjects.length === 1 ? '' : 's'} in the current inspection workspace.</p>
+            <p>{filteredProjects.length} project{filteredProjects.length === 1 ? '' : 's'} stored on this device.</p>
           </div>
           <div className="dashboard-controls">
             <label className="dashboard-search">
@@ -118,7 +118,7 @@ export const DashboardPage = ({
               />
             </label>
             <button className="button button-secondary" type="button" onClick={onToggleProjects}>
-              {showAllProjects ? 'Recent' : 'Filter'}
+              {showAllProjects ? 'Show Less' : 'Show All'}
             </button>
           </div>
         </div>
@@ -181,10 +181,7 @@ export const DashboardPage = ({
       <section className="dashboard-lower-grid">
         <article className="dashboard-trends-card">
           <div className="dashboard-panel-head">
-            <h2>Inspection Trends</h2>
-            <button className="button button-secondary" type="button">
-              Last 7 Days
-            </button>
+            <h2>Inspection Progress</h2>
           </div>
           <div className="trend-bars">
             {projects.slice(0, 4).map((project) => {
@@ -207,7 +204,7 @@ export const DashboardPage = ({
         </article>
 
         <article className="dashboard-activity-card">
-          <h2>Recent Activity</h2>
+          <h2>Recent Updates</h2>
           <div className="activity-list">
             {recentActivity.map((project) => (
               <div className="activity-row" key={project.id}>

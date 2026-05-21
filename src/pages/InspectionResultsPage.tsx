@@ -31,9 +31,9 @@ const measurementLabel = (item: InspectionResult) =>
     : item.measurementNote || 'CV measured'
 
 const statusActionLabel = (status: InspectionResult['status']) => {
-  if (status === 'FAIL') return 'Create Repair Note'
-  if (status === 'REVIEW') return 'Assign Reviewer'
-  return 'Details'
+  if (status === 'FAIL') return 'Review result'
+  if (status === 'REVIEW') return 'Review result'
+  return 'Add note'
 }
 
 const ResultCard = ({
@@ -210,7 +210,7 @@ export const InspectionResultsPage = ({
           <div className="results-project-id">Project ID: {projectId}</div>
           <h1>{projectName}</h1>
           <p className="lead">
-            Detailed quality control results for {manholeLabel}
+            Gap measurement results for {manholeLabel}
             {siteName ? ` at ${siteName}` : ''}.
           </p>
 
@@ -247,12 +247,14 @@ export const InspectionResultsPage = ({
 
       <div className="page-top-actions">
         <button className="button button-secondary" type="button" onClick={onBack}>
-          Back to Uploads
+          Back to Upload
         </button>
         <button className="button button-primary" type="button" onClick={onNext}>
           Project Summary
         </button>
       </div>
+
+      <p className="lead">Guidance only - not a formal adoption assessment.</p>
 
       <section className="inspection-results-grid">
         {results.length ? (

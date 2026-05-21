@@ -120,7 +120,9 @@ const calculateEstimate = ({ meterRun, pipeType }: EstimateMaterialsInput): Esti
   return {
     unitLengthM: spec.unitLengthM,
     pipesNeeded,
-    jointsNeeded: pipesNeeded + 2,
+    jointsNeeded: Math.max(1, pipesNeeded - 1),
+    pipeType,
+    pipeDiameterMm: spec.diameterMm,
   }
 }
 
@@ -567,7 +569,7 @@ export const createMockServices = ({ getStore, updateStore, emit }: StoreContext
         manholes: store.manholes.filter((item) => item.projectId === projectId),
         queueImages: store.queueImages.filter((item) => item.projectId === projectId),
         inspections: store.inspections.filter((item) => item.projectId === projectId),
-        disclaimer: 'Guidance only — not a formal adoption assessment.',
+        disclaimer: 'Guidance only - not a formal adoption assessment.',
       }
       return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
     },
@@ -581,13 +583,13 @@ export const createMockServices = ({ getStore, updateStore, emit }: StoreContext
         `PASS: ${summary.passCount}`,
         `REVIEW: ${summary.reviewCount}`,
         `FAIL: ${summary.failCount}`,
-        'Guidance only — not a formal adoption assessment.',
+        'Guidance only - not a formal adoption assessment.',
       ].join('\n')
       return new Blob([body], { type: 'application/pdf' })
     },
     async exportEvidenceZip(projectId: string) {
       await wait(80)
-      const body = `Evidence pack for ${projectId}\nContains local inspection metadata and image manifest.\nGuidance only — not a formal adoption assessment.`
+      const body = `Evidence pack for ${projectId}\nContains local inspection metadata and image manifest.\nGuidance only - not a formal adoption assessment.`
       return new Blob([body], { type: 'application/zip' })
     },
   }

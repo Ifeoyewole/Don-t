@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { pipeSpecs } from '../services/mockData'
+import { listPipeSpecs } from '../utils'
 import type { CreateManholeInput, EstimateMaterialsResult, Manhole, PipeType } from '../types/domain'
 
 type Props = {
@@ -13,25 +13,24 @@ type Props = {
 
 const defaultForm = (projectId: string, manhole?: Manhole | null): CreateManholeInput => ({
   projectId,
-  manholeId: manhole?.manholeId ?? 'MH-882-NORTH',
+  manholeId: manhole?.manholeId ?? '',
   type: manhole?.type ?? 'surface-water',
-  meterRun: manhole?.meterRun ?? 45.5,
-  pipeType: manhole?.pipeType ?? '450mm-concrete',
+  meterRun: manhole?.meterRun ?? 18,
+  pipeType: manhole?.pipeType ?? '225mm-clay',
 })
-
-const structureLabel = (type: CreateManholeInput['type']) =>
-  type === 'surface-water' ? 'Surface Water' : 'Foul Water'
+const pipeOptions = listPipeSpecs()
 
 export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEstimate, onSave }: Props) => {
   const [form, setForm] = useState<CreateManholeInput>(() => defaultForm(projectId, manhole))
   const [estimate, setEstimate] = useState<EstimateMaterialsResult | null>(() => {
     const initialForm = defaultForm(projectId, manhole)
-    const spec = pipeSpecs[initialForm.pipeType]
+    const spec = pipeOptions.find((item) => item.type === initialForm.pipeType)!
     const pipesNeeded = Math.max(1, Math.ceil(initialForm.meterRun / spec.unitLengthM))
     return {
       unitLengthM: spec.unitLengthM,
       pipesNeeded,
-      jointsNeeded: pipesNeeded + 2,
+      jointsNeeded: Math.max(1, pipesNeeded - 1),
+      pipeType: spec.type,
       pipeDiameterMm: spec.diameterMm,
     }
   })
@@ -82,7 +81,7 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
         <div>
           <p className="eyebrow">{projectName}</p>
           <h1>Manhole Setup</h1>
-          <p className="lead">Set the manhole details used for photo ordering, joint measurement, and summary reporting.</p>
+          <p className="lead">Enter the manhole details before uploading joint photos for measurement.</p>
         </div>
       </section>
 
@@ -117,10 +116,10 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
 
             <div className="stitch-two-up">
               <label className="field">
-                <span>Meter Run (m)</span>
+                <span>Meter Run</span>
                 <input
                   type="number"
-                  min="1"
+                  min="0"
                   step="0.1"
                   value={form.meterRun}
                   onChange={(event) => updateForm((current) => ({ ...current, meterRun: Number(event.target.value) || 0 }))}
@@ -128,7 +127,7 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
               </label>
 
               <label className="field">
-                <span>Pipe Diameter (mm)</span>
+                <span>Pipe Type</span>
                 <select
                   value={form.pipeType}
                   onChange={(event) =>
@@ -138,23 +137,13 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
                     }))
                   }
                 >
-                  {Object.entries(pipeSpecs).map(([value, spec]) => (
-                    <option key={value} value={value}>
-                      {spec.diameterMm} mm
+                  {pipeOptions.map((spec) => (
+                    <option key={spec.type} value={spec.type}>
+                      {spec.label}
                     </option>
                   ))}
                 </select>
               </label>
-            </div>
-
-            <div className="context-photo-card">
-              <span>Site Context Photo</span>
-              <div className="context-photo-placeholder">
-                <div className="context-photo-overlay">
-                  <strong>{structureLabel(form.type)}</strong>
-                  <p>Capture photos in upload order for this manhole.</p>
-                </div>
-              </div>
             </div>
 
             {error ? <p className="form-error">{error}</p> : null}
@@ -164,7 +153,7 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
                 Back
               </button>
               <button className="button button-primary button-wide-on-desktop" type="button" onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving...' : 'Confirm Setup'}
+                {saving ? 'Saving...' : 'Save Manhole'}
               </button>
             </div>
           </article>
@@ -173,13 +162,13 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
         <aside className="split-side-column">
           <article className="estimate-sidebar">
             <div className="estimate-sidebar-head">
-              <h2>Live Materials Estimate</h2>
-              <span>{loadingEstimate ? 'Refreshing' : 'Verified'}</span>
+              <h2>Run Estimate</h2>
+              <span>{loadingEstimate ? 'Updating' : 'Ready'}</span>
             </div>
             <div className="estimate-highlight">
-              <span>Estimated Joints</span>
+              <span>Estimated Pipe Joints</span>
               <strong>{estimate?.jointsNeeded ?? '--'}</strong>
-              <p>Based on {estimate?.unitLengthM ?? '--'}m standard lengths</p>
+              <p>Based on {estimate?.unitLengthM ?? '--'}m pipe lengths</p>
             </div>
             <div className="estimate-mini-grid">
               <div className="estimate-mini-card">
@@ -187,39 +176,12 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
                 <strong>{estimate?.pipesNeeded ?? '--'}</strong>
               </div>
               <div className="estimate-mini-card">
-                <span>Sealing Kit</span>
-                <strong>{estimate?.pipeDiameterMm ? `${estimate.pipeDiameterMm}-SK` : '--'}</strong>
+                <span>Pipe Diameter</span>
+                <strong>{estimate?.pipeDiameterMm ? `${estimate.pipeDiameterMm} mm` : '--'}</strong>
               </div>
             </div>
             <div className="estimate-message">
-              Estimates update automatically as you modify the meter run and selected diameter.
-            </div>
-          </article>
-
-          <article className="specification-card">
-            <h3>Specification Overview</h3>
-            <div className="spec-list">
-              <div className="spec-row">
-                <div>
-                  <strong>Precision Alignment</strong>
-                  <p>Pipe geometry remains mapped to joint labels.</p>
-                </div>
-                <span className="spec-check is-good">✓</span>
-              </div>
-              <div className="spec-row">
-                <div>
-                  <strong>Hydrostatic Test</strong>
-                  <p>Field verification required during review.</p>
-                </div>
-                <span className="spec-check">•</span>
-              </div>
-              <div className="spec-row">
-                <div>
-                  <strong>Corrosion Grade</strong>
-                  <p>Recorded together with pipe material selection.</p>
-                </div>
-                <span className="spec-check is-good">✓</span>
-              </div>
+              This helps you anticipate how many pipe-to-pipe joints may need photos in the run.
             </div>
           </article>
         </aside>

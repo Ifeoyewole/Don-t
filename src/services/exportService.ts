@@ -10,6 +10,7 @@ import type {
   ProjectInspectionSummary,
 } from '../types'
 import { summaryService } from './summaryService'
+import { getPipeSpec } from '../utils'
 
 const DISCLAIMER = 'Guidance only - not a formal adoption assessment.'
 
@@ -110,7 +111,18 @@ async function createPdfBlob(data: ExportProjectData): Promise<Blob> {
   y -= 20
 
   for (const result of data.inspectionResults.slice(0, 25)) {
-    const text = `${result.jointLabel}: ${result.finalGapMm.toFixed(1)}mm - ${result.status}${result.overrideApplied ? ' (override)' : ''}${result.measurementSource === 'fallback' ? ' (estimated)' : ''}`
+    const manhole = data.manholes.find((item) => item.id === result.manholeId)
+    const pipeSpec = manhole ? getPipeSpec(manhole.pipeType) : null
+    const text = [
+      `Manhole ID: ${manhole?.manholeId ?? 'N/A'}`,
+      `Date/time: ${result.processedAt}`,
+      `Pipe type: ${pipeSpec?.label ?? 'N/A'}`,
+      `Pipe diameter: ${manhole?.pipeDiameterMm ?? 'N/A'} mm`,
+      `Joint: ${result.jointLabel}`,
+      `Gap value: ${result.finalGapMm.toFixed(1)} mm`,
+      `Gap status: ${result.status}`,
+      `User notes: ${result.notes ?? 'None'}`,
+    ].join(' | ')
     page.drawText(text, {
       x: left,
       y,
@@ -151,7 +163,35 @@ async function createPdfBlob(data: ExportProjectData): Promise<Blob> {
 export const exportService = {
   async exportJson(projectId: string): Promise<Blob> {
     const data = await loadProjectExportData(projectId)
-    const serialized = JSON.stringify(data, null, 2)
+    const serialized = JSON.stringify(
+      {
+        projectName: data.project.name,
+        siteName: data.project.siteName ?? null,
+        exportedAt: data.exportedAt,
+        disclaimer: data.disclaimer,
+        manholes: data.manholes.map((manhole) => {
+          const results = data.inspectionResults.filter((result) => result.manholeId === manhole.id)
+          const spec = getPipeSpec(manhole.pipeType)
+          return {
+            manholeId: manhole.manholeId,
+            type: manhole.type,
+            meterRun: manhole.meterRun,
+            pipeType: spec.label,
+            pipeDiameterMm: manhole.pipeDiameterMm,
+            numberOfJointsCaptured: results.length,
+            results: results.map((result) => ({
+              dateTime: result.processedAt,
+              jointLabel: result.jointLabel,
+              gapValueMm: result.finalGapMm,
+              gapStatus: result.status,
+              userNotes: result.notes ?? '',
+            })),
+          }
+        }),
+      },
+      null,
+      2,
+    )
     return new Blob([serialized], { type: 'application/json' })
   },
 
