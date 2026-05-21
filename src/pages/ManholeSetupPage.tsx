@@ -20,7 +20,7 @@ const defaultForm = (projectId: string, manhole?: Manhole | null): CreateManhole
 })
 
 const structureLabel = (type: CreateManholeInput['type']) =>
-  type === 'surface-water' ? 'Standard Precast' : 'Reinforced Utility'
+  type === 'surface-water' ? 'Surface Water' : 'Foul Water'
 
 export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEstimate, onSave }: Props) => {
   const [form, setForm] = useState<CreateManholeInput>(() => defaultForm(projectId, manhole))
@@ -82,7 +82,7 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
         <div>
           <p className="eyebrow">{projectName}</p>
           <h1>Manhole Setup</h1>
-          <p className="lead">Configure structural parameters for precise inspection mapping.</p>
+          <p className="lead">Set the manhole details used for photo ordering, joint measurement, and summary reporting.</p>
         </div>
       </section>
 
@@ -99,7 +99,7 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
               </label>
 
               <label className="field">
-                <span>Structure Type</span>
+                <span>Type</span>
                 <select
                   value={form.type}
                   onChange={(event) =>
@@ -109,8 +109,8 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
                     }))
                   }
                 >
-                  <option value="surface-water">Standard Precast</option>
-                  <option value="foul-water">Reinforced Utility</option>
+                  <option value="surface-water">Surface Water</option>
+                  <option value="foul-water">Foul Water</option>
                 </select>
               </label>
             </div>
@@ -152,7 +152,7 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
               <div className="context-photo-placeholder">
                 <div className="context-photo-overlay">
                   <strong>{structureLabel(form.type)}</strong>
-                  <p>Replace site photo during capture</p>
+                  <p>Capture photos in upload order for this manhole.</p>
                 </div>
               </div>
             </div>
