@@ -102,6 +102,7 @@ function smoothProfile(profile) {
 function measureGapFromKnownCircle(gray, width, height, pipeDiameterMm, centerX, centerY, innerRadiusPx) {
   const gapWidths = []
   const brightThresholdSamples = []
+  const coveredSectors = new Set()
   const maxRadius = Math.floor(Math.min(width, height) * 0.45)
 
   for (let step = 0; step < ANGLE_STEPS; step += 1) {
@@ -117,25 +118,31 @@ function measureGapFromKnownCircle(gray, width, height, pipeDiameterMm, centerX,
     const angle = (Math.PI * 2 * step) / ANGLE_STEPS
     const profile = smoothProfile(sampleRayProfile(gray, width, height, centerX, centerY, angle, maxRadius))
     const innerRadius = clamp(Math.round(innerRadiusPx), 4, profile.length - 6)
+    const localReference = average(profile.slice(Math.max(0, innerRadius - 3), Math.min(profile.length, innerRadius + 3)))
+    const rayBrightThreshold = clamp((brightThreshold + localReference) / 2 + 10, 80, 228)
     let outerRadius = -1
-    let strongestGradient = 0
+    let bestScore = 0
 
-    for (let radius = innerRadius + 3; radius < Math.min(profile.length - 2, innerRadius + Math.floor(innerRadiusPx * 0.52)); radius += 1) {
+    for (let radius = innerRadius + 2; radius < Math.min(profile.length - 2, innerRadius + Math.floor(innerRadiusPx * 0.6)); radius += 1) {
       const gradient = profile[radius + 1] - profile[radius - 1]
-      const isBrightEnough = profile[radius] >= brightThreshold
-      if (gradient > strongestGradient && isBrightEnough) {
-        strongestGradient = gradient
+      const intensityJump = profile[radius] - profile[Math.max(0, radius - 2)]
+      const score = gradient + intensityJump
+      const isBrightEnough = profile[radius] >= rayBrightThreshold
+
+      if (score > bestScore && gradient >= 5 && (isBrightEnough || intensityJump >= 12)) {
+        bestScore = score
         outerRadius = radius
       }
     }
 
     const gapPixels = outerRadius - innerRadius
-    if (outerRadius > 0 && gapPixels >= 2 && gapPixels <= innerRadiusPx * 0.42) {
+    if (outerRadius > 0 && gapPixels >= 2 && gapPixels <= innerRadiusPx * 0.5) {
       gapWidths.push(gapPixels)
+      coveredSectors.add(Math.floor(step / 6))
     }
   }
 
-  if (gapWidths.length < 10) {
+  if (gapWidths.length < 6 || coveredSectors.size < 3) {
     return null
   }
 
@@ -143,7 +150,7 @@ function measureGapFromKnownCircle(gray, width, height, pipeDiameterMm, centerX,
   const gapSpread = standardDeviation(gapWidths)
   const mmPerPixel = pipeDiameterMm / (innerRadiusPx * 2)
   const gapMm = Number((gapPixels * mmPerPixel).toFixed(1))
-  const confidence = Number(clamp(0.62 + gapWidths.length / 120 - gapSpread / 28, 0.58, 0.95).toFixed(2))
+  const confidence = Number(clamp(0.52 + gapWidths.length / 90 + coveredSectors.size / 24 - gapSpread / 24, 0.5, 0.93).toFixed(2))
 
   if (gapMm <= 0.5 || gapMm > 60) {
     return null
@@ -152,7 +159,10 @@ function measureGapFromKnownCircle(gray, width, height, pipeDiameterMm, centerX,
   return {
     gapMm,
     confidence,
-    note: confidence < 0.7 ? 'OpenCV confirmed the pipe opening, but the joint edge contrast was low.' : undefined,
+    note:
+      confidence < 0.72
+        ? 'OpenCV confirmed the pipe opening, but the gap was estimated from partial visible joint slices.'
+        : undefined,
   }
 }
 
