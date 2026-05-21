@@ -83,8 +83,13 @@ const ResultCard = ({
 
       <div className="inspection-result-body">
         <div className="inspection-gap-row">
-          <span>Measured Gap</span>
+          <span>Measured gap:</span>
           <strong>{item.finalGapMm.toFixed(1)} mm</strong>
+        </div>
+
+        <div className="inspection-gap-row">
+          <span>Status:</span>
+          <strong>{item.status}</strong>
         </div>
 
         <div className="inspection-note-block">
@@ -254,7 +259,7 @@ export const InspectionResultsPage = ({
         </button>
       </div>
 
-      <p className="lead">Guidance only - not a formal adoption assessment.</p>
+      <p className="lead">Guidance only – not a formal adoption assessment.</p>
 
       <section className="inspection-results-grid">
         {results.length ? (

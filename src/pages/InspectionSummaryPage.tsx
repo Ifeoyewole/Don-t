@@ -35,7 +35,7 @@ export const InspectionSummaryPage = ({
   onOpenFlagged,
 }: Props) => {
   const flagged = summary?.flaggedJoints ?? []
-  const overallStatus =
+  const overallReport =
     (summary?.failCount ?? 0) > 0 ? 'FAIL' : (summary?.reviewCount ?? 0) > 0 ? 'REVIEW' : (summary?.totalJoints ?? 0) > 0 ? 'PASS' : 'NO RESULTS'
 
   return (
@@ -73,8 +73,8 @@ export const InspectionSummaryPage = ({
 
       <section className="summary-kpi-grid">
         <article className="summary-kpi-card">
-          <span>Overall Status</span>
-          <strong>{overallStatus}</strong>
+          <span>Overall Report</span>
+          <strong>{overallReport}</strong>
           <p>Project outcome</p>
         </article>
         <article className="summary-kpi-card is-pass">
@@ -189,7 +189,7 @@ export const InspectionSummaryPage = ({
                 <span>{summary?.failCount ?? 0}</span>
               </div>
             </div>
-            <p className="lead">Guidance only - not a formal adoption assessment.</p>
+            <p className="lead">Guidance only – not a formal adoption assessment.</p>
           </article>
         </aside>
       </section>

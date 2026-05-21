@@ -12,7 +12,7 @@ import type {
 import { summaryService } from './summaryService'
 import { getPipeSpec } from '../utils'
 
-const DISCLAIMER = 'Guidance only - not a formal adoption assessment.'
+const DISCLAIMER = 'Guidance only – not a formal adoption assessment.'
 
 interface ExportProjectData {
   project: Project
@@ -23,6 +23,18 @@ interface ExportProjectData {
   summary: ProjectInspectionSummary
   exportedAt: string
   disclaimer: string
+}
+
+interface ExportResultRecord {
+  projectName: string
+  manholeId: string
+  dateTime: string
+  pipeType: string
+  pipeDiameterMm: number | null
+  numberOfJointsCaptured: number
+  gapValueMm: number
+  gapStatus: string
+  userNotes?: string
 }
 
 async function loadProjectExportData(projectId: string): Promise<ExportProjectData> {
@@ -53,6 +65,26 @@ async function loadProjectExportData(projectId: string): Promise<ExportProjectDa
     exportedAt: new Date().toISOString(),
     disclaimer: DISCLAIMER,
   }
+}
+
+function buildExportResultRecords(data: ExportProjectData): ExportResultRecord[] {
+  return data.inspectionResults.map((result) => {
+    const manhole = data.manholes.find((item) => item.id === result.manholeId)
+    const spec = manhole ? getPipeSpec(manhole.pipeType) : null
+    const capturedCount = data.inspectionResults.filter((item) => item.manholeId === result.manholeId).length
+
+    return {
+      projectName: data.project.name,
+      manholeId: manhole?.manholeId ?? 'N/A',
+      dateTime: result.processedAt,
+      pipeType: spec?.label ?? 'N/A',
+      pipeDiameterMm: manhole?.pipeDiameterMm ?? null,
+      numberOfJointsCaptured: capturedCount,
+      gapValueMm: result.finalGapMm,
+      gapStatus: result.status,
+      userNotes: result.notes ?? '',
+    }
+  })
 }
 
 function createExportFileName(name: string, extension: string): string {
@@ -110,18 +142,17 @@ async function createPdfBlob(data: ExportProjectData): Promise<Blob> {
   })
   y -= 20
 
-  for (const result of data.inspectionResults.slice(0, 25)) {
-    const manhole = data.manholes.find((item) => item.id === result.manholeId)
-    const pipeSpec = manhole ? getPipeSpec(manhole.pipeType) : null
+  for (const result of buildExportResultRecords(data).slice(0, 25)) {
     const text = [
-      `Manhole ID: ${manhole?.manholeId ?? 'N/A'}`,
-      `Date/time: ${result.processedAt}`,
-      `Pipe type: ${pipeSpec?.label ?? 'N/A'}`,
-      `Pipe diameter: ${manhole?.pipeDiameterMm ?? 'N/A'} mm`,
-      `Joint: ${result.jointLabel}`,
-      `Gap value: ${result.finalGapMm.toFixed(1)} mm`,
-      `Gap status: ${result.status}`,
-      `User notes: ${result.notes ?? 'None'}`,
+      `Project name: ${result.projectName}`,
+      `Manhole ID: ${result.manholeId}`,
+      `Date/time: ${result.dateTime}`,
+      `Pipe type: ${result.pipeType}`,
+      `Pipe diameter: ${result.pipeDiameterMm ?? 'N/A'} mm`,
+      `Number of joints captured: ${result.numberOfJointsCaptured}`,
+      `Gap value (mm): ${result.gapValueMm.toFixed(1)}`,
+      `Gap status: ${result.gapStatus}`,
+      `User notes: ${result.userNotes || 'None'}`,
     ].join(' | ')
     page.drawText(text, {
       x: left,
@@ -165,29 +196,8 @@ export const exportService = {
     const data = await loadProjectExportData(projectId)
     const serialized = JSON.stringify(
       {
-        projectName: data.project.name,
-        siteName: data.project.siteName ?? null,
-        exportedAt: data.exportedAt,
         disclaimer: data.disclaimer,
-        manholes: data.manholes.map((manhole) => {
-          const results = data.inspectionResults.filter((result) => result.manholeId === manhole.id)
-          const spec = getPipeSpec(manhole.pipeType)
-          return {
-            manholeId: manhole.manholeId,
-            type: manhole.type,
-            meterRun: manhole.meterRun,
-            pipeType: spec.label,
-            pipeDiameterMm: manhole.pipeDiameterMm,
-            numberOfJointsCaptured: results.length,
-            results: results.map((result) => ({
-              dateTime: result.processedAt,
-              jointLabel: result.jointLabel,
-              gapValueMm: result.finalGapMm,
-              gapStatus: result.status,
-              userNotes: result.notes ?? '',
-            })),
-          }
-        }),
+        results: buildExportResultRecords(data),
       },
       null,
       2,
