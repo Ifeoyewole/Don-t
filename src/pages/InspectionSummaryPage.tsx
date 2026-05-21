@@ -29,7 +29,7 @@ export const InspectionSummaryPage = ({
       <div>
         <p className="eyebrow">Project ID: {projectId}</p>
         <h1>Inspection summary</h1>
-        <p className="lead">{projectName} aggregate counts, flagged items, and export actions for the frontend review flow.</p>
+        <p className="lead">{projectName} totals, flagged items, and evidence exports in one place.</p>
       </div>
       <div className="export-actions">
         <button className="button button-primary" type="button" onClick={() => void onExport('zip')}>

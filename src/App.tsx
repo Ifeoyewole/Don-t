@@ -281,7 +281,7 @@ function App() {
         <div className="page-grid">
           <section className="empty-state">
             <strong>Loading workspace...</strong>
-            <p>Pulling the latest local project, queue, and inspection state from the backend services.</p>
+            <p>Opening your latest inspection data.</p>
           </section>
         </div>
       )

@@ -1,0 +1,22 @@
+<svg width="720" height="160" viewBox="0 0 720 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="160" rx="28" fill="white" fill-opacity="0"/>
+  <g transform="translate(18 16)">
+    <g transform="rotate(12 56 56)">
+      <rect x="8" y="8" width="96" height="96" rx="24" fill="url(#logoGradient)"/>
+      <rect x="28" y="28" width="56" height="56" rx="16" stroke="white" stroke-width="8"/>
+      <path d="M42 56H70" stroke="white" stroke-width="8" stroke-linecap="round"/>
+      <path d="M56 42V70" stroke="white" stroke-width="8" stroke-linecap="round"/>
+      <circle cx="56" cy="56" r="6" fill="white"/>
+    </g>
+  </g>
+  <g fill="#041632">
+    <text x="154" y="74" font-family="Inter, Segoe UI, sans-serif" font-size="44" font-weight="800" letter-spacing="-0.04em">JointInspect</text>
+    <text x="156" y="108" font-family="Inter, Segoe UI, sans-serif" font-size="18" font-weight="600" fill="#4B5A6E" letter-spacing="0.08em">PIPE JOINT INSPECTION</text>
+  </g>
+  <defs>
+    <linearGradient id="logoGradient" x1="56" y1="8" x2="56" y2="104" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0051D5"/>
+      <stop offset="1" stop-color="#041632"/>
+    </linearGradient>
+  </defs>
+</svg>

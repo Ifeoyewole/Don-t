@@ -45,17 +45,17 @@ export const DashboardPage = ({
         <article className="stat-card">
           <span className="stat-label">Active projects</span>
           <strong>{projects.length}</strong>
-          <p>UI-only project cards for the dashboard route.</p>
+          <p>Projects ready for inspection, review, and export.</p>
         </article>
         <article className="stat-card">
           <span className="stat-label">Inspections completed</span>
           <strong>{totalInspections}</strong>
-          <p>Finished evidence items across seeded and new manholes.</p>
+          <p>Measured joint checks completed across all current work.</p>
         </article>
         <article className="stat-card stat-card-alert">
           <span className="stat-label">Review required</span>
           <strong>{totalFailures}</strong>
-          <p>Combined `REVIEW` and `FAIL` statuses needing attention.</p>
+          <p>Items flagged for follow-up before sign-off.</p>
         </article>
       </section>
 
@@ -68,11 +68,11 @@ export const DashboardPage = ({
           </div>
         </div>
         <div className="side-note-card">
-          <h2>Frontend plan coverage</h2>
+          <h2>Today’s priorities</h2>
           <ul className="feature-list">
-            <li>Dashboard and project intake use real navigation handlers.</li>
-            <li>Offline banner, touch target sizing, and contrast rules are preserved.</li>
-            <li>All visible CTA buttons are wired to local UI actions.</li>
+            <li>Start a new project and set up each manhole run.</li>
+            <li>Capture clear joint evidence before processing.</li>
+            <li>Review flagged measurements and export the evidence pack.</li>
           </ul>
         </div>
       </section>
@@ -80,7 +80,7 @@ export const DashboardPage = ({
       <section className="section-header">
         <div>
           <h2>Recent Projects</h2>
-          <p>Frontend-only project summaries and status chips.</p>
+          <p>Pick up where the last inspection left off.</p>
         </div>
         <button className="button button-ghost" type="button" onClick={onToggleProjects}>
           {showAllProjects ? 'Show Recent' : 'View All Projects'}

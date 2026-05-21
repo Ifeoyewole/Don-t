@@ -103,7 +103,7 @@ export const PhotoUploadPage = ({
       <section className="section-header compact">
         <div>
           <h2>Current uploads ({queue.length})</h2>
-          <p>UI queue cards with local progress, remove, clear, and start actions.</p>
+          <p>Review the evidence set before starting inspection.</p>
         </div>
       </section>
 
@@ -133,7 +133,7 @@ export const PhotoUploadPage = ({
         ) : (
           <article className="empty-state">
             <strong>No queued photos yet</strong>
-            <p>Add field images or load the sample queue to validate the full inspection flow.</p>
+            <p>Add field images to begin this inspection run.</p>
           </article>
         )}
       </section>

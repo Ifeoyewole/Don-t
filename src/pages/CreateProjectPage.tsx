@@ -41,7 +41,7 @@ export const CreateProjectPage = ({ todayLabel, onBack, onSave }: Props) => {
         <div className="editor-hero-copy">
           <p className="eyebrow">Setup phase</p>
           <h1>New project</h1>
-          <p className="lead">Create a pipe inspection job with field-safe wording and locally generated timestamps.</p>
+          <p className="lead">Set up the project details before adding manholes, evidence, and inspection results.</p>
         </div>
       </section>
 
@@ -70,17 +70,6 @@ export const CreateProjectPage = ({ todayLabel, onBack, onSave }: Props) => {
         </div>
 
         {error ? <p className="form-error">{error}</p> : null}
-      </section>
-
-      <section className="tips-grid">
-        <article className="tip-card">
-          <strong>Local-first storage</strong>
-          <p>This MVP keeps project metadata on-device and avoids cloud-sync wording.</p>
-        </article>
-        <article className="tip-card">
-          <strong>Pipe inspection terminology</strong>
-          <p>Project, manhole, pipe type, gap measurement, and evidence pack stay consistent with the plan.</p>
-        </article>
       </section>
 
       <footer className="sticky-actions">
