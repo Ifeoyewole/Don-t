@@ -14,3 +14,11 @@ createRoot(rootElement).render(
     <App />
   </StrictMode>,
 )
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Keep the app usable even if offline caching cannot be installed.
+    })
+  })
+}

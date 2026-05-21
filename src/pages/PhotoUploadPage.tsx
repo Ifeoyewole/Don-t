@@ -16,6 +16,9 @@ type Props = {
   onStartInspection: () => Promise<ProcessBatchResult>
 }
 
+const validationTone = (image: InspectionImage) =>
+  image.validationStatus === 'retake' ? 'Needs retake' : 'Guided angle ready'
+
 const phaseLabel = (image: InspectionImage) => {
   if (image.queueStatus === 'failed') return image.errorMessage ?? 'Needs replacement'
   if (image.queueStatus === 'processing') return `Uploading ${image.progress ?? 0}%`
@@ -43,6 +46,7 @@ export const PhotoUploadPage = ({
 
   const completedCount = useMemo(() => queue.filter((image) => image.queueStatus === 'completed').length, [queue])
   const processingCount = useMemo(() => queue.filter((image) => image.queueStatus === 'processing').length, [queue])
+  const invalidCount = useMemo(() => queue.filter((image) => image.validationStatus === 'retake').length, [queue])
   const queueCompletion = useMemo(() => {
     if (!queue.length) return 0
     const weighted = queue.reduce((sum, image) => sum + (image.progress ?? 0), 0)
@@ -86,6 +90,9 @@ export const PhotoUploadPage = ({
     setBusy(true)
     setError('')
     try {
+      if (invalidCount > 0) {
+        throw new Error('Replace the photos marked for retake before starting inspection.')
+      }
       await onStartInspection()
     } catch (processingError) {
       setError(processingError instanceof Error ? processingError.message : 'Processing failed.')
@@ -114,7 +121,12 @@ export const PhotoUploadPage = ({
             validation, joint gap measurement, and tolerance review.
           </p>
         </div>
-        <button className="button button-primary dashboard-cta" type="button" onClick={() => void handleStart()} disabled={!queue.length || busy}>
+        <button
+          className="button button-primary dashboard-cta"
+          type="button"
+          onClick={() => void handleStart()}
+          disabled={!queue.length || busy || invalidCount > 0}
+        >
           {busy ? 'Processing...' : 'Start Inspection'}
         </button>
       </section>
@@ -159,6 +171,7 @@ export const PhotoUploadPage = ({
             <p>
               Offline caching stays enabled, so project data persists locally if connection drops while photos remain in upload order.
             </p>
+            <p>{invalidCount ? `${invalidCount} photo(s) need a retake before measurement can start.` : 'All queued photos are eligible for measurement.'}</p>
             <div className="action-row">
               <button className="button button-secondary" type="button" onClick={() => void onLoadSample()} disabled={busy}>
                 Load Sample
@@ -187,7 +200,10 @@ export const PhotoUploadPage = ({
           <div className="upload-assets-grid">
             {queue.length ? (
               queue.map((image) => (
-                <article className={`asset-card asset-${image.queueStatus}`} key={image.id}>
+                <article
+                  className={`asset-card asset-${image.queueStatus} ${image.validationStatus === 'retake' ? 'asset-invalid-capture' : ''}`}
+                  key={image.id}
+                >
                   <div className="asset-image-wrap">
                     {image.previewUrl ? <img src={image.previewUrl} alt={image.fileName} /> : <div className="preview-placeholder" />}
                     <button className="icon-button" type="button" onClick={() => void onRemoveFile(image.id)}>
@@ -205,10 +221,16 @@ export const PhotoUploadPage = ({
                       <StatusBadge status={image.queueStatus} />
                       <span>{manholeLabel}</span>
                     </div>
+                    <div className="asset-validation-row">
+                      <span className={image.validationStatus === 'retake' ? 'mini-status-pill is-fail' : 'mini-status-pill is-pass'}>
+                        {validationTone(image)}
+                      </span>
+                    </div>
                     <div className="progress-rail">
                       <div className="progress-fill" style={{ width: `${image.progress ?? 0}%` }} />
                     </div>
                     <p>{phaseLabel(image)}</p>
+                    {image.validationMessage ? <p className="asset-validation-message">{image.validationMessage}</p> : null}
                   </div>
                 </article>
               ))
@@ -228,7 +250,12 @@ export const PhotoUploadPage = ({
               <button className="button button-ghost" type="button" onClick={() => void onClearQueue()} disabled={!queue.length || busy}>
                 Clear all
               </button>
-              <button className="button button-primary" type="button" onClick={() => void handleStart()} disabled={!queue.length || busy}>
+              <button
+                className="button button-primary"
+                type="button"
+                onClick={() => void handleStart()}
+                disabled={!queue.length || busy || invalidCount > 0}
+              >
                 {busy ? 'Processing Queue...' : 'Start Inspection'}
               </button>
             </div>

@@ -38,6 +38,20 @@ async function processImage(imageId: string): Promise<string | null> {
 
   emit({ type: 'started', imageId })
 
+  if (image.validationStatus === 'retake') {
+    await db.inspectionImages.put({
+      ...image,
+      queueStatus: 'failed',
+      errorMessage: image.validationMessage ?? 'Retake photo before measurement.',
+    })
+    emit({
+      type: 'failed',
+      imageId,
+      message: image.validationMessage ?? 'Retake photo before measurement.',
+    })
+    return null
+  }
+
   await db.inspectionImages.put({
     ...image,
     queueStatus: 'processing',

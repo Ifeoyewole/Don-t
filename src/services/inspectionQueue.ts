@@ -1,4 +1,5 @@
 import { db } from '../db'
+import { validateGuidedPhoto } from '../lib/photoValidation'
 import type { QueueFilesInput, QueuedInspectionImage } from '../types'
 import { createJointLabels } from '../utils'
 import { createId, createTimestamp } from '../utils/identity'
@@ -19,6 +20,7 @@ export const inspectionQueue = {
         const timestamp = createTimestamp()
         const imageId = createId()
         const blobKey = createId()
+        const validation = await validateGuidedPhoto(file)
         const queuedImage: QueuedInspectionImage = {
           id: imageId,
           projectId: input.projectId,
@@ -32,6 +34,9 @@ export const inspectionQueue = {
           queueStatus: 'queued',
           createdAt: timestamp,
           progress: 0,
+          validationStatus: validation.status,
+          validationMessage: validation.message,
+          validationScore: validation.score,
         }
 
         await db.inspectionImages.add(queuedImage)

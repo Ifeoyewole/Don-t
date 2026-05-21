@@ -1,4 +1,5 @@
 import { runCvMeasurement, type CvWorkerRequest, type CvWorkerResponse } from '../lib/cvMeasurement'
+import { loadOpenCv } from '../lib/opencv'
 
 interface CvWorkerErrorResponse {
   kind: 'error'
@@ -22,6 +23,7 @@ type CvWorkerMessage =
 self.onmessage = async (event: MessageEvent<CvWorkerMessage>) => {
   if (event.data.kind === 'warmup') {
     try {
+      await loadOpenCv()
       const response: CvWorkerReadyResponse = { kind: 'ready' }
       self.postMessage(response)
     } catch (error) {

@@ -1135,6 +1135,11 @@ img {
   background: #fff7f7;
 }
 
+.asset-card.asset-invalid-capture {
+  border-color: rgba(200, 38, 26, 0.35);
+  box-shadow: 0 0 0 2px rgba(200, 38, 26, 0.08);
+}
+
 .asset-card.asset-processing {
   border-color: rgba(0, 81, 213, 0.28);
 }
@@ -1224,6 +1229,17 @@ img {
 
 .asset-meta-row {
   align-items: center;
+}
+
+.asset-validation-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.asset-validation-message {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
 }
 
 .upload-error {

@@ -10,6 +10,7 @@ export type PipeType =
 export type InspectionCaptureSource = 'upload' | 'camera'
 export type QueueStatus = 'queued' | 'processing' | 'completed' | 'failed'
 export type InspectionStatus = 'PASS' | 'REVIEW' | 'FAIL'
+export type GuidedPhotoStatus = 'ready' | 'retake'
 
 export interface Project {
   id: string
@@ -89,6 +90,9 @@ export interface InspectionImage {
   previewUrl?: string
   progress?: number
   errorMessage?: string
+  validationStatus?: GuidedPhotoStatus
+  validationMessage?: string
+  validationScore?: number
 }
 
 export interface InspectionBlob {
