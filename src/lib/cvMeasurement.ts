@@ -1,6 +1,5 @@
 import type { InspectionStatus } from '../types'
 import { classifyGap } from '../utils'
-import { loadOpenCv } from './opencv'
 
 export interface CvWorkerRequest {
   imageId: string
@@ -20,6 +19,7 @@ export interface CvWorkerResponse {
 }
 
 const DEFAULT_PIPE_DIAMETER_MM = 225
+const MAX_PROCESS_DIMENSION = 640
 
 function deriveGapMm(seed: string, orderIndex: number): number {
   const hash = Array.from(seed).reduce((acc, char, index) => {
@@ -31,88 +31,131 @@ function deriveGapMm(seed: string, orderIndex: number): number {
   return Number((base + offset).toFixed(1))
 }
 
-function detectGapPixels(
-  cv: Awaited<ReturnType<typeof loadOpenCv>>,
-  edges: InstanceType<(Awaited<ReturnType<typeof loadOpenCv>>)['Mat']>,
-): number | null {
-  const bandHeight = Math.max(10, Math.floor(edges.rows * 0.18))
-  const startY = Math.max(0, Math.floor(edges.rows / 2 - bandHeight / 2))
-  const band = edges.roi(new cv.Rect(0, startY, edges.cols, Math.min(bandHeight, edges.rows - startY)))
+function buildGrayMap(imageData: ImageData): Uint8Array {
+  const gray = new Uint8Array(imageData.width * imageData.height)
+  const { data } = imageData
 
-  try {
-    const activeColumns: number[] = []
-    const threshold = Math.max(2, Math.floor(band.rows * 0.04))
-
-    for (let x = 0; x < band.cols; x += 1) {
-      const column = band.roi(new cv.Rect(x, 0, 1, band.rows))
-      const edgeCount = cv.countNonZero(column)
-      column.delete()
-
-      if (edgeCount >= threshold) {
-        activeColumns.push(x)
-      }
-    }
-
-    if (activeColumns.length < 2) {
-      return null
-    }
-
-    const midpoint = Math.floor(band.cols / 2)
-    const leftCandidates = activeColumns.filter((x) => x < midpoint)
-    const rightCandidates = activeColumns.filter((x) => x > midpoint)
-
-    if (leftCandidates.length === 0 || rightCandidates.length === 0) {
-      return null
-    }
-
-    const leftEdge = Math.max(...leftCandidates)
-    const rightEdge = Math.min(...rightCandidates)
-    const gapPixels = rightEdge - leftEdge
-
-    return gapPixels > 0 ? gapPixels : null
-  } finally {
-    band.delete()
+  for (let sourceIndex = 0, grayIndex = 0; sourceIndex < data.length; sourceIndex += 4, grayIndex += 1) {
+    const red = data[sourceIndex]
+    const green = data[sourceIndex + 1]
+    const blue = data[sourceIndex + 2]
+    gray[grayIndex] = Math.round(red * 0.299 + green * 0.587 + blue * 0.114)
   }
+
+  return gray
 }
 
-function detectPipeDiameterPixels(
-  cv: Awaited<ReturnType<typeof loadOpenCv>>,
-  blurred: InstanceType<(Awaited<ReturnType<typeof loadOpenCv>>)['Mat']>,
-): number | null {
-  const circles = new cv.Mat()
+function detectPipeDiameterPixels(gray: Uint8Array, width: number, height: number): number | null {
+  const topSearchLimit = Math.max(1, Math.floor(height * 0.72))
+  const minXSearch = Math.floor(width * 0.12)
+  const maxXSearch = Math.ceil(width * 0.88)
 
-  try {
-    cv.HoughCircles(
-      blurred,
-      circles,
-      cv.HOUGH_GRADIENT,
-      1,
-      Math.max(blurred.rows / 8, 20),
-      120,
-      30,
-      Math.max(10, Math.floor(Math.min(blurred.rows, blurred.cols) * 0.08)),
-      Math.max(20, Math.floor(Math.min(blurred.rows, blurred.cols) * 0.45)),
-    )
+  let sum = 0
+  let min = 255
+  let count = 0
 
-    if (!circles.data32F || circles.cols === 0) {
-      return null
+  for (let y = 0; y < topSearchLimit; y += 1) {
+    for (let x = minXSearch; x < maxXSearch; x += 1) {
+      const value = gray[y * width + x]
+      sum += value
+      min = Math.min(min, value)
+      count += 1
     }
-
-    let largestRadius = 0
-    for (let index = 0; index < circles.cols; index += 1) {
-      const radius = circles.data32F[index * 3 + 2]
-      if (radius > largestRadius) {
-        largestRadius = radius
-      }
-    }
-
-    return largestRadius > 0 ? largestRadius * 2 : null
-  } finally {
-    circles.delete()
   }
+
+  if (!count) {
+    return null
+  }
+
+  const mean = sum / count
+  const darkThreshold = Math.max(min + 18, Math.min(140, mean * 0.72))
+
+  let minX = width
+  let maxX = -1
+  let minY = topSearchLimit
+  let maxY = -1
+  let darkCount = 0
+
+  for (let y = 0; y < topSearchLimit; y += 1) {
+    for (let x = minXSearch; x < maxXSearch; x += 1) {
+      if (gray[y * width + x] > darkThreshold) {
+        continue
+      }
+
+      minX = Math.min(minX, x)
+      maxX = Math.max(maxX, x)
+      minY = Math.min(minY, y)
+      maxY = Math.max(maxY, y)
+      darkCount += 1
+    }
+  }
+
+  if (darkCount < width * height * 0.003 || maxX <= minX || maxY <= minY) {
+    return null
+  }
+
+  const detectedWidth = maxX - minX + 1
+  const detectedHeight = maxY - minY + 1
+
+  if (detectedWidth < width * 0.08 || detectedHeight < height * 0.08) {
+    return null
+  }
+
+  return (detectedWidth + detectedHeight) / 2
 }
 
-async function tryMeasureWithOpenCv(
+function detectGapPixels(gray: Uint8Array, width: number, height: number): { gapPixels: number; edgeStrength: number } | null {
+  const bandHeight = Math.max(12, Math.floor(height * 0.14))
+  const startY = Math.max(1, Math.floor(height / 2 - bandHeight / 2))
+  const endY = Math.min(height - 1, startY + bandHeight)
+  const scores = new Float32Array(width)
+
+  for (let x = 1; x < width - 1; x += 1) {
+    let score = 0
+    for (let y = startY; y < endY; y += 1) {
+      const index = y * width + x
+      score += Math.abs(gray[index] - gray[index - 1])
+      score += Math.abs(gray[index] - gray[index + 1])
+    }
+    scores[x] = score / Math.max(1, endY - startY)
+  }
+
+  const midpoint = Math.floor(width / 2)
+  const leftStart = Math.max(1, Math.floor(width * 0.15))
+  const leftEnd = Math.max(leftStart + 1, midpoint - Math.floor(width * 0.05))
+  const rightStart = Math.min(width - 2, midpoint + Math.floor(width * 0.05))
+  const rightEnd = Math.max(rightStart + 1, Math.floor(width * 0.85))
+
+  let leftEdge = -1
+  let rightEdge = -1
+  let leftStrength = 0
+  let rightStrength = 0
+
+  for (let x = leftStart; x < leftEnd; x += 1) {
+    if (scores[x] > leftStrength) {
+      leftStrength = scores[x]
+      leftEdge = x
+    }
+  }
+
+  for (let x = rightStart; x < rightEnd; x += 1) {
+    if (scores[x] > rightStrength) {
+      rightStrength = scores[x]
+      rightEdge = x
+    }
+  }
+
+  const gapPixels = rightEdge - leftEdge
+  const edgeStrength = (leftStrength + rightStrength) / 2
+
+  if (leftEdge < 0 || rightEdge < 0 || gapPixels <= 0 || edgeStrength < 12) {
+    return null
+  }
+
+  return { gapPixels, edgeStrength }
+}
+
+async function tryMeasureWithImageAnalysis(
   blob: Blob | undefined,
   pipeDiameterMm: number,
 ): Promise<{ gapMm: number; confidence: number } | null> {
@@ -120,9 +163,11 @@ async function tryMeasureWithOpenCv(
     return null
   }
 
-  const cv = await loadOpenCv()
   const bitmap = await createImageBitmap(blob)
-  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+  const scale = Math.min(1, MAX_PROCESS_DIMENSION / Math.max(bitmap.width, bitmap.height))
+  const targetWidth = Math.max(1, Math.round(bitmap.width * scale))
+  const targetHeight = Math.max(1, Math.round(bitmap.height * scale))
+  const canvas = new OffscreenCanvas(targetWidth, targetHeight)
   const context = canvas.getContext('2d')
 
   if (!context) {
@@ -130,37 +175,26 @@ async function tryMeasureWithOpenCv(
     return null
   }
 
-  context.drawImage(bitmap, 0, 0)
-  const imageData = context.getImageData(0, 0, bitmap.width, bitmap.height)
-
-  const source = cv.matFromImageData(imageData)
-  const gray = new cv.Mat()
-  const blurred = new cv.Mat()
-  const edges = new cv.Mat()
+  context.drawImage(bitmap, 0, 0, targetWidth, targetHeight)
+  const imageData = context.getImageData(0, 0, targetWidth, targetHeight)
+  const gray = buildGrayMap(imageData)
 
   try {
-    cv.cvtColor(source, gray, cv.COLOR_RGBA2GRAY)
-    cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0)
-    cv.Canny(blurred, edges, 50, 150)
+    const diameterPixels = detectPipeDiameterPixels(gray, targetWidth, targetHeight)
+    const gap = detectGapPixels(gray, targetWidth, targetHeight)
 
-    const diameterPixels = detectPipeDiameterPixels(cv, blurred)
-    const gapPixels = detectGapPixels(cv, edges)
-
-    if (!diameterPixels || !gapPixels) {
+    if (!diameterPixels || !gap) {
       return null
     }
 
     const mmPerPixel = pipeDiameterMm / diameterPixels
-    const gapMm = Number((gapPixels * mmPerPixel).toFixed(1))
+    const gapMm = Number((gap.gapPixels * mmPerPixel).toFixed(1))
+    const confidence = Number(Math.min(0.91, 0.62 + gap.edgeStrength / 180).toFixed(2))
     return {
       gapMm,
-      confidence: 0.86,
+      confidence,
     }
   } finally {
-    source.delete()
-    gray.delete()
-    blurred.delete()
-    edges.delete()
     bitmap.close()
   }
 }
@@ -197,7 +231,7 @@ export async function runCvMeasurement(
     return createFallbackMeasurement(request, pipeDiameterMm, options.fallbackNote)
   }
 
-  const measured = await tryMeasureWithOpenCv(request.blob, pipeDiameterMm)
+  const measured = await tryMeasureWithImageAnalysis(request.blob, pipeDiameterMm)
 
   if (!measured) {
     return createFallbackMeasurement(request, pipeDiameterMm, options?.fallbackNote)

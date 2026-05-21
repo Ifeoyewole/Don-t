@@ -11,36 +11,41 @@ export async function loadOpenCv(): Promise<OpenCvModule> {
     return cvReadyPromise
   }
 
-  cvReadyPromise = import('@techstark/opencv-js').then(
-    (importedModule) =>
-      new Promise<OpenCvModule>((resolve, reject) => {
-        const cv = (
-          'default' in importedModule ? importedModule.default : importedModule
-        ) as OpenCvModule
+  cvReadyPromise = import('@techstark/opencv-js')
+    .then(
+      (importedModule) =>
+        new Promise<OpenCvModule>((resolve, reject) => {
+          const cv = (
+            'default' in importedModule ? importedModule.default : importedModule
+          ) as OpenCvModule
 
-        if (isOpenCvReady(cv)) {
-          resolve(cv)
-          return
-        }
-
-        const moduleLike = cv as OpenCvModule & {
-          onRuntimeInitialized?: () => void
-        }
-
-        moduleLike.onRuntimeInitialized = () => {
-          resolve(cv)
-        }
-
-        setTimeout(() => {
           if (isOpenCvReady(cv)) {
             resolve(cv)
             return
           }
 
-          reject(new Error('OpenCV runtime initialization timed out'))
-        }, 15000)
-      }),
-  )
+          const moduleLike = cv as OpenCvModule & {
+            onRuntimeInitialized?: () => void
+          }
+
+          moduleLike.onRuntimeInitialized = () => {
+            resolve(cv)
+          }
+
+          setTimeout(() => {
+            if (isOpenCvReady(cv)) {
+              resolve(cv)
+              return
+            }
+
+            reject(new Error('OpenCV runtime initialization timed out'))
+          }, 15000)
+        }),
+    )
+    .catch((error) => {
+      cvReadyPromise = null
+      throw error
+    })
 
   return cvReadyPromise
 }
