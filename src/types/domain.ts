@@ -118,6 +118,8 @@ export interface InspectionResult {
   finalGapMm: number
   status: InspectionStatus
   confidence?: number
+  measurementSource?: 'cv' | 'fallback'
+  measurementNote?: string
   notes?: string
   processedAt: string
   overrideApplied: boolean
@@ -172,6 +174,7 @@ export interface FlaggedInspectionSummary {
   jointLabel: string
   status: InspectionStatus
   finalGapMm: number
+  measurementSource?: 'cv' | 'fallback'
   overrideApplied?: boolean
   note?: string
 }

@@ -155,8 +155,53 @@ function App() {
 
   useEffect(() => {
     const unsubscribe = processor.subscribe((event) => {
-      const label = `[${event.type.toUpperCase()}] ${event.message ?? event.imageId}`
+      const label = `[${event.type.toUpperCase()}] ${event.progress ? `${event.progress}% ` : ''}${event.message ?? event.imageId}`
       setEvents((current) => [label, ...current].slice(0, 10))
+      setCurrentQueue((current) =>
+        current.map((image) => {
+          if (image.id !== event.imageId) {
+            return image
+          }
+
+          if (event.type === 'started') {
+            return {
+              ...image,
+              queueStatus: 'processing',
+              progress: 5,
+              errorMessage: undefined,
+            }
+          }
+
+          if (event.type === 'progress') {
+            return {
+              ...image,
+              queueStatus: 'processing',
+              progress: event.progress ?? image.progress ?? 0,
+              errorMessage: event.message,
+            }
+          }
+
+          if (event.type === 'completed') {
+            return {
+              ...image,
+              queueStatus: 'completed',
+              progress: 100,
+              errorMessage: undefined,
+            }
+          }
+
+          if (event.type === 'failed') {
+            return {
+              ...image,
+              queueStatus: 'failed',
+              progress: 100,
+              errorMessage: event.message ?? 'Processing failed',
+            }
+          }
+
+          return image
+        }),
+      )
     })
 
     return unsubscribe

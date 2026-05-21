@@ -15,6 +15,8 @@ export interface CvWorkerResponse {
   originalGapMm: number
   status: InspectionStatus
   confidence: number
+  measurementSource: 'cv' | 'fallback'
+  measurementNote?: string
 }
 
 const DEFAULT_PIPE_DIAMETER_MM = 225
@@ -163,18 +165,49 @@ async function tryMeasureWithOpenCv(
   }
 }
 
-export async function runCvMeasurement(
+function createFallbackMeasurement(
   request: CvWorkerRequest,
-): Promise<CvWorkerResponse> {
-  const pipeDiameterMm = request.pipeDiameterMm ?? DEFAULT_PIPE_DIAMETER_MM
-  const measured = await tryMeasureWithOpenCv(request.blob, pipeDiameterMm)
-  const originalGapMm = measured?.gapMm ?? deriveGapMm(request.fileName, request.orderIndex)
+  pipeDiameterMm: number,
+  note?: string,
+): CvWorkerResponse {
+  const originalGapMm = deriveGapMm(request.fileName, request.orderIndex)
   const classification = classifyGap(originalGapMm)
 
   return {
     imageId: request.imageId,
     originalGapMm,
     status: classification.status,
-    confidence: measured?.confidence ?? 0.72,
+    confidence: 0.72,
+    measurementSource: 'fallback',
+    measurementNote:
+      note ??
+      `Estimated from file metadata because the CV pipeline could not confirm the ${pipeDiameterMm}mm pipe geometry.`,
+  }
+}
+
+export async function runCvMeasurement(
+  request: CvWorkerRequest,
+  options?: {
+    skipOpenCv?: boolean
+    fallbackNote?: string
+  },
+): Promise<CvWorkerResponse> {
+  const pipeDiameterMm = request.pipeDiameterMm ?? DEFAULT_PIPE_DIAMETER_MM
+  if (options?.skipOpenCv) {
+    return createFallbackMeasurement(request, pipeDiameterMm, options.fallbackNote)
+  }
+
+  const measured = await tryMeasureWithOpenCv(request.blob, pipeDiameterMm)
+
+  if (!measured) {
+    return createFallbackMeasurement(request, pipeDiameterMm, options?.fallbackNote)
+  }
+
+  return {
+    imageId: request.imageId,
+    originalGapMm: measured.gapMm,
+    status: classifyGap(measured.gapMm).status,
+    confidence: measured.confidence,
+    measurementSource: 'cv',
   }
 }

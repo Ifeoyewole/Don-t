@@ -54,6 +54,7 @@ const ResultCard = ({
 
   const toneClass =
     item.status === 'PASS' ? 'result-card pass' : item.status === 'FAIL' ? 'result-card fail' : 'result-card review'
+  const measurementLabel = item.measurementSource === 'fallback' ? 'Estimated fallback' : 'CV measured'
 
   return (
     <article className={toneClass}>
@@ -79,6 +80,11 @@ const ResultCard = ({
             <span>Confidence</span>
             <strong>{Math.round((item.confidence ?? 0) * 100)}%</strong>
           </div>
+        </div>
+
+        <div className="result-meta-line">
+          <span>{measurementLabel}</span>
+          {item.measurementNote ? <span>{item.measurementNote}</span> : null}
         </div>
 
         <label className="field">

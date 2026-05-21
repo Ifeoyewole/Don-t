@@ -11,6 +11,7 @@ export function toFlaggedInspection(result: InspectionResult): FlaggedInspection
     jointLabel: result.jointLabel,
     status: result.status,
     finalGapMm: result.finalGapMm,
+    measurementSource: result.measurementSource,
     overrideApplied: result.overrideApplied,
   }
 }

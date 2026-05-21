@@ -82,6 +82,7 @@ export const InspectionSummaryPage = ({
                 <div>
                   <strong>{item.jointLabel}</strong>
                   <span>{item.finalGapMm.toFixed(1)} mm final gap</span>
+                  {item.measurementSource === 'fallback' ? <span>Estimated fallback result</span> : null}
                 </div>
                 <StatusBadge status={item.status} />
               </div>

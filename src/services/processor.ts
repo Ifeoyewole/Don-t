@@ -67,6 +67,8 @@ async function processImage(imageId: string): Promise<string | null> {
     finalGapMm: measurement.originalGapMm,
     status: measurement.status,
     confidence: measurement.confidence,
+    measurementSource: measurement.measurementSource,
+    measurementNote: measurement.measurementNote,
     processedAt: createTimestamp(),
     overrideApplied: false,
   }
@@ -84,7 +86,13 @@ async function processImage(imageId: string): Promise<string | null> {
     })
   })
 
-  emit({ type: 'progress', imageId, inspectionId: resultId, progress: 100, message: 'Completed' })
+  emit({
+    type: 'progress',
+    imageId,
+    inspectionId: resultId,
+    progress: 100,
+    message: measurement.measurementSource === 'fallback' ? 'Completed with estimated fallback' : 'Completed',
+  })
   emit({ type: 'completed', imageId, inspectionId: resultId })
 
   return resultId
@@ -183,6 +191,8 @@ export const processor = {
       status: existing.overrideApplied ? existing.status : measurement.status,
       processedAt: createTimestamp(),
       confidence: measurement.confidence,
+      measurementSource: measurement.measurementSource,
+      measurementNote: measurement.measurementNote,
     }
 
     await db.inspectionResults.put(updated)

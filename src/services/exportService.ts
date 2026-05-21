@@ -110,7 +110,7 @@ async function createPdfBlob(data: ExportProjectData): Promise<Blob> {
   y -= 20
 
   for (const result of data.inspectionResults.slice(0, 25)) {
-    const text = `${result.jointLabel}: ${result.finalGapMm.toFixed(1)}mm - ${result.status}${result.overrideApplied ? ' (override)' : ''}`
+    const text = `${result.jointLabel}: ${result.finalGapMm.toFixed(1)}mm - ${result.status}${result.overrideApplied ? ' (override)' : ''}${result.measurementSource === 'fallback' ? ' (estimated)' : ''}`
     page.drawText(text, {
       x: left,
       y,
