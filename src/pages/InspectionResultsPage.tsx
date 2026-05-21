@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
 import type { InspectionResult, ManholeInspectionSummary } from '../types/domain'
 
 type Props = {
+  inspectionId: string
+  loading?: boolean
   online: boolean
   projectId: string
   projectName: string
@@ -152,6 +154,8 @@ const ResultCard = ({
 }
 
 export const InspectionResultsPage = ({
+  inspectionId,
+  loading = false,
   online,
   projectId,
   projectName,
@@ -172,6 +176,22 @@ export const InspectionResultsPage = ({
   const review = summary?.reviewCount ?? results.filter((item) => item.status === 'REVIEW').length
   const completion = total ? Math.round((results.length / total) * 100) : 0
   const latestProcessedAt = results[results.length - 1]?.processedAt
+
+  useEffect(() => {
+    console.log('ROUTE INSPECTION ID:', inspectionId)
+    console.log('LOADED RESULTS:', results)
+  }, [inspectionId, results])
+
+  if (loading) {
+    return (
+      <div className="page-grid results-page">
+        <article className="empty-state">
+          <strong>Loading inspection results...</strong>
+          <p>Fetching the saved measurement job for display.</p>
+        </article>
+      </div>
+    )
+  }
 
   return (
     <div className="page-grid results-page">
@@ -248,8 +268,8 @@ export const InspectionResultsPage = ({
           ))
         ) : (
           <article className="empty-state">
-            <strong>No results yet</strong>
-            <p>Process the upload queue first to populate inspection results for this manhole.</p>
+            <strong>No inspection results found.</strong>
+            <p>The selected inspection job did not return any saved results yet.</p>
           </article>
         )}
       </section>

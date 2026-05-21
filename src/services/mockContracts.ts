@@ -425,7 +425,24 @@ export const createMockServices = ({ getStore, updateStore, emit }: StoreContext
         processed += 1
       }
 
-      return { manholeId, processed, failed }
+      const resultIds = getStore()
+        .inspections
+        .filter((item) => item.manholeId === manholeId)
+        .sort((a, b) => a.processedAt.localeCompare(b.processedAt))
+        .map((item) => item.id)
+
+      return {
+        success: processed > 0,
+        manholeId,
+        failed,
+        processed,
+        completed: processed,
+        total: queue.length,
+        inspectionId: resultIds[0],
+        resultIds,
+        queueStatus: failed === 0 ? 'completed' : processed > 0 ? 'completed' : 'failed',
+        message: processed > 0 ? undefined : 'Inspection processing failed',
+      }
     },
     async remeasureInspection(inspectionId: string) {
       await wait(220)

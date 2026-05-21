@@ -168,11 +168,16 @@ export const processor = {
     }
 
     return {
+      success: completed > 0,
       manholeId,
+      inspectionId: inspectionIds[0],
+      resultIds: inspectionIds,
+      queueStatus: failed === 0 ? 'completed' : completed > 0 ? 'completed' : 'failed',
+      message: completed > 0 ? undefined : 'Inspection processing failed',
       total: queuedImages.length,
       completed,
       failed,
-      inspectionIds,
+      processed: completed,
     }
   },
 

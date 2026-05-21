@@ -168,11 +168,15 @@ export interface ProcessOptions {
 }
 
 export interface ProcessBatchResult {
+  success: boolean
   manholeId: string
   failed: number
+  inspectionId?: string
+  resultIds?: string[]
+  queueStatus?: QueueStatus
+  message?: string
   total?: number
   completed?: number
-  inspectionIds?: string[]
   processed?: number
 }
 

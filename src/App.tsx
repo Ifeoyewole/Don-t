@@ -37,7 +37,8 @@ type Route =
   | { key: 'new-manhole'; projectId: string }
   | { key: 'edit-manhole'; projectId: string; manholeId: string }
   | { key: 'upload'; projectId: string; manholeId: string }
-  | { key: 'results'; projectId: string; manholeId: string }
+  | { key: 'upload-inspection'; inspectionId: string }
+  | { key: 'results'; inspectionId: string }
   | { key: 'summary'; projectId: string }
 
 type UiProjectSummary = ProjectSummary & {
@@ -57,8 +58,11 @@ const parseRoute = (pathname: string): Route => {
   if (segments[0] === 'projects' && segments[2] === 'manholes' && segments[4] === 'upload') {
     return { key: 'upload', projectId: segments[1], manholeId: segments[3] }
   }
-  if (segments[0] === 'projects' && segments[2] === 'manholes' && segments[4] === 'results') {
-    return { key: 'results', projectId: segments[1], manholeId: segments[3] }
+  if (segments[0] === 'inspections' && segments[2] === 'upload') {
+    return { key: 'upload-inspection', inspectionId: segments[1] }
+  }
+  if (segments[0] === 'inspections' && segments[2] === 'results') {
+    return { key: 'results', inspectionId: segments[1] }
   }
   if (segments[0] === 'projects' && segments[2] === 'summary') {
     return { key: 'summary', projectId: segments[1] }
@@ -112,6 +116,23 @@ const revokeResultPreviews = (results: InspectionResult[]) => {
 
 const revokeSummaryPreviews = (summary: ProjectInspectionSummary | null) => {
   summary?.flaggedJoints.forEach((item) => revokeUrl(item.previewUrl))
+}
+
+const inspectionRouteStorageKey = 'jointinspect:inspection-route-map'
+
+const readInspectionRouteMap = (): Record<string, { projectId: string; manholeId: string }> => {
+  try {
+    const raw = window.localStorage.getItem(inspectionRouteStorageKey)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+const writeInspectionRouteMapEntry = (inspectionId: string, projectId: string, manholeId: string) => {
+  const current = readInspectionRouteMap()
+  current[inspectionId] = { projectId, manholeId }
+  window.localStorage.setItem(inspectionRouteStorageKey, JSON.stringify(current))
 }
 
 const enrichQueueForUi = async (queue: InspectionImage[]) =>
@@ -277,8 +298,10 @@ function App() {
   useEffect(() => () => revokeResultPreviews(currentResults), [currentResults])
   useEffect(() => () => revokeSummaryPreviews(currentProjectSummary), [currentProjectSummary])
 
-  const navigate = (pathname: string) => {
-    setLoading(true)
+  const navigate = (pathname: string, options?: { keepLoading?: boolean }) => {
+    if (!options?.keepLoading) {
+      setLoading(true)
+    }
     window.history.pushState({}, '', pathname)
     setRoute(parseRoute(pathname))
   }
@@ -329,7 +352,23 @@ function App() {
         return
       }
 
-      const project = await projectService.getProject(route.projectId)
+      const targetProjectId =
+        route.key === 'results' || route.key === 'upload-inspection'
+          ? ((await inspectionService.getInspection(route.inspectionId))?.projectId ??
+            readInspectionRouteMap()[route.inspectionId]?.projectId ??
+            null)
+          : route.projectId
+
+      if (!targetProjectId) {
+        clearVisualState()
+        setCurrentProject(null)
+        setProjectManholes([])
+        setCurrentManhole(null)
+        setCurrentManholeSummary(null)
+        return
+      }
+
+      const project = await projectService.getProject(targetProjectId)
       setCurrentProject(project)
       setProjectManholes(project?.manholes ?? [])
 
@@ -340,7 +379,7 @@ function App() {
         return
       }
 
-      const rawProjectSummary = await summaryService.getProjectSummary(route.projectId)
+      const rawProjectSummary = await summaryService.getProjectSummary(targetProjectId)
       if (route.key === 'summary') {
         const enrichedProjectSummary = await enrichFlaggedSummary(rawProjectSummary, project.manholes)
         setCurrentProjectSummary((previous) => {
@@ -368,7 +407,34 @@ function App() {
         return
       }
 
-      const manhole = await manholeService.getManhole(route.manholeId)
+      const focusInspection =
+        route.key === 'results' || route.key === 'upload-inspection'
+          ? await inspectionService.getInspection(route.inspectionId)
+          : null
+      const targetManholeId =
+        route.key === 'results' || route.key === 'upload-inspection'
+          ? (focusInspection?.manholeId ?? readInspectionRouteMap()[route.inspectionId]?.manholeId ?? null)
+          : route.manholeId
+
+      if (route.key === 'results' || route.key === 'upload-inspection') {
+        console.log('ROUTE INSPECTION ID:', route.inspectionId)
+      }
+
+      if (!targetManholeId) {
+        setCurrentQueue((previous) => {
+          revokeQueuePreviews(previous)
+          return []
+        })
+        setCurrentResults((previous) => {
+          revokeResultPreviews(previous)
+          return []
+        })
+        setCurrentManhole(null)
+        setCurrentManholeSummary(null)
+        return
+      }
+
+      const manhole = await manholeService.getManhole(targetManholeId)
       setCurrentManhole(manhole)
 
       if (!manhole) {
@@ -385,9 +451,9 @@ function App() {
       }
 
       const [queue, rawResults, manholeSummary] = await Promise.all([
-        inspectionQueue.listQueue(route.manholeId),
-        inspectionService.listByManhole(route.manholeId),
-        summaryService.getManholeSummary(route.manholeId),
+        inspectionQueue.listQueue(targetManholeId),
+        inspectionService.listByManhole(targetManholeId),
+        summaryService.getManholeSummary(targetManholeId),
       ])
 
       const [queueWithPreviews, enrichedResults] = await Promise.all([
@@ -401,9 +467,12 @@ function App() {
       })
       setCurrentResults((previous) => {
         revokeResultPreviews(previous)
+        if (route.key === 'results') {
+          console.log('LOADED RESULTS:', enrichedResults)
+        }
         return enrichedResults
       })
-      setCurrentManholeSummary({ ...manholeSummary, projectId: route.projectId })
+      setCurrentManholeSummary({ ...manholeSummary, projectId: targetProjectId })
     } finally {
       setLoading(false)
     }
@@ -480,7 +549,10 @@ function App() {
       )
     }
 
-    if (route.key === 'upload') {
+    if (route.key === 'upload' || route.key === 'upload-inspection') {
+      const uploadProjectId = route.key === 'upload' ? route.projectId : currentProject?.id ?? ''
+      const uploadManholeId = route.key === 'upload' ? route.manholeId : currentManhole?.id ?? ''
+
       return (
         <PhotoUploadPage
           online={online}
@@ -488,11 +560,17 @@ function App() {
           manholeLabel={currentManhole?.manholeId ?? 'Unassigned manhole'}
           queue={currentQueue}
           events={events}
-          onBack={() => navigate(`/projects/${route.projectId}/manholes/${route.manholeId}`)}
+          onBack={() => {
+            if (!uploadProjectId || !uploadManholeId) {
+              navigate('/')
+              return
+            }
+            navigate(`/projects/${uploadProjectId}/manholes/${uploadManholeId}`)
+          }}
           onAddFiles={async (files) => {
             await inspectionQueue.addFiles({
-              projectId: route.projectId,
-              manholeId: route.manholeId,
+              projectId: uploadProjectId,
+              manholeId: uploadManholeId,
               files,
             })
             await refreshRouteData()
@@ -504,8 +582,8 @@ function App() {
               new File(['sample-three'], 'joint_3-4.jpg', { type: 'image/jpeg' }),
             ]
             await inspectionQueue.addFiles({
-              projectId: route.projectId,
-              manholeId: route.manholeId,
+              projectId: uploadProjectId,
+              manholeId: uploadManholeId,
               files: sampleFiles,
             })
             await refreshRouteData()
@@ -515,21 +593,68 @@ function App() {
             await refreshRouteData()
           }}
           onClearQueue={async () => {
-            await inspectionQueue.clearManholeQueue(route.manholeId)
+            await inspectionQueue.clearManholeQueue(uploadManholeId)
             await refreshRouteData()
           }}
           onStartInspection={async () => {
-            const result = await processor.processQueuedImages(route.manholeId)
+            const result = await processor.processQueuedImages(uploadManholeId)
+            console.log('PROCESS RESULT:', result)
+            if (!result.success || !result.inspectionId) {
+              throw new Error(result.message || 'Inspection processing failed')
+            }
+
+            const focusInspection = await inspectionService.getInspection(result.inspectionId)
+            if (!focusInspection) {
+              throw new Error('Inspection result was saved but could not be reloaded')
+            }
+            writeInspectionRouteMapEntry(result.inspectionId, focusInspection.projectId, focusInspection.manholeId)
+
+            const [project, manhole, queue, rawResults, manholeSummary, rawProjectSummary] = await Promise.all([
+              projectService.getProject(focusInspection.projectId),
+              manholeService.getManhole(focusInspection.manholeId),
+              inspectionQueue.listQueue(focusInspection.manholeId),
+              inspectionService.listByManhole(focusInspection.manholeId),
+              summaryService.getManholeSummary(focusInspection.manholeId),
+              summaryService.getProjectSummary(focusInspection.projectId),
+            ])
+
+            const projectManholes = project?.manholes ?? []
+            const [queueWithPreviews, enrichedResults] = await Promise.all([
+              enrichQueueForUi(queue),
+              enrichResultsForUi(rawResults, projectManholes),
+            ])
+
             await refreshProjects()
-            await refreshRouteData()
-            navigate(`/projects/${route.projectId}/manholes/${route.manholeId}/results`)
+
+            setCurrentProject(project)
+            setProjectManholes(projectManholes)
+            setCurrentManhole(manhole)
+            setCurrentQueue((previous) => {
+              revokeQueuePreviews(previous)
+              return queueWithPreviews
+            })
+            setCurrentResults((previous) => {
+              revokeResultPreviews(previous)
+              return enrichedResults
+            })
+            setCurrentManholeSummary({ ...manholeSummary, projectId: focusInspection.projectId })
+            setCurrentProjectSummary((previous) => {
+              revokeSummaryPreviews(previous)
+              return rawProjectSummary
+            })
+            setLoading(false)
+            navigate(`/inspections/${result.inspectionId}/results`, { keepLoading: true })
             return {
+              success: result.success,
               manholeId: result.manholeId,
+              inspectionId: result.inspectionId,
               processed: result.completed ?? 0,
               failed: result.failed,
               completed: result.completed,
               total: result.total,
-              inspectionIds: result.inspectionIds,
+              resultIds: result.resultIds,
+              queueStatus: result.queueStatus,
+              message: result.message,
             }
           }}
         />
@@ -539,14 +664,22 @@ function App() {
     if (route.key === 'results') {
       return (
         <InspectionResultsPage
+          inspectionId={route.inspectionId}
+          loading={loading}
           online={online}
-          projectId={route.projectId}
+          projectId={currentProject?.id ?? ''}
           projectName={currentProject?.name ?? 'Untitled project'}
           siteName={currentProject?.siteName}
           manholeLabel={currentManhole?.manholeId ?? 'Unassigned manhole'}
           results={currentResults}
           summary={currentManholeSummary}
-          onBack={() => navigate(`/projects/${route.projectId}/manholes/${route.manholeId}/upload`)}
+          onBack={() => {
+            if (!currentProject?.id || !currentManhole?.id) {
+              navigate('/')
+              return
+            }
+            navigate(`/projects/${currentProject.id}/manholes/${currentManhole.id}/upload`)
+          }}
           onSaveNote={async (inspectionId, note) => {
             await inspectionService.saveInspectorNote(inspectionId, note)
             await refreshRouteData()
@@ -566,7 +699,13 @@ function App() {
             await refreshProjects()
             await refreshRouteData()
           }}
-          onNext={() => navigate(`/projects/${route.projectId}/summary`)}
+          onNext={() => {
+            if (!currentProject?.id) {
+              navigate('/')
+              return
+            }
+            navigate(`/projects/${currentProject.id}/summary`)
+          }}
         />
       )
     }
@@ -590,15 +729,11 @@ function App() {
           }}
           onOpenFlagged={(inspectionId) => {
             const targetInspectionId = inspectionId ?? currentProjectSummary?.flaggedJoints[0]?.inspectionId
-            if (!targetInspectionId || !currentProjectId) {
+            if (!targetInspectionId) {
               navigate('/')
               return
             }
-            void inspectionService.getInspection(targetInspectionId).then((inspection) => {
-              if (inspection) {
-                navigate(`/projects/${currentProjectId}/manholes/${inspection.manholeId}/results`)
-              }
-            })
+            navigate(`/inspections/${targetInspectionId}/results`)
           }}
           onExport={async (format) => {
             if (format === 'json') {

@@ -1,205 +1,132 @@
-import { runCvMeasurement, type CvWorkerRequest, type CvWorkerResponse } from './cvMeasurement'
+import type { CvWorkerRequest, CvWorkerResponse } from './cvMeasurement'
 
-interface CvWorkerErrorResponse {
-  kind: 'error'
-  imageId: string
-  error: string
+type WarmupDebugMessage = {
+  imageId?: string
+  stage: string
+  type: 'DEBUG'
 }
 
-interface CvWorkerReadyResponse {
-  kind: 'ready'
+type WarmupOkMessage = {
+  stage: string
+  type: 'WARMUP_OK'
 }
 
-interface CvWorkerDebugResponse {
-  kind: 'debug'
+type WarmupErrorMessage = {
+  imageId?: string
+  message: string
+  stage: string
+  type: 'WARMUP_ERROR'
+}
+
+type MeasureOkMessage = {
+  result: CvWorkerResponse
+  stage: string
+  type: 'MEASURE_OK'
+}
+
+type MeasureErrorMessage = {
   imageId: string
   message: string
+  stage: string
+  type: 'MEASURE_ERROR'
 }
 
-interface CvWorkerMeasureResponse extends CvWorkerResponse {
-  kind: 'measure'
-}
+type CvWorkerMessage =
+  | WarmupDebugMessage
+  | WarmupOkMessage
+  | WarmupErrorMessage
+  | MeasureOkMessage
+  | MeasureErrorMessage
 
-type CvWorkerMessage = CvWorkerReadyResponse | CvWorkerMeasureResponse | CvWorkerErrorResponse | CvWorkerDebugResponse
+const CV_WORKER_WARMUP_TIMEOUT_MS = 30000
+const CV_WORKER_MEASURE_TIMEOUT_MS = 30000
 
 function isBrowserWorkerAvailable(): boolean {
-  return typeof Worker !== 'undefined' && typeof URL !== 'undefined'
+  return typeof Worker !== 'undefined'
 }
 
-const CV_WORKER_TIMEOUT_MS = 8000
-const CV_WORKER_WARMUP_TIMEOUT_MS = 5000
-let sharedWorker: Worker | null = null
-let workerReadyPromise: Promise<void> | null = null
-let workerReadyState: 'idle' | 'warming' | 'ready' = 'idle'
-let resolveWorkerReady: (() => void) | null = null
-let rejectWorkerReady: ((reason?: unknown) => void) | null = null
-let workerWarmupTimeoutId: ReturnType<typeof setTimeout> | null = null
-let latestWorkerDebugMessage = 'worker not started'
-
-type PendingRequest = {
-  reject: (reason?: unknown) => void
-  request: CvWorkerRequest
-  resolve: (value: CvWorkerResponse | PromiseLike<CvWorkerResponse>) => void
-  timeoutId: ReturnType<typeof setTimeout>
+function createCvWorker(): Worker {
+  return new Worker('/workers/cv-worker.js?v=opencv-classic-4')
 }
 
-const pendingRequests = new Map<string, PendingRequest>()
-
-function destroySharedWorker(): void {
-  if (sharedWorker) {
-    sharedWorker.terminate()
-    sharedWorker = null
-  }
-
-  if (workerWarmupTimeoutId) {
-    clearTimeout(workerWarmupTimeoutId)
-    workerWarmupTimeoutId = null
-  }
-
-  workerReadyPromise = null
-  workerReadyState = 'idle'
-  resolveWorkerReady = null
-  rejectWorkerReady = null
-  latestWorkerDebugMessage = 'worker not started'
+function appendDebugStage(debugTrail: string[], stage: string): string[] {
+  const nextTrail = [...debugTrail, stage].slice(-30)
+  console.info(`[cv-worker] ${stage}`)
+  return nextTrail
 }
 
-function ensureWorker(): Worker {
-  if (sharedWorker) {
-    return sharedWorker
-  }
-
-  latestWorkerDebugMessage = 'worker constructed'
-  sharedWorker = new Worker(new URL('../workers/cvWorker.ts', import.meta.url), {
-    type: 'module',
-  })
-
-  sharedWorker.onmessage = (event: MessageEvent<CvWorkerMessage>) => {
-    const payload = event.data
-
-    if (payload.kind === 'debug') {
-      latestWorkerDebugMessage = payload.message
-      console.info(`[cv-worker] ${payload.imageId}: ${payload.message}`)
-      return
-    }
-
-    if (payload.kind === 'ready') {
-      if (workerWarmupTimeoutId) {
-        clearTimeout(workerWarmupTimeoutId)
-        workerWarmupTimeoutId = null
-      }
-      workerReadyState = 'ready'
-      resolveWorkerReady?.()
-      resolveWorkerReady = null
-      rejectWorkerReady = null
-      return
-    }
-
-    const pending = pendingRequests.get(payload.imageId)
-
-    if (!pending) {
-      if (payload.kind === 'error' && payload.imageId === '__worker__') {
-        if (workerWarmupTimeoutId) {
-          clearTimeout(workerWarmupTimeoutId)
-          workerWarmupTimeoutId = null
-        }
-        rejectWorkerReady?.(new Error(`${payload.error} | debug trail: ${latestWorkerDebugMessage}`))
-        destroySharedWorker()
-      }
-      return
-    }
-
-    clearTimeout(pending.timeoutId)
-    pendingRequests.delete(payload.imageId)
-
-    if (payload.kind === 'error') {
-      pending.reject(new Error(`OpenCV worker failed: ${payload.error} | debug trail: ${latestWorkerDebugMessage}`))
-      return
-    }
-
-    pending.resolve(payload)
-  }
-
-  sharedWorker.onerror = () => {
-    const inflight = Array.from(pendingRequests.entries())
-    pendingRequests.clear()
-    destroySharedWorker()
-
-    for (const [, pending] of inflight) {
-      clearTimeout(pending.timeoutId)
-      pending.reject(new Error(`CV worker could not continue processing. Last stage: ${latestWorkerDebugMessage}`))
-    }
-  }
-
-  return sharedWorker
-}
-
-async function warmUpWorker(): Promise<void> {
-  if (workerReadyState === 'ready') {
-    return
-  }
-
-  const worker = ensureWorker()
-
-  if (workerReadyPromise) {
-    return workerReadyPromise
-  }
-
-  workerReadyState = 'warming'
-  workerReadyPromise = new Promise<void>((resolve, reject) => {
-    resolveWorkerReady = resolve
-    rejectWorkerReady = reject
-    workerWarmupTimeoutId = setTimeout(() => {
-      reject(
-        new Error(
-          `CV worker warmup timed out after ${Math.round(CV_WORKER_WARMUP_TIMEOUT_MS / 1000)} seconds. Last stage: ${latestWorkerDebugMessage}`,
-        ),
-      )
-      destroySharedWorker()
-    }, CV_WORKER_WARMUP_TIMEOUT_MS)
-  })
-
-  worker.postMessage({ kind: 'warmup' })
-  return workerReadyPromise
+function formatTrail(debugTrail: string[]): string {
+  return debugTrail.join(' > ')
 }
 
 export async function measureWithCv(request: CvWorkerRequest): Promise<CvWorkerResponse> {
   if (!isBrowserWorkerAvailable()) {
-    return runCvMeasurement(request)
+    throw new Error('Web workers are unavailable in this browser.')
   }
 
-  try {
-    await warmUpWorker()
-  } catch (error) {
-    throw new Error(error instanceof Error ? `OpenCV warmup failed: ${error.message}` : 'OpenCV warmup failed.', {
-      cause: error,
-    })
-  }
+  const worker = createCvWorker()
 
   return new Promise<CvWorkerResponse>((resolve, reject) => {
-    const worker = ensureWorker()
-    const timeoutId: ReturnType<typeof setTimeout> = setTimeout(() => {
-      pendingRequests.delete(request.imageId)
-      reject(
-        new Error(
-          `OpenCV processing timed out after ${Math.round(CV_WORKER_TIMEOUT_MS / 1000)} seconds. Last stage: ${latestWorkerDebugMessage}`,
-        ),
-      )
-    }, CV_WORKER_TIMEOUT_MS)
+    let debugTrail = ['worker-created']
+    let phase: 'warming' | 'measuring' = 'warming'
 
-    pendingRequests.set(request.imageId, {
-      request,
-      resolve,
-      reject,
-      timeoutId,
-    })
+    const timeoutId = setTimeout(() => {
+      cleanup()
+      const timeoutLabel =
+        phase === 'warming'
+          ? `OpenCV worker warmup timed out. Trail: ${formatTrail(debugTrail)}`
+          : `OpenCV worker measurement timed out after ${Math.round(CV_WORKER_MEASURE_TIMEOUT_MS / 1000)} seconds. Trail: ${formatTrail(debugTrail)}`
+      reject(new Error(timeoutLabel))
+    }, CV_WORKER_WARMUP_TIMEOUT_MS + CV_WORKER_MEASURE_TIMEOUT_MS)
 
-    try {
-      worker.postMessage({ kind: 'measure', request })
-    } catch {
+    const cleanup = (): void => {
       clearTimeout(timeoutId)
-      pendingRequests.delete(request.imageId)
-      destroySharedWorker()
-      reject(new Error(`OpenCV worker could not start. Last stage: ${latestWorkerDebugMessage}`))
+      worker.removeEventListener('message', handleMessage)
+      worker.removeEventListener('error', handleError)
+      worker.terminate()
     }
+
+    const handleError = (event: ErrorEvent): void => {
+      cleanup()
+      reject(new Error(`Worker crashed: ${event.message}. Trail: ${formatTrail(debugTrail)}`))
+    }
+
+    const handleMessage = (event: MessageEvent<CvWorkerMessage>): void => {
+      const data = event.data
+
+      if (data.type === 'DEBUG') {
+        if (!data.imageId || data.imageId === request.imageId || data.imageId === '__worker__') {
+          debugTrail = appendDebugStage(debugTrail, data.stage)
+        }
+        return
+      }
+
+      if (data.type === 'WARMUP_ERROR') {
+        cleanup()
+        reject(new Error(`${data.message}. Last stage: ${data.stage}. Trail: ${formatTrail(debugTrail)}`))
+        return
+      }
+
+      if (data.type === 'MEASURE_ERROR' && data.imageId === request.imageId) {
+        cleanup()
+        reject(new Error(`${data.message}. Last stage: ${data.stage}. Trail: ${formatTrail(debugTrail)}`))
+        return
+      }
+
+      if (data.type === 'WARMUP_OK') {
+        phase = 'measuring'
+        worker.postMessage({ type: 'MEASURE', request })
+        return
+      }
+
+      if (data.type === 'MEASURE_OK') {
+        cleanup()
+        resolve(data.result)
+      }
+    }
+
+    worker.addEventListener('message', handleMessage)
+    worker.addEventListener('error', handleError)
+    worker.postMessage({ type: 'WARMUP' })
   })
 }
