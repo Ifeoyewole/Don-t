@@ -10,6 +10,55 @@ import { createId, createTimestamp } from '../utils/identity'
 
 const listeners = new Set<(event: ProcessingEvent) => void>()
 
+function getRetakeMessageFromProcessingError(message: string): string | null {
+  if (
+    message.includes('Pipe opening was detected, but joint gap extraction failed') ||
+    message.includes('OpenCV did not detect a valid pipe opening') ||
+    message.includes('OpenCV circle scoring returned no usable opening')
+  ) {
+    return 'Retake photo: keep the full pipe opening and the joint ring clearly visible so the gap can be measured.'
+  }
+
+  if (
+    message.includes('measuring-gap-from-circle') ||
+    message.includes('running-hough-circles')
+  ) {
+    return 'Retake photo: use the guided capture angle and keep the full pipe opening steady in frame.'
+  }
+
+  return null
+}
+
+async function failImageProcessing(imageId: string, message: string): Promise<void> {
+  const image = await db.inspectionImages.get(imageId)
+  const retakeMessage = getRetakeMessageFromProcessingError(message)
+
+  if (!image) {
+    emit({
+      type: 'failed',
+      imageId,
+      message: retakeMessage ?? message,
+    })
+    return
+  }
+
+  await db.inspectionImages.put({
+    ...image,
+    queueStatus: 'failed',
+    progress: 0,
+    errorMessage: retakeMessage ?? message,
+    validationStatus: retakeMessage ? 'retake' : image.validationStatus,
+    validationMessage: retakeMessage ?? image.validationMessage,
+    validationScore: retakeMessage ? Math.min(image.validationScore ?? 0.3, 0.28) : image.validationScore,
+  })
+
+  emit({
+    type: 'failed',
+    imageId,
+    message: retakeMessage ?? message,
+  })
+}
+
 function emit(event: ProcessingEvent): void {
   for (const listener of listeners) {
     listener(event)
@@ -143,15 +192,7 @@ export const processor = {
             return await processImage(image.id)
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Processing failed'
-            await db.inspectionImages.update(image.id, {
-              queueStatus: 'failed',
-              errorMessage: message,
-            })
-            emit({
-              type: 'failed',
-              imageId: image.id,
-              message,
-            })
+            await failImageProcessing(image.id, message)
             return null
           }
         }),
