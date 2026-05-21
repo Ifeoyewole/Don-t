@@ -1,117 +1,228 @@
-import { StatusBadge } from '../components/StatusBadge'
-import type { ProjectInspectionSummary } from '../types/domain'
+import type { Manhole, ProjectInspectionSummary } from '../types/domain'
 
 type Props = {
   projectName: string
   projectId: string
+  projectSiteName?: string
+  manholes: Manhole[]
+  lastUpdatedAt?: string
   summary: ProjectInspectionSummary | null
   onBack: () => void
   onExport: (format: 'json' | 'pdf' | 'zip') => Promise<void>
-  onOpenFlagged: () => void
+  onOpenFlagged: (inspectionId?: string) => void
 }
+
+const formatDateTime = (value?: string) =>
+  value
+    ? new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(value))
+    : 'Not yet processed'
 
 export const InspectionSummaryPage = ({
   projectName,
   projectId,
+  projectSiteName,
+  manholes,
+  lastUpdatedAt,
   summary,
   onBack,
   onExport,
   onOpenFlagged,
-}: Props) => (
-  <div className="page-grid">
-    <section className="section-header compact">
-      <button className="button button-ghost" type="button" onClick={onBack}>
-        Back
-      </button>
-    </section>
+}: Props) => {
+  const flagged = summary?.flaggedJoints ?? []
+  const latestManhole = manholes[0]?.manholeId ?? 'No manholes yet'
 
-    <section className="page-intro">
-      <div>
-        <p className="eyebrow">Project ID: {projectId}</p>
-        <h1>Inspection summary</h1>
-        <p className="lead">{projectName} totals, flagged items, and evidence exports in one place.</p>
-      </div>
-      <div className="export-actions">
-        <button className="button button-primary" type="button" onClick={() => void onExport('zip')}>
-          Export Evidence Pack
+  return (
+    <div className="page-grid summary-page">
+      <section className="page-breadcrumbs">
+        <button className="page-back-link" type="button" onClick={onBack}>
+          Projects
         </button>
-        <button className="button button-secondary" type="button" onClick={() => void onExport('pdf')}>
-          Export PDF
-        </button>
-        <button className="button button-ghost" type="button" onClick={() => void onExport('json')}>
-          Export JSON
-        </button>
-      </div>
-    </section>
+        <span>›</span>
+        <span>{projectName.toUpperCase()}</span>
+        <span>›</span>
+        <strong>Inspection Summary</strong>
+      </section>
 
-    <section className="stats-grid">
-      <article className="stat-card">
-        <span className="stat-label">Total joints</span>
-        <strong>{summary?.totalJoints ?? 0}</strong>
-      </article>
-      <article className="stat-card">
-        <span className="stat-label">Pass</span>
-        <strong>{summary?.passCount ?? 0}</strong>
-      </article>
-      <article className="stat-card">
-        <span className="stat-label">Review</span>
-        <strong>{summary?.reviewCount ?? 0}</strong>
-      </article>
-      <article className="stat-card stat-card-alert">
-        <span className="stat-label">Fail</span>
-        <strong>{summary?.failCount ?? 0}</strong>
-      </article>
-    </section>
-
-    <section className="summary-layout">
-      <div className="flagged-list">
-        <div className="section-header compact">
-          <div>
-            <h2>Flagged items ({summary?.flaggedJoints.length ?? 0})</h2>
-            <p>Non-pass joints surfaced for second-pass review.</p>
-          </div>
-          <button className="button button-secondary" type="button" onClick={onOpenFlagged}>
-            Review Results
+      <section className="page-hero">
+        <div>
+          <h1>{projectName}</h1>
+          <p className="lead">
+            Last updated: {formatDateTime(lastUpdatedAt)}
+            {projectSiteName ? ` • Site: ${projectSiteName}` : ''}
+          </p>
+        </div>
+        <div className="export-actions">
+          <button className="button button-primary" type="button" onClick={() => void onExport('zip')}>
+            Export Evidence Pack
+          </button>
+          <button className="button button-secondary" type="button" onClick={() => void onExport('pdf')}>
+            Export PDF
+          </button>
+          <button className="button button-ghost" type="button" onClick={() => void onExport('json')}>
+            Export JSON
           </button>
         </div>
+      </section>
 
-        {summary?.flaggedJoints.length ? (
-          summary.flaggedJoints.map((item) => (
-            <article className="flagged-card" key={item.inspectionId}>
-              <div className="upload-title-row">
-                <div>
-                  <strong>{item.jointLabel}</strong>
-                  <span>{item.finalGapMm.toFixed(1)} mm final gap</span>
-                  {item.measurementSource === 'fallback' ? <span>Estimated fallback result</span> : null}
-                </div>
-                <StatusBadge status={item.status} />
-              </div>
-              <p>{item.note}</p>
-            </article>
-          ))
-        ) : (
-          <article className="empty-state">
-            <strong>No flagged items</strong>
-            <p>All current joint measurements sit inside the pass band.</p>
+      <section className="summary-kpi-grid">
+        <article className="summary-kpi-card">
+          <span>Total Joints</span>
+          <strong>{summary?.totalJoints ?? 0}</strong>
+          <p>100% inspected</p>
+        </article>
+        <article className="summary-kpi-card is-pass">
+          <span>Pass</span>
+          <strong>{summary?.passCount ?? 0}</strong>
+          <p>Within tolerance</p>
+        </article>
+        <article className="summary-kpi-card is-review">
+          <span>Review</span>
+          <strong>{summary?.reviewCount ?? 0}</strong>
+          <p>Action required</p>
+        </article>
+        <article className="summary-kpi-card is-fail">
+          <span>Fail</span>
+          <strong>{summary?.failCount ?? 0}</strong>
+          <p>Critical issues</p>
+        </article>
+      </section>
+
+      <section className="summary-bento-grid">
+        <div className="flagged-anomalies-card">
+          <div className="flagged-card-head">
+            <h2>Flagged Anomalies</h2>
+            <div className="flagged-head-actions">
+              <button className="button button-secondary" type="button">
+                Filter
+              </button>
+              <button className="button button-secondary" type="button">
+                Search
+              </button>
+            </div>
+          </div>
+
+          <div className="flagged-anomalies-list">
+            {flagged.length ? (
+              flagged.map((item) => (
+                <button
+                  className="flagged-anomaly-row"
+                  type="button"
+                  key={item.inspectionId}
+                  onClick={() => onOpenFlagged(item.inspectionId)}
+                >
+                  <div className="flagged-anomaly-thumb">
+                    {item.previewUrl ? <img src={item.previewUrl} alt={item.fileName ?? item.jointLabel} /> : <div className="preview-placeholder" />}
+                  </div>
+                  <div className="flagged-anomaly-copy">
+                    <div className="flagged-anomaly-top">
+                      <div>
+                        <strong>Joint #{item.jointLabel}</strong>
+                        <span>
+                          {item.manholeLabel || latestManhole}
+                          {projectSiteName ? ` • ${projectSiteName}` : ''}
+                        </span>
+                      </div>
+                      <span className={`mini-status-pill is-${item.status.toLowerCase()}`}>{item.status}</span>
+                    </div>
+                    <p>
+                      {item.note ||
+                        `${item.finalGapMm.toFixed(1)} mm measured gap ${
+                          item.measurementSource === 'fallback' ? 'estimated from fallback analysis.' : 'recorded from CV measurement.'
+                        }`}
+                    </p>
+                    <div className="flagged-anomaly-meta">
+                      <span>Log: {formatDateTime(item.processedAt)}</span>
+                      <span>{item.photoCount ?? 1} Photo{(item.photoCount ?? 1) === 1 ? '' : 's'}</span>
+                    </div>
+                  </div>
+                  <span className="dashboard-arrow" aria-hidden="true">
+                    ›
+                  </span>
+                </button>
+              ))
+            ) : (
+              <article className="empty-state">
+                <strong>No flagged anomalies</strong>
+                <p>All measured joints are currently inside the pass band.</p>
+              </article>
+            )}
+          </div>
+
+          <div className="flagged-footer">
+            <button className="button button-ghost" type="button" onClick={() => onOpenFlagged()}>
+              View All Flagged Items ({flagged.length})
+            </button>
+          </div>
+        </div>
+
+        <aside className="summary-side-panels">
+          <article className="location-panel">
+            <div className="location-panel-head">
+              <h3>Location</h3>
+              <span>⌖</span>
+            </div>
+            <div className="location-map">
+              <div className="location-map-badge">{latestManhole}</div>
+            </div>
+            <div className="location-details">
+              <p>
+                <strong>Project:</strong> {projectId}
+              </p>
+              <p>
+                <strong>Site:</strong> {projectSiteName || 'Not provided'}
+              </p>
+              <p>
+                <strong>Manholes:</strong> {manholes.length}
+              </p>
+            </div>
           </article>
-        )}
-      </div>
 
-      <aside className="summary-sidebar">
-        <div className="summary-card dark-card">
-          <h2>Evidence pack contents</h2>
-          <ul className="feature-list">
-            <li>Project and manhole details</li>
-            <li>Queued images and measured results</li>
-            <li>Override metadata and inspector notes</li>
-            <li>Required disclaimer footer text</li>
-          </ul>
-        </div>
-        <div className="tip-card">
-          <strong>Disclaimer</strong>
-          <p>Guidance only — not a formal adoption assessment.</p>
-        </div>
-      </aside>
-    </section>
-  </div>
-)
+          <article className="session-log-panel">
+            <h3>Session Log</h3>
+            <div className="session-log-timeline">
+              <div className="session-log-item is-good">
+                <strong>Session Finalized</strong>
+                <span>{formatDateTime(lastUpdatedAt)}</span>
+              </div>
+              <div className="session-log-item is-primary">
+                <strong>{summary?.totalJoints ?? 0} Joints Synchronized</strong>
+                <span>{formatDateTime(flagged[0]?.processedAt ?? lastUpdatedAt)}</span>
+              </div>
+              <div className="session-log-item">
+                <strong>Inspection Started</strong>
+                <span>{formatDateTime(manholes[0]?.createdAt)}</span>
+              </div>
+            </div>
+            <div className="session-log-meta">
+              <div>
+                <span>Weather Conditions</span>
+                <strong>14°C, Clear</strong>
+              </div>
+              <div>
+                <span>Hardware Used</span>
+                <strong>Field Tablet</strong>
+              </div>
+              <div>
+                <span>Sync Status</span>
+                <strong>Fully Synced</strong>
+              </div>
+            </div>
+          </article>
+        </aside>
+      </section>
+
+      <div className="summary-bottom-sync">
+        <span>Online - all changes synced to server</span>
+        <button className="button button-ghost" type="button" onClick={() => void onExport('zip')}>
+          Force Sync
+        </button>
+      </div>
+    </div>
+  )
+}

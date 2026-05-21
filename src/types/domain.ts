@@ -114,12 +114,15 @@ export interface InspectionResult {
   projectId: string
   manholeId: string
   jointLabel: string
+  fileName?: string
+  manholeLabel?: string
   originalGapMm: number
   finalGapMm: number
   status: InspectionStatus
   confidence?: number
   measurementSource?: 'cv' | 'fallback'
   measurementNote?: string
+  previewUrl?: string
   notes?: string
   processedAt: string
   overrideApplied: boolean
@@ -172,11 +175,16 @@ export interface ProcessBatchResult {
 export interface FlaggedInspectionSummary {
   inspectionId: string
   jointLabel: string
+  fileName?: string
+  manholeLabel?: string
   status: InspectionStatus
   finalGapMm: number
   measurementSource?: 'cv' | 'fallback'
   overrideApplied?: boolean
   note?: string
+  previewUrl?: string
+  processedAt?: string
+  photoCount?: number
 }
 
 export interface ProjectInspectionSummary {

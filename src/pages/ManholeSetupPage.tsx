@@ -13,11 +13,14 @@ type Props = {
 
 const defaultForm = (projectId: string, manhole?: Manhole | null): CreateManholeInput => ({
   projectId,
-  manholeId: manhole?.manholeId ?? 'MH-',
+  manholeId: manhole?.manholeId ?? 'MH-882-NORTH',
   type: manhole?.type ?? 'surface-water',
-  meterRun: manhole?.meterRun ?? 18,
-  pipeType: manhole?.pipeType ?? '225mm-clay',
+  meterRun: manhole?.meterRun ?? 45.5,
+  pipeType: manhole?.pipeType ?? '450mm-concrete',
 })
+
+const structureLabel = (type: CreateManholeInput['type']) =>
+  type === 'surface-water' ? 'Standard Precast' : 'Reinforced Utility'
 
 export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEstimate, onSave }: Props) => {
   const [form, setForm] = useState<CreateManholeInput>(() => defaultForm(projectId, manhole))
@@ -29,6 +32,7 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
       unitLengthM: spec.unitLengthM,
       pipesNeeded,
       jointsNeeded: pipesNeeded + 2,
+      pipeDiameterMm: spec.diameterMm,
     }
   })
   const [loadingEstimate, setLoadingEstimate] = useState(false)
@@ -55,12 +59,6 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
     })
   }
 
-  const handleReset = () => {
-    const next = defaultForm(projectId, manhole)
-    setForm(next)
-    void refreshEstimate(next)
-  }
-
   const handleSave = async () => {
     if (!form.manholeId.trim()) {
       setError('Manhole ID is required.')
@@ -79,110 +77,151 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
   }
 
   return (
-    <div className="page-grid">
-      <section className="section-header compact">
-        <button className="button button-ghost" type="button" onClick={onBack}>
-          Back
-        </button>
-      </section>
-
-      <section className="page-intro">
+    <div className="page-grid manhole-page">
+      <section className="page-hero left-aligned">
         <div>
           <p className="eyebrow">{projectName}</p>
-          <h1>Manhole setup</h1>
-          <p className="lead">Configure run length and pipe type, then use the live estimator before image capture.</p>
+          <h1>Manhole Setup</h1>
+          <p className="lead">Configure structural parameters for precise inspection mapping.</p>
         </div>
       </section>
 
-      <section className="two-column-layout">
-        <div className="form-card">
-          <label className="field">
-            <span>Manhole ID</span>
-            <input
-              value={form.manholeId}
-              onChange={(event) => updateForm((current) => ({ ...current, manholeId: event.target.value }))}
-              placeholder="Enter ID"
-            />
-          </label>
+      <section className="split-page-shell">
+        <div className="split-main-column">
+          <article className="stitch-form-card">
+            <div className="stitch-two-up">
+              <label className="field">
+                <span>Manhole ID</span>
+                <input
+                  value={form.manholeId}
+                  onChange={(event) => updateForm((current) => ({ ...current, manholeId: event.target.value }))}
+                />
+              </label>
 
-          <label className="field">
-            <span>Type</span>
-            <select
-              value={form.type}
-              onChange={(event) =>
-                updateForm((current) => ({
-                  ...current,
-                  type: event.target.value as CreateManholeInput['type'],
-                }))
-              }
-            >
-              <option value="surface-water">Surface Water</option>
-              <option value="foul-water">Foul Water</option>
-            </select>
-          </label>
+              <label className="field">
+                <span>Structure Type</span>
+                <select
+                  value={form.type}
+                  onChange={(event) =>
+                    updateForm((current) => ({
+                      ...current,
+                      type: event.target.value as CreateManholeInput['type'],
+                    }))
+                  }
+                >
+                  <option value="surface-water">Standard Precast</option>
+                  <option value="foul-water">Reinforced Utility</option>
+                </select>
+              </label>
+            </div>
 
-          <label className="field">
-            <span>Meter Run</span>
-            <input
-              type="number"
-              min="1"
-              step="0.1"
-              value={form.meterRun}
-              onChange={(event) => updateForm((current) => ({ ...current, meterRun: Number(event.target.value) || 0 }))}
-            />
-          </label>
+            <div className="stitch-two-up">
+              <label className="field">
+                <span>Meter Run (m)</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="0.1"
+                  value={form.meterRun}
+                  onChange={(event) => updateForm((current) => ({ ...current, meterRun: Number(event.target.value) || 0 }))}
+                />
+              </label>
 
-          <label className="field">
-            <span>Pipe Type</span>
-            <select
-              value={form.pipeType}
-              onChange={(event) =>
-                updateForm((current) => ({
-                  ...current,
-                  pipeType: event.target.value as PipeType,
-                }))
-              }
-            >
-              {Object.entries(pipeSpecs).map(([value, spec]) => (
-                <option key={value} value={value}>
-                  {spec.label} - {spec.unitLengthM}m
-                </option>
-              ))}
-            </select>
-          </label>
+              <label className="field">
+                <span>Pipe Diameter (mm)</span>
+                <select
+                  value={form.pipeType}
+                  onChange={(event) =>
+                    updateForm((current) => ({
+                      ...current,
+                      pipeType: event.target.value as PipeType,
+                    }))
+                  }
+                >
+                  {Object.entries(pipeSpecs).map(([value, spec]) => (
+                    <option key={value} value={value}>
+                      {spec.diameterMm} mm
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
-          {error ? <p className="form-error">{error}</p> : null}
+            <div className="context-photo-card">
+              <span>Site Context Photo</span>
+              <div className="context-photo-placeholder">
+                <div className="context-photo-overlay">
+                  <strong>{structureLabel(form.type)}</strong>
+                  <p>Replace site photo during capture</p>
+                </div>
+              </div>
+            </div>
 
-          <div className="action-row">
-            <button className="button button-primary" type="button" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Configuration'}
-            </button>
-            <button className="button button-secondary" type="button" onClick={handleReset}>
-              Reset
-            </button>
-          </div>
+            {error ? <p className="form-error">{error}</p> : null}
+
+            <div className="page-footer-actions align-right">
+              <button className="button button-secondary" type="button" onClick={onBack}>
+                Back
+              </button>
+              <button className="button button-primary button-wide-on-desktop" type="button" onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving...' : 'Confirm Setup'}
+              </button>
+            </div>
+          </article>
         </div>
 
-        <aside className="estimate-panel">
-          <div className="estimate-header">
-            <h2>Materials Estimate</h2>
-            <span>{loadingEstimate ? 'Refreshing...' : 'Live'}</span>
-          </div>
-          <div className="estimate-card">
-            <span>Pipes needed</span>
-            <strong>{estimate?.pipesNeeded ?? '--'}</strong>
-          </div>
-          <div className="estimate-card">
-            <span>Joints needed</span>
-            <strong>{estimate?.jointsNeeded ?? '--'}</strong>
-          </div>
-          <div className="estimate-card">
-            <span>Unit length</span>
-            <strong>{estimate?.unitLengthM ?? '--'}m</strong>
-          </div>
-          <p className="estimate-note">
-            Live UI estimate using the plan formula: pipes = ceil(run / unit length), joints = pipes + 2.
-          </p>
+        <aside className="split-side-column">
+          <article className="estimate-sidebar">
+            <div className="estimate-sidebar-head">
+              <h2>Live Materials Estimate</h2>
+              <span>{loadingEstimate ? 'Refreshing' : 'Verified'}</span>
+            </div>
+            <div className="estimate-highlight">
+              <span>Estimated Joints</span>
+              <strong>{estimate?.jointsNeeded ?? '--'}</strong>
+              <p>Based on {estimate?.unitLengthM ?? '--'}m standard lengths</p>
+            </div>
+            <div className="estimate-mini-grid">
+              <div className="estimate-mini-card">
+                <span>Pipe Sections</span>
+                <strong>{estimate?.pipesNeeded ?? '--'}</strong>
+              </div>
+              <div className="estimate-mini-card">
+                <span>Sealing Kit</span>
+                <strong>{estimate?.pipeDiameterMm ? `${estimate.pipeDiameterMm}-SK` : '--'}</strong>
+              </div>
+            </div>
+            <div className="estimate-message">
+              Estimates update automatically as you modify the meter run and selected diameter.
+            </div>
+          </article>
+
+          <article className="specification-card">
+            <h3>Specification Overview</h3>
+            <div className="spec-list">
+              <div className="spec-row">
+                <div>
+                  <strong>Precision Alignment</strong>
+                  <p>Pipe geometry remains mapped to joint labels.</p>
+                </div>
+                <span className="spec-check is-good">✓</span>
+              </div>
+              <div className="spec-row">
+                <div>
+                  <strong>Hydrostatic Test</strong>
+                  <p>Field verification required during review.</p>
+                </div>
+                <span className="spec-check">•</span>
+              </div>
+              <div className="spec-row">
+                <div>
+                  <strong>Corrosion Grade</strong>
+                  <p>Recorded together with pipe material selection.</p>
+                </div>
+                <span className="spec-check is-good">✓</span>
+              </div>
+            </div>
+          </article>
         </aside>
       </section>
     </div>

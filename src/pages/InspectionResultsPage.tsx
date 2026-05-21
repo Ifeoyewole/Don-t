@@ -3,7 +3,9 @@ import { StatusBadge } from '../components/StatusBadge'
 import type { InspectionResult, ManholeInspectionSummary } from '../types/domain'
 
 type Props = {
+  projectId: string
   projectName: string
+  siteName?: string
   manholeLabel: string
   results: InspectionResult[]
   summary: ManholeInspectionSummary | null
@@ -18,6 +20,17 @@ type Props = {
 type DraftOverride = {
   value: string
   reason: string
+}
+
+const measurementLabel = (item: InspectionResult) =>
+  item.measurementSource === 'fallback'
+    ? item.measurementNote || 'Estimated fallback'
+    : item.measurementNote || 'CV measured'
+
+const statusActionLabel = (status: InspectionResult['status']) => {
+  if (status === 'FAIL') return 'Create Repair Note'
+  if (status === 'REVIEW') return 'Assign Reviewer'
+  return 'Details'
 }
 
 const ResultCard = ({
@@ -39,6 +52,7 @@ const ResultCard = ({
     reason: item.overrideReason ?? '',
   })
   const [busy, setBusy] = useState(false)
+  const [openControls, setOpenControls] = useState(false)
 
   const handleSaveNote = async () => {
     setBusy(true)
@@ -52,89 +66,94 @@ const ResultCard = ({
     setBusy(false)
   }
 
-  const toneClass =
-    item.status === 'PASS' ? 'result-card pass' : item.status === 'FAIL' ? 'result-card fail' : 'result-card review'
-  const measurementLabel = item.measurementSource === 'fallback' ? 'Estimated fallback' : 'CV measured'
-
   return (
-    <article className={toneClass}>
-      <div className="result-media">
-        <div className="result-image-placeholder" />
-        <span>{item.jointLabel}</span>
-      </div>
-      <div className="result-body">
-        <div className="upload-title-row">
-          <h3>{item.jointLabel}</h3>
+    <article className={`inspection-result-card result-${item.status.toLowerCase()}`}>
+      <div className="inspection-result-media">
+        {item.previewUrl ? <img src={item.previewUrl} alt={item.fileName ?? item.jointLabel} /> : <div className="preview-placeholder" />}
+        <div className="result-media-top">
           <StatusBadge status={item.status} />
         </div>
-        <div className="metric-row">
-          <div>
-            <span>Original</span>
-            <strong>{item.originalGapMm.toFixed(1)} mm</strong>
-          </div>
-          <div>
-            <span>Final</span>
-            <strong>{item.finalGapMm.toFixed(1)} mm</strong>
-          </div>
-          <div>
-            <span>Confidence</span>
-            <strong>{Math.round((item.confidence ?? 0) * 100)}%</strong>
-          </div>
+        <div className="result-media-bottom">
+          <strong>Joint {item.jointLabel}</strong>
+        </div>
+      </div>
+
+      <div className="inspection-result-body">
+        <div className="inspection-gap-row">
+          <span>Measured Gap</span>
+          <strong>{item.finalGapMm.toFixed(1)} mm</strong>
         </div>
 
-        <div className="result-meta-line">
-          <span>{measurementLabel}</span>
-          {item.measurementNote ? <span>{item.measurementNote}</span> : null}
+        <div className="inspection-note-block">
+          <span>Inspector Notes</span>
+          <p>{item.notes || 'Awaiting inspector note for this joint.'}</p>
         </div>
 
-        <label className="field">
-          <span>Inspector Note</span>
-          <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={4} />
-        </label>
-
-        <div className="override-grid">
-          <label className="field">
-            <span>Override Value (mm)</span>
-            <input
-              type="number"
-              step="0.1"
-              value={overrideDraft.value}
-              onChange={(event) => setOverrideDraft((current) => ({ ...current, value: event.target.value }))}
-            />
-          </label>
-          <label className="field">
-            <span>Override Reason</span>
-            <input
-              value={overrideDraft.reason}
-              onChange={(event) => setOverrideDraft((current) => ({ ...current, reason: event.target.value }))}
-              placeholder="Why are you overriding this value?"
-            />
-          </label>
+        <div className="inspection-meta-row">
+          <span>{measurementLabel(item)}</span>
+          <span>{Math.round((item.confidence ?? 0) * 100)}% confidence</span>
         </div>
 
-        <div className="action-row">
-          <button className="button button-secondary" type="button" onClick={() => void handleSaveNote()} disabled={busy}>
-            Save Note
+        <div className="inspection-cta-row">
+          <button className="button button-secondary card-action-button" type="button" onClick={() => setOpenControls((current) => !current)}>
+            {statusActionLabel(item.status)}
           </button>
-          <button className="button button-secondary" type="button" onClick={() => void onRemeasure(item.id)} disabled={busy}>
+          <button className="button button-ghost" type="button" onClick={() => void onRemeasure(item.id)} disabled={busy}>
             Re-measure
           </button>
-          <button className="button button-primary" type="button" onClick={() => void handleOverride()} disabled={busy}>
-            Apply Override
-          </button>
-          {item.overrideApplied ? (
-            <button className="button button-ghost" type="button" onClick={() => void onClearOverride(item.id)} disabled={busy}>
-              Clear Override
-            </button>
-          ) : null}
         </div>
+
+        {openControls ? (
+          <div className="inspection-controls-panel">
+            <label className="field">
+              <span>Inspector Note</span>
+              <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={4} />
+            </label>
+
+            <div className="override-grid">
+              <label className="field">
+                <span>Override Value (mm)</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={overrideDraft.value}
+                  onChange={(event) => setOverrideDraft((current) => ({ ...current, value: event.target.value }))}
+                />
+              </label>
+              <label className="field">
+                <span>Override Reason</span>
+                <input
+                  value={overrideDraft.reason}
+                  onChange={(event) => setOverrideDraft((current) => ({ ...current, reason: event.target.value }))}
+                  placeholder="Why are you overriding this value?"
+                />
+              </label>
+            </div>
+
+            <div className="action-row">
+              <button className="button button-secondary" type="button" onClick={() => void handleSaveNote()} disabled={busy}>
+                Save Note
+              </button>
+              <button className="button button-primary" type="button" onClick={() => void handleOverride()} disabled={busy}>
+                Apply Override
+              </button>
+              {item.overrideApplied ? (
+                <button className="button button-ghost" type="button" onClick={() => void onClearOverride(item.id)} disabled={busy}>
+                  Clear Override
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </div>
     </article>
   )
 }
 
 export const InspectionResultsPage = ({
+  projectId,
   projectName,
+  siteName,
   manholeLabel,
   results,
   summary,
@@ -144,55 +163,70 @@ export const InspectionResultsPage = ({
   onApplyOverride,
   onClearOverride,
   onNext,
-}: Props) => (
-  <div className="page-grid">
-    <section className="section-header compact">
-      <button className="button button-ghost" type="button" onClick={onBack}>
-        Back
-      </button>
-      <button className="button button-primary" type="button" onClick={onNext}>
-        Project Summary
-      </button>
-    </section>
+}: Props) => {
+  const total = summary?.totalJoints ?? results.length
+  const pass = summary?.passCount ?? results.filter((item) => item.status === 'PASS').length
+  const fail = summary?.failCount ?? results.filter((item) => item.status === 'FAIL').length
+  const review = summary?.reviewCount ?? results.filter((item) => item.status === 'REVIEW').length
+  const completion = total ? Math.round((results.length / total) * 100) : 0
 
-    <section className="page-intro">
-      <div>
-        <p className="eyebrow">{projectName}</p>
-        <h1>Inspection results</h1>
-        <p className="lead">{manholeLabel} result review with notes, overrides, and re-measure actions for the UI flow.</p>
+  return (
+    <div className="page-grid results-page">
+      <div className="page-status-strip">
+        <span>Online - all data synced with server</span>
+        <span>Last sync: 2 min ago</span>
       </div>
-    </section>
 
-    <section className="two-column-layout">
-      <aside className="summary-sidebar">
-        <div className="summary-card">
-          <h2>Inspection Summary</h2>
-          <div className="summary-metrics">
-            <div>
-              <span>Total joints</span>
-              <strong>{summary?.totalJoints ?? 0}</strong>
+      <section className="results-summary-hero">
+        <div className="results-summary-copy">
+          <div className="results-project-id">Project ID: {projectId}</div>
+          <h1>{projectName}</h1>
+          <p className="lead">
+            Detailed quality control results for {manholeLabel}
+            {siteName ? ` at ${siteName}` : ''}.
+          </p>
+
+          <div className="results-progress-block">
+            <div className="results-progress-head">
+              <span>Overall Inspection Completion</span>
+              <strong>{completion}%</strong>
             </div>
-            <div>
-              <span>Pass</span>
-              <strong>{summary?.passCount ?? 0}</strong>
-            </div>
-            <div>
-              <span>Review</span>
-              <strong>{summary?.reviewCount ?? 0}</strong>
-            </div>
-            <div>
-              <span>Fail</span>
-              <strong>{summary?.failCount ?? 0}</strong>
+            <div className="progress-rail large">
+              <div className="progress-fill" style={{ width: `${completion}%` }} />
             </div>
           </div>
         </div>
-        <div className="side-note-card emphasis">
-          <h2>Review rules</h2>
-          <p>Original values stay preserved, final values reflect overrides, and every mutation leaves an explicit trace in UI copy.</p>
-        </div>
-      </aside>
 
-      <section className="results-stack">
+        <div className="results-kpi-grid">
+          <article className="results-kpi-card">
+            <strong>{total}</strong>
+            <span>Total</span>
+          </article>
+          <article className="results-kpi-card is-pass">
+            <strong>{pass}</strong>
+            <span>Pass</span>
+          </article>
+          <article className="results-kpi-card is-fail">
+            <strong>{fail}</strong>
+            <span>Fail</span>
+          </article>
+          <article className="results-kpi-card is-review">
+            <strong>{review}</strong>
+            <span>Review</span>
+          </article>
+        </div>
+      </section>
+
+      <div className="page-top-actions">
+        <button className="button button-secondary" type="button" onClick={onBack}>
+          Back to Uploads
+        </button>
+        <button className="button button-primary" type="button" onClick={onNext}>
+          Project Summary
+        </button>
+      </div>
+
+      <section className="inspection-results-grid">
         {results.length ? (
           results.map((item) => (
             <ResultCard
@@ -211,6 +245,6 @@ export const InspectionResultsPage = ({
           </article>
         )}
       </section>
-    </section>
-  </div>
-)
+    </div>
+  )
+}
