@@ -1,4 +1,4 @@
-import type { InspectionStatus } from '../types'
+import type { CvMeasurementDebug, InspectionStatus, MeasurementOverlayHints, MeasurementSource } from '../types'
 import { loadOpenCv } from './opencv'
 import { classifyGap } from '../utils'
 
@@ -15,13 +15,22 @@ export interface CvWorkerResponse {
   originalGapMm: number
   status: InspectionStatus
   confidence: number
-  measurementSource: 'cv' | 'fallback'
+  measurementSource: MeasurementSource
   measurementNote?: string
+  cvDebug?: CvMeasurementDebug
+  overlayHints?: MeasurementOverlayHints
 }
 
 const DEFAULT_PIPE_DIAMETER_MM = 225
 const MAX_PROCESS_DIMENSION = 720
 const ANGLE_STEPS = 48
+
+type CvMeasurementCandidate = {
+  gapMm: number
+  confidence: number
+  note?: string
+  debug: CvMeasurementDebug
+}
 
 function deriveGapMm(seed: string, orderIndex: number): number {
   const hash = Array.from(seed).reduce((acc, char, index) => acc + char.charCodeAt(0) * (index + 1), 0)
@@ -42,6 +51,28 @@ function buildGrayMap(imageData: ImageData): Uint8Array {
   }
 
   return gray
+}
+
+function enhanceImageData(imageData: ImageData): ImageData {
+  const enhanced = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height)
+  const { data } = enhanced
+  let luminanceSum = 0
+
+  for (let index = 0; index < data.length; index += 4) {
+    luminanceSum += data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114
+  }
+
+  const mean = luminanceSum / Math.max(1, data.length / 4)
+  const exposureLift = clamp(128 - mean, -28, 42)
+  const contrast = mean < 105 ? 1.18 : 1.08
+
+  for (let index = 0; index < data.length; index += 4) {
+    data[index] = clamp((data[index] - 128) * contrast + 128 + exposureLift, 0, 255)
+    data[index + 1] = clamp((data[index + 1] - 128) * contrast + 128 + exposureLift, 0, 255)
+    data[index + 2] = clamp((data[index + 2] - 128) * contrast + 128 + exposureLift, 0, 255)
+  }
+
+  return enhanced
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -157,7 +188,8 @@ function measureGapFromKnownCircle(
   centerX: number,
   centerY: number,
   innerRadiusPx: number,
-): { gapMm: number; confidence: number; note?: string } | null {
+  enhancementUsed = false,
+): CvMeasurementCandidate | null {
   const gapWidths: number[] = []
   const brightThresholdSamples: number[] = []
   const coveredSectors = new Set<number>()
@@ -209,6 +241,7 @@ function measureGapFromKnownCircle(
   const mmPerPixel = pipeDiameterMm / (innerRadiusPx * 2)
   const gapMm = Number((gapPixels * mmPerPixel).toFixed(1))
   const confidence = Number(clamp(0.52 + gapWidths.length / 90 + coveredSectors.size / 24 - gapSpread / 24, 0.5, 0.93).toFixed(2))
+  const outerRadiusPx = innerRadiusPx + gapPixels
 
   if (gapMm <= 0.5 || gapMm > 60) {
     return null
@@ -221,6 +254,28 @@ function measureGapFromKnownCircle(
       confidence < 0.72
         ? 'OpenCV confirmed the pipe opening, but the gap was estimated from partial visible joint slices.'
         : undefined,
+    debug: {
+      pipeDetected: true,
+      imageWidth: width,
+      imageHeight: height,
+      innerRadiusPx: Number(innerRadiusPx.toFixed(1)),
+      outerRadiusPx: Number(outerRadiusPx.toFixed(1)),
+      gapPixels: Number(gapPixels.toFixed(1)),
+      mmPerPixel: Number(mmPerPixel.toFixed(4)),
+      visibleSectors: coveredSectors.size,
+      enhancementUsed,
+      overlayHints: {
+        pipeCenter: { x: Number(centerX.toFixed(1)), y: Number(centerY.toFixed(1)) },
+        innerRadiusPx: Number(innerRadiusPx.toFixed(1)),
+        outerRadiusPx: Number(outerRadiusPx.toFixed(1)),
+        gapLine: {
+          x1: Number((centerX + innerRadiusPx).toFixed(1)),
+          y1: Number(centerY.toFixed(1)),
+          x2: Number((centerX + outerRadiusPx).toFixed(1)),
+          y2: Number(centerY.toFixed(1)),
+        },
+      },
+    },
   }
 }
 
@@ -243,7 +298,8 @@ function findCircleGapMeasurement(
   width: number,
   height: number,
   pipeDiameterMm: number,
-): { gapMm: number; confidence: number; note?: string } | null {
+  enhancementUsed = false,
+): CvMeasurementCandidate | null {
   const center = detectOpeningCenter(gray, width, height)
   if (!center) {
     return null
@@ -310,6 +366,7 @@ function findCircleGapMeasurement(
 
   const mmPerPixel = pipeDiameterMm / (innerRadiusPx * 2)
   const gapMm = Number((gapPixels * mmPerPixel).toFixed(1))
+  const outerRadiusPx = innerRadiusPx + gapPixels
   const confidence = Number(
     clamp(0.58 + innerRadii.length / 90 - radiusSpread / 60 - gapSpread / 30, 0.55, 0.93).toFixed(2),
   )
@@ -318,6 +375,28 @@ function findCircleGapMeasurement(
     gapMm,
     confidence,
     note: confidence < 0.68 ? 'Measurement captured from a low-confidence opening profile.' : undefined,
+    debug: {
+      pipeDetected: true,
+      imageWidth: width,
+      imageHeight: height,
+      innerRadiusPx: Number(innerRadiusPx.toFixed(1)),
+      outerRadiusPx: Number(outerRadiusPx.toFixed(1)),
+      gapPixels: Number(gapPixels.toFixed(1)),
+      mmPerPixel: Number(mmPerPixel.toFixed(4)),
+      visibleSectors: innerRadii.length,
+      enhancementUsed,
+      overlayHints: {
+        pipeCenter: { x: Number(center.x.toFixed(1)), y: Number(center.y.toFixed(1)) },
+        innerRadiusPx: Number(innerRadiusPx.toFixed(1)),
+        outerRadiusPx: Number(outerRadiusPx.toFixed(1)),
+        gapLine: {
+          x1: Number((center.x + innerRadiusPx).toFixed(1)),
+          y1: Number(center.y.toFixed(1)),
+          x2: Number((center.x + outerRadiusPx).toFixed(1)),
+          y2: Number(center.y.toFixed(1)),
+        },
+      },
+    },
   }
 }
 
@@ -407,10 +486,89 @@ function detectReferenceSpanPixels(gray: Uint8Array, width: number, height: numb
   return span > width * 0.22 ? span : null
 }
 
+function detectHorizontalJointGap(gray: Uint8Array, width: number, height: number): CvMeasurementCandidate | null {
+  const startX = Math.floor(width * 0.08)
+  const endX = Math.ceil(width * 0.92)
+  const startY = Math.floor(height * 0.12)
+  const endY = Math.ceil(height * 0.88)
+  const rowDarkness: number[] = []
+
+  for (let y = startY; y < endY; y += 1) {
+    let sum = 0
+    for (let x = startX; x < endX; x += 1) {
+      sum += 255 - gray[y * width + x]
+    }
+    rowDarkness.push(sum / Math.max(1, endX - startX))
+  }
+
+  let bestScore = 0
+  let bestIndex = -1
+
+  for (let index = 3; index < rowDarkness.length - 3; index += 1) {
+    const local = average(rowDarkness.slice(index - 2, index + 3))
+    const upper = average(rowDarkness.slice(Math.max(0, index - 24), Math.max(1, index - 8)))
+    const lower = average(rowDarkness.slice(Math.min(rowDarkness.length - 1, index + 8), Math.min(rowDarkness.length, index + 24)))
+    const score = local - Math.max(upper, lower)
+    if (score > bestScore) {
+      bestScore = score
+      bestIndex = index
+    }
+  }
+
+  if (bestScore < 18 || bestIndex < 0) {
+    return null
+  }
+
+  const centerY = startY + bestIndex
+  let topEdge = centerY
+  let bottomEdge = centerY
+  const threshold = rowDarkness[bestIndex] - bestScore * 0.45
+
+  while (topEdge > startY && rowDarkness[topEdge - startY] > threshold) {
+    topEdge -= 1
+  }
+
+  while (bottomEdge < endY - 1 && rowDarkness[bottomEdge - startY] > threshold) {
+    bottomEdge += 1
+  }
+
+  const gapPixels = Math.max(2, bottomEdge - topEdge)
+  const mmPerPixel = 0.55
+  const gapMm = Number((gapPixels * mmPerPixel).toFixed(1))
+
+  if (gapMm <= 0.5 || gapMm > 80) {
+    return null
+  }
+
+  return {
+    gapMm,
+    confidence: Number(clamp(0.42 + bestScore / 140, 0.45, 0.68).toFixed(2)),
+    note: 'Linear close-up joint seam detected. AI review or inspector confirmation is recommended for final accuracy.',
+    debug: {
+      pipeDetected: false,
+      imageWidth: width,
+      imageHeight: height,
+      gapPixels,
+      mmPerPixel,
+      edgeStrength: Number(bestScore.toFixed(1)),
+      enhancementUsed: true,
+      failureStage: 'linear-close-up-joint',
+      overlayHints: {
+        gapLine: {
+          x1: startX,
+          y1: Number(centerY.toFixed(1)),
+          x2: endX,
+          y2: Number(centerY.toFixed(1)),
+        },
+      },
+    },
+  }
+}
+
 async function tryMeasureWithImageAnalysis(
   blob: Blob | undefined,
   pipeDiameterMm: number,
-): Promise<{ gapMm: number; confidence: number; note?: string } | null> {
+): Promise<CvMeasurementCandidate | null> {
   if (!blob || typeof createImageBitmap !== 'function' || typeof OffscreenCanvas === 'undefined') {
     return null
   }
@@ -428,13 +586,18 @@ async function tryMeasureWithImageAnalysis(
   }
 
   context.drawImage(bitmap, 0, 0, targetWidth, targetHeight)
-  const imageData = context.getImageData(0, 0, targetWidth, targetHeight)
+  const imageData = enhanceImageData(context.getImageData(0, 0, targetWidth, targetHeight))
   const gray = buildGrayMap(imageData)
 
   try {
-    const circularMeasurement = findCircleGapMeasurement(gray, targetWidth, targetHeight, pipeDiameterMm)
+    const circularMeasurement = findCircleGapMeasurement(gray, targetWidth, targetHeight, pipeDiameterMm, true)
     if (circularMeasurement && circularMeasurement.gapMm > 0.5 && circularMeasurement.gapMm < 60) {
       return circularMeasurement
+    }
+
+    const closeUpJoint = detectHorizontalJointGap(gray, targetWidth, targetHeight)
+    if (closeUpJoint) {
+      return closeUpJoint
     }
 
     const linearGap = detectLinearGapPixels(gray, targetWidth, targetHeight)
@@ -455,6 +618,24 @@ async function tryMeasureWithImageAnalysis(
       gapMm,
       confidence,
       note: 'Measured from a partial joint view. Capture a centered guided joint photo for highest accuracy.',
+      debug: {
+        pipeDetected: false,
+        imageWidth: targetWidth,
+        imageHeight: targetHeight,
+        gapPixels: linearGap.gapPixels,
+        mmPerPixel: Number(mmPerPixel.toFixed(4)),
+        edgeStrength: Number(linearGap.edgeStrength.toFixed(1)),
+        enhancementUsed: true,
+        failureStage: 'linear-gap-estimate',
+        overlayHints: {
+          gapLine: {
+            x1: Number((targetWidth / 2 - linearGap.gapPixels / 2).toFixed(1)),
+            y1: Number((targetHeight / 2).toFixed(1)),
+            x2: Number((targetWidth / 2 + linearGap.gapPixels / 2).toFixed(1)),
+            y2: Number((targetHeight / 2).toFixed(1)),
+          },
+        },
+      },
     }
   } finally {
     bitmap.close()
@@ -464,7 +645,7 @@ async function tryMeasureWithImageAnalysis(
 async function tryMeasureWithOpenCv(
   blob: Blob | undefined,
   pipeDiameterMm: number,
-): Promise<{ gapMm: number; confidence: number; note?: string } | null> {
+): Promise<CvMeasurementCandidate | null> {
   if (!blob || typeof createImageBitmap !== 'function' || typeof OffscreenCanvas === 'undefined') {
     return null
   }
@@ -483,7 +664,7 @@ async function tryMeasureWithOpenCv(
   }
 
   context.drawImage(bitmap, 0, 0, width, height)
-  const imageData = context.getImageData(0, 0, width, height)
+  const imageData = enhanceImageData(context.getImageData(0, 0, width, height))
   const grayMap = buildGrayMap(imageData)
   const source = cv.matFromImageData(imageData)
   const gray = new cv.Mat()
@@ -528,7 +709,7 @@ async function tryMeasureWithOpenCv(
       return null
     }
 
-    return measureGapFromKnownCircle(grayMap, width, height, pipeDiameterMm, bestCircle.x, bestCircle.y, bestCircle.r)
+    return measureGapFromKnownCircle(grayMap, width, height, pipeDiameterMm, bestCircle.x, bestCircle.y, bestCircle.r, true)
   } finally {
     circles.delete()
     blurred.delete()
@@ -555,6 +736,11 @@ function createFallbackMeasurement(
     measurementNote:
       note ??
       `Estimated from file metadata because the CV pipeline could not confirm the ${pipeDiameterMm}mm pipe geometry.`,
+    cvDebug: {
+      pipeDetected: false,
+      failureStage: 'fallback-derived-from-metadata',
+      enhancementUsed: false,
+    },
   }
 }
 
@@ -581,6 +767,8 @@ export async function runCvMeasurement(
         confidence: openCvMeasured.confidence,
         measurementSource: 'cv',
         measurementNote: openCvMeasured.note,
+        cvDebug: openCvMeasured.debug,
+        overlayHints: openCvMeasured.debug.overlayHints,
       }
     }
   }
@@ -602,5 +790,7 @@ export async function runCvMeasurement(
     confidence: measured.confidence,
     measurementSource: 'cv',
     measurementNote: measured.note,
+    cvDebug: measured.debug,
+    overlayHints: measured.debug.overlayHints,
   }
 }

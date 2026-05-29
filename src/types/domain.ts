@@ -12,6 +12,55 @@ export type InspectionCaptureSource = 'upload' | 'camera'
 export type QueueStatus = 'queued' | 'processing' | 'completed' | 'failed'
 export type InspectionStatus = 'PASS' | 'REVIEW' | 'FAIL'
 export type GuidedPhotoStatus = 'ready' | 'retake'
+export type MeasurementSource = 'cv' | 'ai-assisted' | 'ai-estimated' | 'ai-review' | 'manual' | 'fallback'
+
+export interface MeasurementOverlayHints {
+  pipeCenter?: { x: number; y: number }
+  innerRadiusPx?: number
+  outerRadiusPx?: number
+  gapLine?: { x1: number; y1: number; x2: number; y2: number }
+}
+
+export interface CvMeasurementDebug {
+  pipeDetected: boolean
+  imageWidth?: number
+  imageHeight?: number
+  innerRadiusPx?: number
+  outerRadiusPx?: number
+  gapPixels?: number
+  mmPerPixel?: number
+  visibleSectors?: number
+  edgeStrength?: number
+  failureStage?: string
+  enhancementUsed?: boolean
+  overlayHints?: MeasurementOverlayHints
+}
+
+export interface AiMeasurementReview {
+  provider: 'mock-gemini' | 'gemini'
+  model: string
+  usable: boolean
+  jointVisible: boolean
+  pipeOpeningVisible: boolean
+  cvPlausible: boolean
+  estimatedGapMm: number | null
+  confidence: number
+  reason: string
+  retakeMessage?: string
+  overlayHints?: MeasurementOverlayHints
+  reviewedAt: string
+}
+
+export interface MeasurementAudit {
+  originalSource: MeasurementSource
+  finalSource: MeasurementSource
+  cvConfidence?: number
+  aiConfidence?: number
+  cvGapMm?: number
+  aiEstimatedGapMm?: number | null
+  enhancementUsed?: boolean
+  decision: string
+}
 
 export interface Project {
   id: string
@@ -125,8 +174,12 @@ export interface InspectionResult {
   finalGapMm: number
   status: InspectionStatus
   confidence?: number
-  measurementSource?: 'cv' | 'fallback'
+  measurementSource?: MeasurementSource
   measurementNote?: string
+  cvDebug?: CvMeasurementDebug
+  aiReview?: AiMeasurementReview
+  overlayHints?: MeasurementOverlayHints
+  measurementAudit?: MeasurementAudit
   previewUrl?: string
   notes?: string
   processedAt: string
@@ -188,7 +241,7 @@ export interface FlaggedInspectionSummary {
   manholeLabel?: string
   status: InspectionStatus
   finalGapMm: number
-  measurementSource?: 'cv' | 'fallback'
+  measurementSource?: MeasurementSource
   overrideApplied?: boolean
   note?: string
   previewUrl?: string

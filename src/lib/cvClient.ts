@@ -46,7 +46,7 @@ function isBrowserWorkerAvailable(): boolean {
 }
 
 function createCvWorker(): Worker {
-  return new Worker('/workers/cv-worker.js?v=opencv-classic-5')
+  return new Worker('/workers/cv-worker.js?v=ai-assisted-debug-1')
 }
 
 function appendDebugStage(debugTrail: string[], stage: string): string[] {

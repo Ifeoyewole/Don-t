@@ -9,6 +9,9 @@ type Props = {
   lastUpdatedAt?: string
   summary: ProjectInspectionSummary | null
   onBack: () => void
+  onEditProject: () => void
+  onEditManhole: (manholeId: string) => void
+  onResumeUpload: (manholeId: string) => void
   onExport: (format: 'json' | 'pdf' | 'zip') => Promise<void>
   onOpenFlagged: (inspectionId?: string) => void
 }
@@ -31,6 +34,9 @@ export const InspectionSummaryPage = ({
   lastUpdatedAt,
   summary,
   onBack,
+  onEditProject,
+  onEditManhole,
+  onResumeUpload,
   onExport,
   onOpenFlagged,
 }: Props) => {
@@ -59,6 +65,9 @@ export const InspectionSummaryPage = ({
           </p>
         </div>
         <div className="export-actions">
+          <button className="button button-secondary" type="button" onClick={onEditProject}>
+            Edit Project
+          </button>
           <button className="button button-primary" type="button" onClick={() => void onExport('zip')}>
             Export Evidence Pack
           </button>
@@ -170,6 +179,40 @@ export const InspectionSummaryPage = ({
               <p>
                 <strong>Joints Captured:</strong> {summary?.totalJoints ?? 0}
               </p>
+            </div>
+            <div className="summary-action-stack">
+              <button className="button button-primary" type="button" onClick={() => onResumeUpload(manholes[0]?.id ?? '')} disabled={!manholes.length}>
+                Resume Upload
+              </button>
+              <button className="button button-secondary" type="button" onClick={() => onOpenFlagged()} disabled={!flagged.length}>
+                View Results Again
+              </button>
+            </div>
+          </article>
+
+          <article className="session-log-panel">
+            <h3>Edit Inspection Setup</h3>
+            <div className="summary-manhole-list">
+              {manholes.length ? (
+                manholes.map((manhole) => (
+                  <div className="summary-manhole-row" key={manhole.id}>
+                    <div>
+                      <strong>{manhole.manholeId}</strong>
+                      <span>{manhole.pipeDiameterMm} mm pipe • {manhole.estimatedJointCount} expected joints</span>
+                    </div>
+                    <div className="action-row">
+                      <button className="button button-secondary" type="button" onClick={() => onEditManhole(manhole.id)}>
+                        Edit
+                      </button>
+                      <button className="button button-ghost" type="button" onClick={() => onResumeUpload(manhole.id)}>
+                        Upload
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="lead">No manholes have been added yet.</p>
+              )}
             </div>
           </article>
 

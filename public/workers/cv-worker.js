@@ -65,6 +65,28 @@ function buildGrayMap(imageData) {
   return gray
 }
 
+function enhanceImageData(imageData) {
+  const enhanced = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height)
+  const { data } = enhanced
+  let luminanceSum = 0
+
+  for (let index = 0; index < data.length; index += 4) {
+    luminanceSum += data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114
+  }
+
+  const mean = luminanceSum / Math.max(1, data.length / 4)
+  const exposureLift = clamp(128 - mean, -28, 42)
+  const contrast = mean < 105 ? 1.18 : 1.08
+
+  for (let index = 0; index < data.length; index += 4) {
+    data[index] = clamp((data[index] - 128) * contrast + 128 + exposureLift, 0, 255)
+    data[index + 1] = clamp((data[index + 1] - 128) * contrast + 128 + exposureLift, 0, 255)
+    data[index + 2] = clamp((data[index + 2] - 128) * contrast + 128 + exposureLift, 0, 255)
+  }
+
+  return enhanced
+}
+
 function getPixel(gray, width, height, x, y) {
   const clampedX = clamp(Math.round(x), 0, width - 1)
   const clampedY = clamp(Math.round(y), 0, height - 1)
@@ -99,7 +121,86 @@ function smoothProfile(profile) {
   })
 }
 
-function measureGapFromKnownCircle(gray, width, height, pipeDiameterMm, centerX, centerY, innerRadiusPx) {
+function detectHorizontalJointGap(gray, width, height) {
+  const startX = Math.floor(width * 0.08)
+  const endX = Math.ceil(width * 0.92)
+  const startY = Math.floor(height * 0.12)
+  const endY = Math.ceil(height * 0.88)
+  const rowDarkness = []
+
+  for (let y = startY; y < endY; y += 1) {
+    let sum = 0
+    for (let x = startX; x < endX; x += 1) {
+      sum += 255 - gray[y * width + x]
+    }
+    rowDarkness.push(sum / Math.max(1, endX - startX))
+  }
+
+  let bestScore = 0
+  let bestIndex = -1
+
+  for (let index = 3; index < rowDarkness.length - 3; index += 1) {
+    const local = average(rowDarkness.slice(index - 2, index + 3))
+    const upper = average(rowDarkness.slice(Math.max(0, index - 24), Math.max(1, index - 8)))
+    const lower = average(rowDarkness.slice(Math.min(rowDarkness.length - 1, index + 8), Math.min(rowDarkness.length, index + 24)))
+    const score = local - Math.max(upper, lower)
+    if (score > bestScore) {
+      bestScore = score
+      bestIndex = index
+    }
+  }
+
+  if (bestScore < 18 || bestIndex < 0) {
+    return null
+  }
+
+  const centerY = startY + bestIndex
+  let topEdge = centerY
+  let bottomEdge = centerY
+  const threshold = rowDarkness[bestIndex] - bestScore * 0.45
+
+  while (topEdge > startY && rowDarkness[topEdge - startY] > threshold) {
+    topEdge -= 1
+  }
+
+  while (bottomEdge < endY - 1 && rowDarkness[bottomEdge - startY] > threshold) {
+    bottomEdge += 1
+  }
+
+  const gapPixels = Math.max(2, bottomEdge - topEdge)
+  const assumedMmPerPixel = 0.55
+  const gapMm = Number((gapPixels * assumedMmPerPixel).toFixed(1))
+
+  if (gapMm <= 0.5 || gapMm > 80) {
+    return null
+  }
+
+  return {
+    gapMm,
+    confidence: Number(clamp(0.42 + bestScore / 140, 0.45, 0.68).toFixed(2)),
+    note: 'Linear close-up joint seam detected. AI review or inspector confirmation is recommended for final accuracy.',
+    debug: {
+      pipeDetected: false,
+      imageWidth: width,
+      imageHeight: height,
+      gapPixels,
+      mmPerPixel: assumedMmPerPixel,
+      edgeStrength: Number(bestScore.toFixed(1)),
+      enhancementUsed: true,
+      failureStage: 'linear-close-up-joint',
+      overlayHints: {
+        gapLine: {
+          x1: startX,
+          y1: Number(centerY.toFixed(1)),
+          x2: endX,
+          y2: Number(centerY.toFixed(1)),
+        },
+      },
+    },
+  }
+}
+
+function measureGapFromKnownCircle(gray, width, height, pipeDiameterMm, centerX, centerY, innerRadiusPx, enhancementUsed = false) {
   const gapWidths = []
   const brightThresholdSamples = []
   const coveredSectors = new Set()
@@ -151,6 +252,7 @@ function measureGapFromKnownCircle(gray, width, height, pipeDiameterMm, centerX,
   const mmPerPixel = pipeDiameterMm / (innerRadiusPx * 2)
   const gapMm = Number((gapPixels * mmPerPixel).toFixed(1))
   const confidence = Number(clamp(0.52 + gapWidths.length / 90 + coveredSectors.size / 24 - gapSpread / 24, 0.5, 0.93).toFixed(2))
+  const outerRadiusPx = innerRadiusPx + gapPixels
 
   if (gapMm <= 0.5 || gapMm > 60) {
     return null
@@ -163,6 +265,28 @@ function measureGapFromKnownCircle(gray, width, height, pipeDiameterMm, centerX,
       confidence < 0.72
         ? 'OpenCV confirmed the pipe opening, but the gap was estimated from partial visible joint slices.'
         : undefined,
+    debug: {
+      pipeDetected: true,
+      imageWidth: width,
+      imageHeight: height,
+      innerRadiusPx: Number(innerRadiusPx.toFixed(1)),
+      outerRadiusPx: Number(outerRadiusPx.toFixed(1)),
+      gapPixels: Number(gapPixels.toFixed(1)),
+      mmPerPixel: Number(mmPerPixel.toFixed(4)),
+      visibleSectors: coveredSectors.size,
+      enhancementUsed,
+      overlayHints: {
+        pipeCenter: { x: Number(centerX.toFixed(1)), y: Number(centerY.toFixed(1)) },
+        innerRadiusPx: Number(innerRadiusPx.toFixed(1)),
+        outerRadiusPx: Number(outerRadiusPx.toFixed(1)),
+        gapLine: {
+          x1: Number((centerX + innerRadiusPx).toFixed(1)),
+          y1: Number(centerY.toFixed(1)),
+          x2: Number((centerX + outerRadiusPx).toFixed(1)),
+          y2: Number(centerY.toFixed(1)),
+        },
+      },
+    },
   }
 }
 
@@ -305,7 +429,7 @@ async function measureGap(request) {
   }
 
   context.drawImage(bitmap, 0, 0, width, height)
-  const imageData = context.getImageData(0, 0, width, height)
+  const imageData = enhanceImageData(context.getImageData(0, 0, width, height))
   const grayMap = buildGrayMap(imageData)
   const source = cv.matFromImageData(imageData)
   const gray = new cv.Mat()
@@ -329,6 +453,20 @@ async function measureGap(request) {
     )
 
     if (!circles.data32F || circles.data32F.length < 3) {
+      const linearMeasured = detectHorizontalJointGap(grayMap, width, height)
+      if (linearMeasured) {
+        debug('linear-joint-measurement-completed', request.imageId)
+        return {
+          imageId: request.imageId,
+          originalGapMm: linearMeasured.gapMm,
+          status: classifyGap(linearMeasured.gapMm),
+          confidence: linearMeasured.confidence,
+          measurementSource: 'cv',
+          measurementNote: linearMeasured.note,
+          cvDebug: linearMeasured.debug,
+          overlayHints: linearMeasured.debug.overlayHints,
+        }
+      }
       throw new Error('OpenCV did not detect a valid pipe opening.')
     }
 
@@ -352,7 +490,7 @@ async function measureGap(request) {
     }
 
     debug('measuring-gap-from-circle', request.imageId)
-    const measured = measureGapFromKnownCircle(grayMap, width, height, pipeDiameterMm, bestCircle.x, bestCircle.y, bestCircle.r)
+    const measured = measureGapFromKnownCircle(grayMap, width, height, pipeDiameterMm, bestCircle.x, bestCircle.y, bestCircle.r, true)
 
     if (!measured) {
       throw new Error('Pipe opening was detected, but joint gap extraction failed.')
@@ -366,6 +504,8 @@ async function measureGap(request) {
       confidence: measured.confidence,
       measurementSource: 'cv',
       measurementNote: measured.note,
+      cvDebug: measured.debug,
+      overlayHints: measured.debug.overlayHints,
     }
   } finally {
     circles.delete()

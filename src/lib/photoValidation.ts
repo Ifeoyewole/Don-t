@@ -122,6 +122,46 @@ function sampleRayRadii(gray: Uint8Array, width: number, height: number, centerX
   return radii
 }
 
+function detectLinearJoint(gray: Uint8Array, width: number, height: number): { score: number; y: number } | null {
+  const startX = Math.floor(width * 0.08)
+  const endX = Math.ceil(width * 0.92)
+  const startY = Math.floor(height * 0.12)
+  const endY = Math.ceil(height * 0.88)
+  const rowDarkness: number[] = []
+
+  for (let y = startY; y < endY; y += 1) {
+    let sum = 0
+    for (let x = startX; x < endX; x += 1) {
+      sum += 255 - gray[y * width + x]
+    }
+    rowDarkness.push(sum / Math.max(1, endX - startX))
+  }
+
+  const baseline = average(rowDarkness)
+  let bestScore = 0
+  let bestY = -1
+
+  for (let index = 2; index < rowDarkness.length - 2; index += 1) {
+    const local = average(rowDarkness.slice(index - 2, index + 3))
+    const upper = average(rowDarkness.slice(Math.max(0, index - 20), Math.max(1, index - 8)))
+    const lower = average(rowDarkness.slice(Math.min(rowDarkness.length - 1, index + 8), Math.min(rowDarkness.length, index + 20)))
+    const contrast = local - Math.max(upper, lower, baseline * 0.82)
+    if (contrast > bestScore) {
+      bestScore = contrast
+      bestY = startY + index
+    }
+  }
+
+  if (bestScore < 18 || bestY < 0) {
+    return null
+  }
+
+  return {
+    score: Number(clamp(bestScore / 70, 0.38, 0.92).toFixed(2)),
+    y: bestY,
+  }
+}
+
 export async function validateGuidedPhoto(blob?: Blob): Promise<GuidedPhotoValidationResult> {
   if (!blob || typeof createImageBitmap !== 'function' || typeof OffscreenCanvas === 'undefined') {
     return {
@@ -154,6 +194,15 @@ export async function validateGuidedPhoto(blob?: Blob): Promise<GuidedPhotoValid
 
   const center = detectOpeningCenter(gray, width, height)
   if (!center) {
+    const linearJoint = detectLinearJoint(gray, width, height)
+    if (linearJoint) {
+      return {
+        status: 'ready',
+        message: 'Linear joint seam detected. Enhanced CV and AI review will confirm the measurement.',
+        score: linearJoint.score,
+      }
+    }
+
     return {
       status: 'retake',
       message: 'Retake photo: keep the pipe opening visible and centered so the gap can be scaled correctly.',
@@ -163,6 +212,15 @@ export async function validateGuidedPhoto(blob?: Blob): Promise<GuidedPhotoValid
 
   const radii = sampleRayRadii(gray, width, height, center.x, center.y, center.brightThreshold)
   if (radii.length < 16) {
+    const linearJoint = detectLinearJoint(gray, width, height)
+    if (linearJoint) {
+      return {
+        status: 'ready',
+        message: 'Linear joint seam detected. Enhanced CV and AI review will confirm the measurement.',
+        score: linearJoint.score,
+      }
+    }
+
     return {
       status: 'retake',
       message: 'Retake photo: the pipe opening is not clear enough for reliable gap measurement.',

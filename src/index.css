@@ -588,7 +588,8 @@ img {
 
 .dashboard-project-copy,
 .dashboard-status-cell,
-.dashboard-count-cell {
+.dashboard-count-cell,
+.summary-manhole-row > div:first-child {
   display: grid;
   gap: 4px;
 }
@@ -607,6 +608,7 @@ img {
 .dashboard-project-copy span,
 .dashboard-status-cell small,
 .dashboard-count-cell span,
+.summary-manhole-row span,
 .activity-row p,
 .activity-row span,
 .trend-row span,
@@ -759,6 +761,24 @@ img {
 .summary-side-panels {
   display: grid;
   gap: 24px;
+}
+
+.summary-action-stack,
+.summary-manhole-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.summary-manhole-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--surface-high);
+  border-radius: 8px;
+  background: var(--surface-low);
 }
 
 .stitch-form-card {
@@ -1336,6 +1356,61 @@ img {
   inset: 16px 16px auto 16px;
 }
 
+.measurement-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.overlay-inner-ring,
+.overlay-outer-ring,
+.overlay-gap-line {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.overlay-inner-ring {
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 2.5;
+}
+
+.overlay-outer-ring {
+  stroke: rgba(20, 184, 166, 0.94);
+  stroke-dasharray: 8 6;
+  stroke-width: 2.5;
+}
+
+.overlay-gap-line {
+  stroke: rgba(255, 197, 61, 0.96);
+  stroke-linecap: round;
+  stroke-width: 4;
+}
+
+.source-chip {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(8, 28, 48, 0.78);
+  color: white;
+  font-size: 0.74rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.source-ai-assisted,
+.source-ai-estimated,
+.source-ai-review {
+  background: rgba(14, 116, 144, 0.86);
+}
+
+.source-manual {
+  background: rgba(126, 58, 242, 0.86);
+}
+
 .result-media-bottom {
   position: absolute;
   inset: auto 0 0 0;
@@ -1362,6 +1437,23 @@ img {
 .inspection-meta-row {
   color: var(--ink-soft);
   font-size: 0.92rem;
+}
+
+.inspection-audit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+.inspection-audit-grid span {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: var(--surface-soft);
 }
 
 .inspection-cta-row {

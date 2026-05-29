@@ -17,7 +17,7 @@ type Props = {
 }
 
 const validationTone = (image: InspectionImage) =>
-  image.validationStatus === 'retake' ? 'Needs retake' : 'Ready for inspection'
+  image.validationStatus === 'retake' && image.queueStatus === 'queued' ? 'AI review needed' : image.validationStatus === 'retake' ? 'Needs retake' : 'Ready for inspection'
 
 const phaseLabel = (image: InspectionImage) => {
   if (image.queueStatus === 'failed') return image.errorMessage ?? 'Needs replacement'
@@ -46,7 +46,7 @@ export const PhotoUploadPage = ({
 
   const completedCount = useMemo(() => queue.filter((image) => image.queueStatus === 'completed').length, [queue])
   const processingCount = useMemo(() => queue.filter((image) => image.queueStatus === 'processing').length, [queue])
-  const invalidCount = useMemo(() => queue.filter((image) => image.validationStatus === 'retake').length, [queue])
+  const aiReviewCount = useMemo(() => queue.filter((image) => image.validationStatus === 'retake' && image.queueStatus === 'queued').length, [queue])
   const queueCompletion = useMemo(() => {
     if (!queue.length) return 0
     const weighted = queue.reduce((sum, image) => sum + (image.progress ?? 0), 0)
@@ -90,9 +90,6 @@ export const PhotoUploadPage = ({
     setBusy(true)
     setError('')
     try {
-      if (invalidCount > 0) {
-        throw new Error('Replace the photos marked for retake before starting inspection.')
-      }
       await onStartInspection()
     } catch (processingError) {
       setError(processingError instanceof Error ? processingError.message : 'Processing failed.')
@@ -124,7 +121,7 @@ export const PhotoUploadPage = ({
           className="button button-primary dashboard-cta"
           type="button"
           onClick={() => void handleStart()}
-          disabled={!queue.length || busy || invalidCount > 0}
+          disabled={!queue.length || busy}
         >
           {busy ? 'Processing...' : 'Start Inspection'}
         </button>
@@ -170,7 +167,7 @@ export const PhotoUploadPage = ({
             <p>
               Project data stays on this device, and queued photos keep their upload order while you work.
             </p>
-            <p>{invalidCount ? `${invalidCount} photo(s) need a retake before measurement can start.` : 'All queued photos are eligible for measurement.'}</p>
+            <p>{aiReviewCount ? `${aiReviewCount} photo(s) will use enhanced CV and AI review before a retake decision.` : 'All queued photos are eligible for measurement.'}</p>
             <div className="action-row">
               <button className="button button-secondary" type="button" onClick={() => void onLoadSample()} disabled={busy}>
                 Load Sample
@@ -221,7 +218,7 @@ export const PhotoUploadPage = ({
                       <span>{manholeLabel}</span>
                     </div>
                     <div className="asset-validation-row">
-                      <span className={image.validationStatus === 'retake' ? 'mini-status-pill is-fail' : 'mini-status-pill is-pass'}>
+                      <span className={image.validationStatus === 'retake' && image.queueStatus === 'queued' ? 'mini-status-pill is-review' : image.validationStatus === 'retake' ? 'mini-status-pill is-fail' : 'mini-status-pill is-pass'}>
                         {validationTone(image)}
                       </span>
                     </div>
@@ -253,7 +250,7 @@ export const PhotoUploadPage = ({
                 className="button button-primary"
                 type="button"
                 onClick={() => void handleStart()}
-                disabled={!queue.length || busy || invalidCount > 0}
+                disabled={!queue.length || busy}
               >
                 {busy ? 'Processing Queue...' : 'Start Inspection'}
               </button>

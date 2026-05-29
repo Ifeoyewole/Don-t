@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
-import type { InspectionResult, ManholeInspectionSummary } from '../types/domain'
+import type { CvMeasurementDebug, InspectionResult, ManholeInspectionSummary, MeasurementOverlayHints, MeasurementSource } from '../types/domain'
 
 type Props = {
   inspectionId: string
@@ -25,10 +25,46 @@ type DraftOverride = {
   reason: string
 }
 
-const measurementLabel = (item: InspectionResult) =>
-  item.measurementSource === 'fallback'
-    ? item.measurementNote || 'Estimated fallback'
-    : item.measurementNote || 'CV measured'
+const sourceLabels: Record<MeasurementSource, string> = {
+  cv: 'CV measured',
+  'ai-assisted': 'AI assisted',
+  'ai-estimated': 'AI estimated',
+  'ai-review': 'AI review',
+  manual: 'Manual override',
+  fallback: 'Estimated fallback',
+}
+
+const measurementLabel = (item: InspectionResult) => {
+  const source = item.measurementSource ?? 'cv'
+  return item.measurementNote || sourceLabels[source]
+}
+
+const sourceLabel = (item: InspectionResult) => sourceLabels[item.measurementSource ?? 'cv']
+
+const Overlay = ({ debug, hints }: { debug?: CvMeasurementDebug; hints?: MeasurementOverlayHints }) => {
+  if (!hints?.pipeCenter && !hints?.gapLine) {
+    return null
+  }
+
+  const radius = hints.outerRadiusPx ?? hints.innerRadiusPx ?? 0
+  const width = debug?.imageWidth ?? Math.max((hints.pipeCenter?.x ?? hints.gapLine?.x2 ?? 1) + radius, 1)
+  const height = debug?.imageHeight ?? Math.max((hints.pipeCenter?.y ?? hints.gapLine?.y2 ?? 1) + radius, 1)
+  const viewBox = `0 0 ${width} ${height}`
+
+  return (
+    <svg className="measurement-overlay" viewBox={viewBox} preserveAspectRatio="none" aria-hidden="true">
+      {hints.pipeCenter && hints.innerRadiusPx ? (
+        <circle cx={hints.pipeCenter.x} cy={hints.pipeCenter.y} r={hints.innerRadiusPx} className="overlay-inner-ring" />
+      ) : null}
+      {hints.pipeCenter && hints.outerRadiusPx ? (
+        <circle cx={hints.pipeCenter.x} cy={hints.pipeCenter.y} r={hints.outerRadiusPx} className="overlay-outer-ring" />
+      ) : null}
+      {hints.gapLine ? (
+        <line x1={hints.gapLine.x1} y1={hints.gapLine.y1} x2={hints.gapLine.x2} y2={hints.gapLine.y2} className="overlay-gap-line" />
+      ) : null}
+    </svg>
+  )
+}
 
 const statusActionLabel = (status: InspectionResult['status']) => {
   if (status === 'FAIL') return 'Review result'
@@ -73,8 +109,10 @@ const ResultCard = ({
     <article className={`inspection-result-card result-${item.status.toLowerCase()}`}>
       <div className="inspection-result-media">
         {item.previewUrl ? <img src={item.previewUrl} alt={item.fileName ?? item.jointLabel} /> : <div className="preview-placeholder" />}
+        <Overlay debug={item.cvDebug} hints={item.overlayHints ?? item.cvDebug?.overlayHints} />
         <div className="result-media-top">
           <StatusBadge status={item.status} />
+          <span className={`source-chip source-${(item.measurementSource ?? 'cv').replaceAll('-', '-')}`}>{sourceLabel(item)}</span>
         </div>
         <div className="result-media-bottom">
           <strong>Joint {item.jointLabel}</strong>
@@ -83,13 +121,24 @@ const ResultCard = ({
 
       <div className="inspection-result-body">
         <div className="inspection-gap-row">
-          <span>Measured gap:</span>
-          <strong>{item.finalGapMm.toFixed(1)} mm</strong>
+          <span>{item.measurementSource === 'ai-review' ? 'Measurement:' : 'Measured gap:'}</span>
+          <strong>{item.measurementSource === 'ai-review' ? 'Manual check' : `${item.finalGapMm.toFixed(1)} mm`}</strong>
         </div>
 
         <div className="inspection-gap-row">
           <span>Status:</span>
           <strong>{item.status}</strong>
+        </div>
+
+        <div className="inspection-note-block">
+          <span>Measurement Review</span>
+          <p>{measurementLabel(item)}</p>
+        </div>
+
+        <div className="inspection-audit-grid">
+          <span>{item.measurementAudit?.enhancementUsed ? 'Enhanced image used' : 'Original image basis'}</span>
+          <span>{item.aiReview ? `${Math.round(item.aiReview.confidence * 100)}% AI review` : 'AI skipped'}</span>
+          <span>{item.cvDebug?.visibleSectors ? `${item.cvDebug.visibleSectors} sectors checked` : 'Geometry trace saved'}</span>
         </div>
 
         <div className="inspection-note-block">

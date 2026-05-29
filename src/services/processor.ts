@@ -1,11 +1,14 @@
 import { db } from '../db'
 import type {
+  InspectionImage,
   InspectionResult,
   ProcessBatchResult,
   ProcessingEvent,
   ProcessOptions,
 } from '../types'
-import { measureWithCv } from '../lib'
+import { fuseMeasurementWithAi, measureWithCv } from '../lib'
+import type { CvWorkerResponse } from '../lib'
+import { reviewMeasurementWithAi } from './aiMeasurement'
 import { createId, createTimestamp } from '../utils/identity'
 
 const listeners = new Set<(event: ProcessingEvent) => void>()
@@ -71,6 +74,75 @@ function wait(ms: number): Promise<void> {
   })
 }
 
+function shouldReviewWithAi(measurement: Awaited<ReturnType<typeof measureWithCv>>): boolean {
+  return measurement.measurementSource === 'fallback' || measurement.confidence < 0.82
+}
+
+async function runAiAssistedMeasurement(
+  image: InspectionImage,
+  blob: Blob | undefined,
+  pipeDiameterMm: number | undefined,
+): Promise<ReturnType<typeof fuseMeasurementWithAi>> {
+  try {
+    const cvMeasurement = await measureWithCv({
+      imageId: image.id,
+      fileName: image.fileName,
+      orderIndex: image.orderIndex,
+      blob,
+      pipeDiameterMm,
+    })
+    const aiReview = shouldReviewWithAi(cvMeasurement)
+      ? await reviewMeasurementWithAi({
+          imageId: image.id,
+          fileName: image.fileName,
+          mimeType: image.mimeType,
+          blob,
+          pipeDiameterMm,
+          gapMm: cvMeasurement.originalGapMm,
+          confidence: cvMeasurement.confidence,
+          measurementSource: cvMeasurement.measurementSource,
+          cvDebug: cvMeasurement.cvDebug,
+        })
+      : undefined
+
+    return fuseMeasurementWithAi(cvMeasurement, aiReview)
+  } catch (error) {
+    const fallbackMeasurement: CvWorkerResponse = {
+      imageId: image.id,
+      originalGapMm: 0,
+      status: 'REVIEW',
+      confidence: 0.2,
+      measurementSource: 'fallback',
+      measurementNote: error instanceof Error ? error.message : 'OpenCV measurement failed before producing geometry.',
+      cvDebug: {
+        pipeDetected: false,
+        failureStage: 'opencv-measurement-error',
+        enhancementUsed: true,
+      },
+    }
+    const aiReview = await reviewMeasurementWithAi({
+      imageId: image.id,
+      fileName: image.fileName,
+      mimeType: image.mimeType,
+      blob,
+      pipeDiameterMm,
+      gapMm: 0,
+      confidence: 0.2,
+      measurementSource: 'fallback',
+      cvDebug: fallbackMeasurement.cvDebug,
+    })
+    const fused = fuseMeasurementWithAi(fallbackMeasurement, aiReview)
+
+    if (fused.measurementSource === 'fallback' && fused.originalGapMm <= 0 && !aiReview.jointVisible && !aiReview.pipeOpeningVisible) {
+      throw new Error(aiReview.retakeMessage ?? fallbackMeasurement.measurementNote ?? 'Retake photo before measurement.', {
+        cause: error,
+      })
+    }
+
+    return fused
+  }
+}
+
 async function processImage(imageId: string): Promise<string | null> {
   const image = await db.inspectionImages.get(imageId)
   if (!image) {
@@ -87,20 +159,6 @@ async function processImage(imageId: string): Promise<string | null> {
 
   emit({ type: 'started', imageId })
 
-  if (image.validationStatus === 'retake') {
-    await db.inspectionImages.put({
-      ...image,
-      queueStatus: 'failed',
-      errorMessage: image.validationMessage ?? 'Retake photo before measurement.',
-    })
-    emit({
-      type: 'failed',
-      imageId,
-      message: image.validationMessage ?? 'Retake photo before measurement.',
-    })
-    return null
-  }
-
   await db.inspectionImages.put({
     ...image,
     queueStatus: 'processing',
@@ -108,16 +166,10 @@ async function processImage(imageId: string): Promise<string | null> {
 
   emit({ type: 'progress', imageId, progress: 25, message: 'Preparing image' })
   await wait(20)
-  emit({ type: 'progress', imageId, progress: 60, message: 'Running CV pipeline' })
+  emit({ type: 'progress', imageId, progress: 60, message: image.validationStatus === 'retake' ? 'Running enhanced CV and AI review' : 'Running CV pipeline' })
   await wait(20)
 
-  const measurement = await measureWithCv({
-    imageId: image.id,
-    fileName: image.fileName,
-    orderIndex: image.orderIndex,
-    blob: blobRecord?.blob,
-    pipeDiameterMm: manhole?.pipeDiameterMm,
-  })
+  const measurement = await runAiAssistedMeasurement(image, blobRecord?.blob, manhole?.pipeDiameterMm)
 
   const resultId = createId()
   const result: InspectionResult = {
@@ -132,6 +184,10 @@ async function processImage(imageId: string): Promise<string | null> {
     confidence: measurement.confidence,
     measurementSource: measurement.measurementSource,
     measurementNote: measurement.measurementNote,
+    cvDebug: measurement.cvDebug,
+    aiReview: measurement.aiReview,
+    overlayHints: measurement.overlayHints,
+    measurementAudit: measurement.measurementAudit,
     processedAt: createTimestamp(),
     overrideApplied: false,
   }
@@ -240,13 +296,7 @@ export const processor = {
     emit({ type: 'progress', imageId: image.id, inspectionId, progress: 40, message: 'Re-running CV measurement' })
     await wait(20)
 
-    const measurement = await measureWithCv({
-      imageId: image.id,
-      fileName: image.fileName,
-      orderIndex: image.orderIndex,
-      blob: blobRecord?.blob,
-      pipeDiameterMm: manhole?.pipeDiameterMm,
-    })
+    const measurement = await runAiAssistedMeasurement(image, blobRecord?.blob, manhole?.pipeDiameterMm)
 
     const updated: InspectionResult = {
       ...existing,
@@ -257,6 +307,10 @@ export const processor = {
       confidence: measurement.confidence,
       measurementSource: measurement.measurementSource,
       measurementNote: measurement.measurementNote,
+      cvDebug: measurement.cvDebug,
+      aiReview: measurement.aiReview,
+      overlayHints: measurement.overlayHints,
+      measurementAudit: measurement.measurementAudit,
     }
 
     await db.inspectionResults.put(updated)

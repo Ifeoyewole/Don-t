@@ -34,6 +34,7 @@ import type {
 type Route =
   | { key: 'dashboard' }
   | { key: 'create-project' }
+  | { key: 'edit-project'; projectId: string }
   | { key: 'new-manhole'; projectId: string }
   | { key: 'edit-manhole'; projectId: string; manholeId: string }
   | { key: 'upload'; projectId: string; manholeId: string }
@@ -52,6 +53,7 @@ const parseRoute = (pathname: string): Route => {
   const segments = pathname.split('/').filter(Boolean)
   if (!segments.length) return { key: 'dashboard' }
   if (segments[0] === 'projects' && segments[1] === 'new') return { key: 'create-project' }
+  if (segments[0] === 'projects' && segments[2] === 'edit') return { key: 'edit-project', projectId: segments[1] }
   if (segments[0] === 'projects' && segments[2] === 'manholes' && segments[3] === 'new') {
     return { key: 'new-manhole', projectId: segments[1] }
   }
@@ -393,7 +395,7 @@ function App() {
         })
       }
 
-      if (route.key === 'new-manhole' || route.key === 'summary') {
+      if (route.key === 'new-manhole' || route.key === 'summary' || route.key === 'edit-project') {
         setCurrentQueue((previous) => {
           revokeQueuePreviews(previous)
           return []
@@ -516,15 +518,18 @@ function App() {
       )
     }
 
-    if (route.key === 'create-project') {
+    if (route.key === 'create-project' || route.key === 'edit-project') {
       return (
         <CreateProjectPage
           todayValue={new Date().toISOString().slice(0, 10)}
-          onBack={() => navigate('/')}
+          project={route.key === 'edit-project' ? currentProject : null}
+          onBack={() => navigate(route.key === 'edit-project' ? `/projects/${route.projectId}/summary` : '/')}
           onSave={async (input: CreateProjectInput) => {
-            const project = await projectService.createProject(input)
+            const project = route.key === 'edit-project'
+              ? await projectService.updateProject(route.projectId, input)
+              : await projectService.createProject(input)
             await refreshProjects()
-            navigate(`/projects/${project.id}/manholes/new`)
+            navigate(route.key === 'edit-project' ? `/projects/${project.id}/summary` : `/projects/${project.id}/manholes/new`)
           }}
         />
       )
@@ -727,6 +732,9 @@ function App() {
             }
             navigate(`/projects/${currentProjectId}/manholes/new`)
           }}
+          onEditProject={() => navigate(`/projects/${route.projectId}/edit`)}
+          onEditManhole={(manholeId) => navigate(`/projects/${route.projectId}/manholes/${manholeId}`)}
+          onResumeUpload={(manholeId) => navigate(`/projects/${route.projectId}/manholes/${manholeId}/upload`)}
           onOpenFlagged={(inspectionId) => {
             const targetInspectionId = inspectionId ?? currentProjectSummary?.flaggedJoints[0]?.inspectionId
             if (!targetInspectionId) {

@@ -1,14 +1,16 @@
 import { useState } from 'react'
-import type { CreateProjectInput } from '../types/domain'
+import type { CreateProjectInput, Project } from '../types/domain'
 
 type Props = {
   todayValue: string
+  project?: Project | null
   onBack: () => void
   onSave: (input: CreateProjectInput) => Promise<void>
 }
 
-export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
-  const [form, setForm] = useState<CreateProjectInput>({ name: '', siteName: '' })
+export const CreateProjectPage = ({ todayValue, project, onBack, onSave }: Props) => {
+  const editing = Boolean(project)
+  const [form, setForm] = useState<CreateProjectInput>({ name: project?.name ?? '', siteName: project?.siteName ?? '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -39,8 +41,8 @@ export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
 
           <header className="page-hero left-aligned">
             <div>
-              <h1>Create New Project</h1>
-              <p className="lead">Create a project record before adding manholes and uploading joint inspection photos.</p>
+              <h1>{editing ? 'Edit Project' : 'Create New Project'}</h1>
+              <p className="lead">{editing ? 'Update the project record, then return to the inspection summary.' : 'Create a project record before adding manholes and uploading joint inspection photos.'}</p>
             </div>
           </header>
 
@@ -79,10 +81,10 @@ export const CreateProjectPage = ({ todayValue, onBack, onSave }: Props) => {
 
           <footer className="page-footer-actions">
             <button className="button button-ghost" type="button" onClick={onBack}>
-              Discard Draft
+              {editing ? 'Cancel Edit' : 'Discard Draft'}
             </button>
             <button className="button button-primary button-wide-on-desktop" type="button" onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Saving Project...' : 'Save Project'}
+              {saving ? 'Saving Project...' : editing ? 'Update Project' : 'Save Project'}
             </button>
           </footer>
         </div>
