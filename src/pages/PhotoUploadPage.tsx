@@ -135,7 +135,7 @@ export const PhotoUploadPage = ({
               className="sr-only"
               id="upload-input"
               type="file"
-              accept="image/*"
+              accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif"
               multiple
               onChange={(event) => void handleFileSelection(event.target.files)}
             />
@@ -144,7 +144,10 @@ export const PhotoUploadPage = ({
                 ⌁
               </div>
               <strong>Drag photos here</strong>
-              <span>Or click to browse your workstation. Support JPG, PNG up to 25MB.</span>
+              <span>Or tap to browse photos. Support JPG, PNG, WEBP and phone image files.</span>
+              <button className="button button-secondary" type="button" onClick={() => inputRef.current?.click()} disabled={busy}>
+                Browse Photos
+              </button>
               <div className="upload-tag-row">
                 <span>Photos only</span>
                 <span>Upload order kept</span>
