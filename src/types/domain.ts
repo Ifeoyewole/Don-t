@@ -19,15 +19,20 @@ export interface MeasurementOverlayHints {
   innerRadiusPx?: number
   outerRadiusPx?: number
   gapLine?: { x1: number; y1: number; x2: number; y2: number }
+  jointTrace?: Array<{ x: number; y: number }>
+  jointEdgeA?: Array<{ x: number; y: number }>
+  jointEdgeB?: Array<{ x: number; y: number }>
 }
 
 export interface CvMeasurementDebug {
   pipeDetected: boolean
   imageWidth?: number
   imageHeight?: number
+  pipeDiameterMm?: number
   innerRadiusPx?: number
   outerRadiusPx?: number
   gapPixels?: number
+  gapPixelSamples?: number[]
   mmPerPixel?: number
   visibleSectors?: number
   edgeStrength?: number

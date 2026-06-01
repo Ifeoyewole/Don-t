@@ -8,6 +8,7 @@ type Props = {
   onToggleProjects: () => void
   onNewProject: () => void
   onOpenProject: (projectId: string) => void
+  onDeleteProject: (projectId: string) => void
 }
 
 const formatRelativeTime = (iso: string) =>
@@ -35,6 +36,7 @@ export const DashboardPage = ({
   onToggleProjects,
   onNewProject,
   onOpenProject,
+  onDeleteProject,
 }: Props) => {
   const [search, setSearch] = useState('')
 
@@ -134,12 +136,7 @@ export const DashboardPage = ({
           </div>
 
           {visibleProjects.map((project) => (
-            <button
-              key={project.id}
-              className="dashboard-table-row"
-              type="button"
-              onClick={() => onOpenProject(project.id)}
-            >
+            <div key={project.id} className="dashboard-table-row">
               <div className="dashboard-project-cell">
                 <div className="dashboard-project-thumb" aria-hidden="true">
                   {project.name.slice(0, 1)}
@@ -159,10 +156,15 @@ export const DashboardPage = ({
                 <span>{project.completedInspections ?? 0} inspected</span>
               </div>
               <span>{formatRelativeTime(project.updatedAt)}</span>
-              <span className="dashboard-arrow" aria-hidden="true">
-                ›
-              </span>
-            </button>
+              <div className="dashboard-actions-cell">
+                <button className="button button-secondary button-compact" type="button" onClick={() => onOpenProject(project.id)}>
+                  Open
+                </button>
+                <button className="button button-danger button-compact" type="button" onClick={() => onDeleteProject(project.id)}>
+                  Delete
+                </button>
+              </div>
+            </div>
           ))}
         </div>
 

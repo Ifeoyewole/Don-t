@@ -41,14 +41,77 @@ const measurementLabel = (item: InspectionResult) => {
 
 const sourceLabel = (item: InspectionResult) => sourceLabels[item.measurementSource ?? 'cv']
 
+const measurementValueLabel = (item: InspectionResult) => {
+  if (item.measurementSource === 'ai-review') {
+    return item.cvDebug?.gapPixels ? `${item.cvDebug.gapPixels.toFixed(1)} px gap - calibrate for mm` : 'Calibration needed'
+  }
+
+  if (item.measurementSource === 'ai-estimated' && !item.cvDebug?.pipeDetected) {
+    return `~${item.finalGapMm.toFixed(1)} mm from ${item.cvDebug?.gapPixels?.toFixed(1) ?? '--'} px`
+  }
+
+  return `${item.finalGapMm.toFixed(1)} mm`
+}
+
+const toSmoothPath = (points: Array<{ x: number; y: number }>) => {
+  if (!points.length) {
+    return ''
+  }
+
+  if (points.length === 1) {
+    return `M ${points[0].x} ${points[0].y}`
+  }
+
+  const commands = [`M ${points[0].x} ${points[0].y}`]
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const previous = points[Math.max(0, index - 1)]
+    const current = points[index]
+    const next = points[index + 1]
+    const following = points[Math.min(points.length - 1, index + 2)]
+    const controlOne = {
+      x: current.x + (next.x - previous.x) / 6,
+      y: current.y + (next.y - previous.y) / 6,
+    }
+    const controlTwo = {
+      x: next.x - (following.x - current.x) / 6,
+      y: next.y - (following.y - current.y) / 6,
+    }
+
+    commands.push(
+      `C ${controlOne.x.toFixed(1)} ${controlOne.y.toFixed(1)}, ${controlTwo.x.toFixed(1)} ${controlTwo.y.toFixed(1)}, ${next.x} ${next.y}`,
+    )
+  }
+
+  return commands.join(' ')
+}
+
+const resolveOverlayHints = (item: InspectionResult): MeasurementOverlayHints | undefined => {
+  const primaryHints = item.overlayHints
+  const cvHints = item.cvDebug?.overlayHints
+
+  if (primaryHints?.jointTrace?.length || !cvHints?.jointTrace?.length) {
+    return primaryHints ?? cvHints
+  }
+
+  return {
+    ...primaryHints,
+    jointTrace: cvHints.jointTrace,
+    jointEdgeA: primaryHints?.jointEdgeA ?? cvHints.jointEdgeA,
+    jointEdgeB: primaryHints?.jointEdgeB ?? cvHints.jointEdgeB,
+  }
+}
+
 const Overlay = ({ debug, hints }: { debug?: CvMeasurementDebug; hints?: MeasurementOverlayHints }) => {
-  if (!hints?.pipeCenter && !hints?.gapLine) {
+  if (!hints?.pipeCenter && !hints?.gapLine && !hints?.jointTrace?.length && !hints?.jointEdgeA?.length && !hints?.jointEdgeB?.length) {
     return null
   }
 
   const radius = hints.outerRadiusPx ?? hints.innerRadiusPx ?? 0
-  const width = debug?.imageWidth ?? Math.max((hints.pipeCenter?.x ?? hints.gapLine?.x2 ?? 1) + radius, 1)
-  const height = debug?.imageHeight ?? Math.max((hints.pipeCenter?.y ?? hints.gapLine?.y2 ?? 1) + radius, 1)
+  const allTracePoints = [...(hints.jointTrace ?? []), ...(hints.jointEdgeA ?? []), ...(hints.jointEdgeB ?? [])]
+  const lastTracePoint = allTracePoints[allTracePoints.length - 1]
+  const width = debug?.imageWidth ?? Math.max((hints.pipeCenter?.x ?? hints.gapLine?.x2 ?? lastTracePoint?.x ?? 1) + radius, 1)
+  const height = debug?.imageHeight ?? Math.max((hints.pipeCenter?.y ?? hints.gapLine?.y2 ?? lastTracePoint?.y ?? 1) + radius, 1)
   const viewBox = `0 0 ${width} ${height}`
 
   return (
@@ -59,9 +122,12 @@ const Overlay = ({ debug, hints }: { debug?: CvMeasurementDebug; hints?: Measure
       {hints.pipeCenter && hints.outerRadiusPx ? (
         <circle cx={hints.pipeCenter.x} cy={hints.pipeCenter.y} r={hints.outerRadiusPx} className="overlay-outer-ring" />
       ) : null}
-      {hints.gapLine ? (
+      {hints.gapLine && !hints.jointTrace?.length ? (
         <line x1={hints.gapLine.x1} y1={hints.gapLine.y1} x2={hints.gapLine.x2} y2={hints.gapLine.y2} className="overlay-gap-line" />
       ) : null}
+      {hints.jointEdgeA?.length ? <path d={toSmoothPath(hints.jointEdgeA)} className="overlay-gap-edge" /> : null}
+      {hints.jointEdgeB?.length ? <path d={toSmoothPath(hints.jointEdgeB)} className="overlay-gap-edge" /> : null}
+      {hints.jointTrace?.length ? <path d={toSmoothPath(hints.jointTrace)} className="overlay-joint-trace" /> : null}
     </svg>
   )
 }
@@ -109,7 +175,7 @@ const ResultCard = ({
     <article className={`inspection-result-card result-${item.status.toLowerCase()}`}>
       <div className="inspection-result-media">
         {item.previewUrl ? <img src={item.previewUrl} alt={item.fileName ?? item.jointLabel} /> : <div className="preview-placeholder" />}
-        <Overlay debug={item.cvDebug} hints={item.overlayHints ?? item.cvDebug?.overlayHints} />
+        <Overlay debug={item.cvDebug} hints={resolveOverlayHints(item)} />
         <div className="result-media-top">
           <StatusBadge status={item.status} />
           <span className={`source-chip source-${(item.measurementSource ?? 'cv').replaceAll('-', '-')}`}>{sourceLabel(item)}</span>
@@ -121,8 +187,8 @@ const ResultCard = ({
 
       <div className="inspection-result-body">
         <div className="inspection-gap-row">
-          <span>{item.measurementSource === 'ai-review' ? 'Measurement:' : 'Measured gap:'}</span>
-          <strong>{item.measurementSource === 'ai-review' ? 'Manual check' : `${item.finalGapMm.toFixed(1)} mm`}</strong>
+          <span>{item.measurementSource === 'ai-review' ? 'Detected gap:' : item.measurementSource === 'ai-estimated' && !item.cvDebug?.pipeDetected ? 'Estimated gap:' : 'Measured gap:'}</span>
+          <strong>{measurementValueLabel(item)}</strong>
         </div>
 
         <div className="inspection-gap-row">

@@ -341,6 +341,30 @@ function App() {
     })
   }
 
+  const deleteProject = async (projectId: string) => {
+    const project = projects.find((item) => item.id === projectId)
+    const projectName = project?.name ?? currentProject?.name ?? 'this project'
+    const confirmed = window.confirm(
+      `Delete ${projectName}? This will remove its manholes, photos, and inspection results from this device.`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    await projectService.deleteProject(projectId)
+    await refreshProjects()
+
+    if (currentProject?.id === projectId || ('projectId' in route && route.projectId === projectId)) {
+      clearVisualState()
+      setCurrentProject(null)
+      setProjectManholes([])
+      setCurrentManhole(null)
+      setCurrentManholeSummary(null)
+      navigate('/')
+    }
+  }
+
   const refreshRouteData = useCallback(async () => {
     try {
       await refreshProjects()
@@ -506,6 +530,7 @@ function App() {
           showAllProjects={showAllProjects}
           onToggleProjects={() => setShowAllProjects((current) => !current)}
           onNewProject={() => navigate('/projects/new')}
+          onDeleteProject={(projectId) => void deleteProject(projectId)}
           onOpenProject={(projectId) => {
             const project = projects.find((item) => item.id === projectId)
             if ((project?.totalManholes ?? 0) > 0) {
@@ -733,6 +758,7 @@ function App() {
             navigate(`/projects/${currentProjectId}/manholes/new`)
           }}
           onEditProject={() => navigate(`/projects/${route.projectId}/edit`)}
+          onDeleteProject={() => void deleteProject(route.projectId)}
           onEditManhole={(manholeId) => navigate(`/projects/${route.projectId}/manholes/${manholeId}`)}
           onResumeUpload={(manholeId) => navigate(`/projects/${route.projectId}/manholes/${manholeId}/upload`)}
           onOpenFlagged={(inspectionId) => {

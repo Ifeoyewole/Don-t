@@ -122,12 +122,12 @@ async function encodeCanvasVariant(
 
 export async function createEnhancedImageVariants(blob: Blob, mimeType = 'image/jpeg'): Promise<EnhancedImageVariant[]> {
   if (typeof createImageBitmap !== 'function') {
-    return {
+    return [{
       base64: await readBlobAsBase64(blob),
       mimeType: blob.type || mimeType,
       enhanced: false,
       label: 'original',
-    } satisfies EnhancedImageVariant[]
+    }]
   }
 
   const bitmap = await createImageBitmap(blob)

@@ -17,28 +17,32 @@ export interface AiMeasurementRequest {
 function createMockReview(request: AiMeasurementRequest): AiMeasurementReview {
   const cvDebug = request.cvDebug
   const hasPipeGeometry = Boolean(cvDebug?.pipeDetected && cvDebug.innerRadiusPx && cvDebug.gapPixels)
-  const lowConfidence = request.confidence < 0.74
+  const unscaledCloseUp = cvDebug?.failureStage === 'linear-close-up-joint' && !cvDebug.pipeDetected
   const fallbackResult = request.measurementSource === 'fallback'
-  const estimatedGapMm = fallbackResult ? null : Number(request.gapMm.toFixed(1))
-  const confidence = fallbackResult ? 0.42 : lowConfidence ? 0.68 : 0.84
+  const possibleBlackGapCloseUp = fallbackResult && !cvDebug?.pipeDetected
+  const lowConfidence = request.confidence < 0.74
+  const estimatedGapMm = fallbackResult || unscaledCloseUp ? null : Number(request.gapMm.toFixed(1))
+  const confidence = fallbackResult || unscaledCloseUp ? 0.46 : lowConfidence ? 0.68 : 0.84
 
   return {
     provider: 'mock-gemini',
     model: 'gemini-2.5-flash-mock',
-    usable: hasPipeGeometry || !fallbackResult,
-    jointVisible: hasPipeGeometry || !fallbackResult,
+    usable: hasPipeGeometry || !fallbackResult || possibleBlackGapCloseUp,
+    jointVisible: hasPipeGeometry || !fallbackResult || possibleBlackGapCloseUp,
     pipeOpeningVisible: Boolean(cvDebug?.pipeDetected),
-    cvPlausible: !fallbackResult && request.gapMm > 0.5 && request.gapMm < 80,
+    cvPlausible: !fallbackResult && !unscaledCloseUp && request.gapMm > 0.5 && request.gapMm < 80,
     estimatedGapMm,
     confidence,
-    reason: fallbackResult
-      ? 'AI review placeholder found insufficient CV geometry, so the photo should be retaken or reviewed.'
+    reason: unscaledCloseUp
+      ? 'AI review placeholder can see the joint, but the close-up crop has no visible scale reference for millimetres.'
+      : possibleBlackGapCloseUp
+      ? 'AI review placeholder treats the visible black slot between solid edges as a close-up joint gap, but millimetres need scale calibration.'
+      : fallbackResult
+      ? 'AI review placeholder found insufficient CV geometry, so the photo should be reviewed.'
       : lowConfidence
         ? 'AI review placeholder accepts the CV result with caution because the visible joint evidence is partial.'
         : 'AI review placeholder confirms the CV geometry is suitable for calculation.',
-    retakeMessage: fallbackResult
-      ? 'Retake photo: keep the pipe opening centered and make the full joint ring edge visible.'
-      : undefined,
+    retakeMessage: undefined,
     overlayHints: cvDebug?.overlayHints,
     reviewedAt: createTimestamp(),
   }

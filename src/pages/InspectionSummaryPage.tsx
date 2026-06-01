@@ -10,6 +10,7 @@ type Props = {
   summary: ProjectInspectionSummary | null
   onBack: () => void
   onEditProject: () => void
+  onDeleteProject: () => void
   onEditManhole: (manholeId: string) => void
   onResumeUpload: (manholeId: string) => void
   onExport: (format: 'json' | 'pdf' | 'zip') => Promise<void>
@@ -35,6 +36,7 @@ export const InspectionSummaryPage = ({
   summary,
   onBack,
   onEditProject,
+  onDeleteProject,
   onEditManhole,
   onResumeUpload,
   onExport,
@@ -67,6 +69,9 @@ export const InspectionSummaryPage = ({
         <div className="export-actions">
           <button className="button button-secondary" type="button" onClick={onEditProject}>
             Edit Project
+          </button>
+          <button className="button button-danger" type="button" onClick={onDeleteProject}>
+            Delete Project
           </button>
           <button className="button button-primary" type="button" onClick={() => void onExport('zip')}>
             Export Evidence Pack

@@ -103,9 +103,17 @@ export default defineConfig(({ mode }) => {
               const model = env.GEMINI_MODEL || 'gemini-2.5-flash'
               const prompt = [
                 'You are reviewing a pipe joint inspection photo. It may be a centered pipe-opening image or a close-up linear seam image.',
-                'Use the enhanced image and CV debug data to decide whether the measured gap is visually plausible.',
+                'Use the enhanced image to independently estimate the joint gap. Use CV debug data only as supporting evidence for where the joint is, not as the final answer.',
+                'Important: in close-up photos, the dark or black slot between the two pipe/concrete edges is the joint gap to inspect. Treat that black void as the measurable gap, not as a missing/invalid image area.',
+                'If two solid edges are visible on either side of a black slot, set jointVisible=true and usable=true even when the pipe opening is not visible.',
+                'Trace the centerline or edge path of that black gap in overlayHints.jointTrace. When possible, also return overlayHints.jointEdgeA and overlayHints.jointEdgeB as the two visible sides of the black slot.',
                 'Return only JSON with these fields: usable, jointVisible, pipeOpeningVisible, cvPlausible, estimatedGapMm, confidence, reason, retakeMessage, overlayHints.',
                 'estimatedGapMm must be a number or null. confidence must be 0 to 1.',
+                'overlayHints may include pipeCenter, innerRadiusPx, outerRadiusPx, gapLine, and jointTrace.',
+                'When marking a visible seam/joint, prefer overlayHints.jointTrace as 8 to 40 image-coordinate points that follow the actual curved or angled joint edge. Do not replace a curved joint with a straight line.',
+                'If a visible scale reference exists in the image, return estimatedGapMm as a measurement estimate from that scale.',
+                'If no visible scale reference exists but the black gap is clear, still return a rough visual estimatedGapMm and lower confidence. Explain that it is uncalibrated and not a confirmed measurement.',
+                'A known pipe diameter helps only when the pipe opening or another known-size reference is visible in that same image.',
                 'Do not claim perfect accuracy. If the joint edge is unclear, return usable=false and a retakeMessage.',
                 'If the image has enough visual scale and joint geometry, estimate the gap in millimetres.',
                 'Use the known pipe diameter as the scale reference when provided.',

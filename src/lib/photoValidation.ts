@@ -122,7 +122,7 @@ function sampleRayRadii(gray: Uint8Array, width: number, height: number, centerX
   return radii
 }
 
-function detectLinearJoint(gray: Uint8Array, width: number, height: number): { score: number; y: number } | null {
+function detectHorizontalLinearJoint(gray: Uint8Array, width: number, height: number): { score: number } | null {
   const startX = Math.floor(width * 0.08)
   const endX = Math.ceil(width * 0.92)
   const startY = Math.floor(height * 0.12)
@@ -158,8 +158,88 @@ function detectLinearJoint(gray: Uint8Array, width: number, height: number): { s
 
   return {
     score: Number(clamp(bestScore / 70, 0.38, 0.92).toFixed(2)),
-    y: bestY,
   }
+}
+
+function detectVerticalLinearJoint(gray: Uint8Array, width: number, height: number): { score: number } | null {
+  const startX = Math.floor(width * 0.08)
+  const endX = Math.ceil(width * 0.92)
+  const startY = Math.floor(height * 0.12)
+  const endY = Math.ceil(height * 0.88)
+  const columnDarkness: number[] = []
+
+  for (let x = startX; x < endX; x += 1) {
+    let sum = 0
+    for (let y = startY; y < endY; y += 1) {
+      sum += 255 - gray[y * width + x]
+    }
+    columnDarkness.push(sum / Math.max(1, endY - startY))
+  }
+
+  const baseline = average(columnDarkness)
+  let bestScore = 0
+
+  for (let index = 2; index < columnDarkness.length - 2; index += 1) {
+    const local = average(columnDarkness.slice(index - 2, index + 3))
+    const left = average(columnDarkness.slice(Math.max(0, index - 20), Math.max(1, index - 8)))
+    const right = average(columnDarkness.slice(Math.min(columnDarkness.length - 1, index + 8), Math.min(columnDarkness.length, index + 20)))
+    const contrast = local - Math.max(left, right, baseline * 0.82)
+    if (contrast > bestScore) {
+      bestScore = contrast
+    }
+  }
+
+  if (bestScore < 18) {
+    const darkThreshold = baseline * 1.18
+    let bestRunScore = 0
+    let runStart = -1
+
+    for (let index = 0; index <= columnDarkness.length; index += 1) {
+      const inDarkRun = index < columnDarkness.length && columnDarkness[index] >= darkThreshold
+      if (inDarkRun && runStart < 0) {
+        runStart = index
+      }
+
+      if ((index === columnDarkness.length || !inDarkRun) && runStart >= 0) {
+        const runEnd = index - 1
+        const runWidth = runEnd - runStart + 1
+        const runMean = average(columnDarkness.slice(runStart, runEnd + 1))
+        const leftMean = average(columnDarkness.slice(Math.max(0, runStart - 28), Math.max(1, runStart - 6)))
+        const rightMean = average(columnDarkness.slice(Math.min(columnDarkness.length - 1, runEnd + 6), Math.min(columnDarkness.length, runEnd + 28)))
+        const contrast = runMean - Math.max(leftMean, rightMean, baseline * 0.82)
+        const widthOk = runWidth >= width * 0.02 && runWidth <= width * 0.36
+        if (widthOk && contrast > bestRunScore) {
+          bestRunScore = contrast
+        }
+        runStart = -1
+      }
+    }
+
+    bestScore = bestRunScore
+  }
+
+  if (bestScore < 12) {
+    return null
+  }
+
+  return {
+    score: Number(clamp(bestScore / 70, 0.38, 0.92).toFixed(2)),
+  }
+}
+
+function detectLinearJoint(gray: Uint8Array, width: number, height: number): { score: number } | null {
+  const horizontal = detectHorizontalLinearJoint(gray, width, height)
+  const vertical = detectVerticalLinearJoint(gray, width, height)
+
+  if (!horizontal) {
+    return vertical
+  }
+
+  if (!vertical) {
+    return horizontal
+  }
+
+  return horizontal.score >= vertical.score ? horizontal : vertical
 }
 
 export async function validateGuidedPhoto(blob?: Blob): Promise<GuidedPhotoValidationResult> {
@@ -248,6 +328,15 @@ export async function validateGuidedPhoto(blob?: Blob): Promise<GuidedPhotoValid
   )
 
   if (!centeredEnough || !openingLargeEnough || !circleStableEnough) {
+    const linearJoint = detectLinearJoint(gray, width, height)
+    if (linearJoint) {
+      return {
+        status: 'ready',
+        message: 'Linear joint seam detected. Enhanced CV and AI review will confirm the measurement.',
+        score: linearJoint.score,
+      }
+    }
+
     return {
       status: 'retake',
       message: 'Retake photo: use the guided capture angle and keep the full pipe opening steady in frame.',

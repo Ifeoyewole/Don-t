@@ -39,7 +39,8 @@ export const inspectionService = {
       throw new Error(`Inspection result not found: ${input.inspectionId}`)
     }
 
-    const classification = classifyGap(input.overrideValueMm)
+    const manhole = await db.manholes.get(existing.manholeId)
+    const classification = classifyGap(input.overrideValueMm, manhole?.pipeDiameterMm)
     const updated: InspectionResult = {
       ...existing,
       finalGapMm: input.overrideValueMm,
@@ -71,7 +72,8 @@ export const inspectionService = {
       throw new Error(`Inspection result not found: ${inspectionId}`)
     }
 
-    const classification = classifyGap(existing.originalGapMm)
+    const manhole = await db.manholes.get(existing.manholeId)
+    const classification = classifyGap(existing.originalGapMm, manhole?.pipeDiameterMm)
     const updated: InspectionResult = {
       ...existing,
       finalGapMm: existing.originalGapMm,

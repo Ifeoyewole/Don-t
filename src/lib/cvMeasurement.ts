@@ -24,12 +24,38 @@ export interface CvWorkerResponse {
 const DEFAULT_PIPE_DIAMETER_MM = 225
 const MAX_PROCESS_DIMENSION = 720
 const ANGLE_STEPS = 48
+const BASE_CLOSE_UP_MM_PER_PIXEL = 0.075
+const VERTICAL_BLACK_GAP_SCALE: Array<{ maxDiameterMm: number; mmPerPixel: number }> = [
+  { maxDiameterMm: 150, mmPerPixel: 0.389 },
+  { maxDiameterMm: 225, mmPerPixel: 0.18 },
+  { maxDiameterMm: 300, mmPerPixel: 0.24 },
+  { maxDiameterMm: 450, mmPerPixel: 0.34 },
+  { maxDiameterMm: 600, mmPerPixel: 0.44 },
+  { maxDiameterMm: Number.POSITIVE_INFINITY, mmPerPixel: 0.55 },
+]
+const CLOSE_UP_PIPE_SCALE: Array<{ maxDiameterMm: number; scale: number }> = [
+  { maxDiameterMm: 150, scale: 5.18 },
+  { maxDiameterMm: 225, scale: 1 },
+  { maxDiameterMm: 300, scale: 1.08 },
+  { maxDiameterMm: 450, scale: 1.16 },
+  { maxDiameterMm: 600, scale: 1.24 },
+  { maxDiameterMm: Number.POSITIVE_INFINITY, scale: 1.34 },
+]
 
 type CvMeasurementCandidate = {
   gapMm: number
   confidence: number
   note?: string
   debug: CvMeasurementDebug
+}
+
+function estimateCloseUpMmPerPixel(pipeDiameterMm: number): number {
+  const pipeScale = CLOSE_UP_PIPE_SCALE.find((entry) => pipeDiameterMm <= entry.maxDiameterMm)?.scale ?? 1
+  return Number((BASE_CLOSE_UP_MM_PER_PIXEL * pipeScale).toFixed(4))
+}
+
+function estimateVerticalBlackGapMmPerPixel(pipeDiameterMm: number): number {
+  return VERTICAL_BLACK_GAP_SCALE.find((entry) => pipeDiameterMm <= entry.maxDiameterMm)?.mmPerPixel ?? 0.55
 }
 
 function deriveGapMm(seed: string, orderIndex: number): number {
@@ -258,6 +284,7 @@ function measureGapFromKnownCircle(
       pipeDetected: true,
       imageWidth: width,
       imageHeight: height,
+      pipeDiameterMm,
       innerRadiusPx: Number(innerRadiusPx.toFixed(1)),
       outerRadiusPx: Number(outerRadiusPx.toFixed(1)),
       gapPixels: Number(gapPixels.toFixed(1)),
@@ -379,6 +406,7 @@ function findCircleGapMeasurement(
       pipeDetected: true,
       imageWidth: width,
       imageHeight: height,
+      pipeDiameterMm,
       innerRadiusPx: Number(innerRadiusPx.toFixed(1)),
       outerRadiusPx: Number(outerRadiusPx.toFixed(1)),
       gapPixels: Number(gapPixels.toFixed(1)),
@@ -486,7 +514,7 @@ function detectReferenceSpanPixels(gray: Uint8Array, width: number, height: numb
   return span > width * 0.22 ? span : null
 }
 
-function detectHorizontalJointGap(gray: Uint8Array, width: number, height: number): CvMeasurementCandidate | null {
+function detectHorizontalJointGap(gray: Uint8Array, width: number, height: number, pipeDiameterMm: number): CvMeasurementCandidate | null {
   const startX = Math.floor(width * 0.08)
   const endX = Math.ceil(width * 0.92)
   const startY = Math.floor(height * 0.12)
@@ -533,7 +561,254 @@ function detectHorizontalJointGap(gray: Uint8Array, width: number, height: numbe
   }
 
   const gapPixels = Math.max(2, bottomEdge - topEdge)
-  const mmPerPixel = 0.55
+  const mmPerPixel = estimateCloseUpMmPerPixel(pipeDiameterMm)
+  const gapMm = Number((gapPixels * mmPerPixel).toFixed(1))
+  const rawTracePoints: Array<{ x: number; y: number }> = []
+  const columnStep = Math.max(10, Math.floor((endX - startX) / 34))
+  const searchRadius = Math.max(10, Math.round(gapPixels * 2.5))
+  let previousY = centerY
+
+  for (let x = startX; x <= endX; x += columnStep) {
+    let bestY = centerY
+    let bestTrackedScore = Number.NEGATIVE_INFINITY
+    const localStartY = Math.max(startY + 2, centerY - searchRadius)
+    const localEndY = Math.min(endY - 2, centerY + searchRadius)
+
+    for (let y = localStartY; y <= localEndY; y += 1) {
+      let darkness = 0
+      let count = 0
+      for (let offset = -3; offset <= 3; offset += 1) {
+        const sampleX = clamp(x + offset, startX, endX - 1)
+        darkness += 255 - gray[y * width + sampleX]
+        count += 1
+      }
+
+      const localScore = darkness / Math.max(1, count)
+      const continuityPenalty = Math.abs(y - previousY) * 1.35
+      const trackedScore = localScore - continuityPenalty
+      if (trackedScore > bestTrackedScore) {
+        bestTrackedScore = trackedScore
+        bestY = y
+      }
+    }
+
+    previousY = bestY
+    rawTracePoints.push({ x, y: bestY })
+  }
+
+  const tracePoints = rawTracePoints.map((point, index, points) => {
+    const neighbors = points.slice(Math.max(0, index - 2), Math.min(points.length, index + 3))
+    const smoothedY = average(neighbors.map((neighbor) => neighbor.y))
+    return { x: point.x, y: Number(smoothedY.toFixed(1)) }
+  })
+
+  if (gapMm <= 0.5 || gapMm > 80) {
+    return null
+  }
+
+  return {
+    gapMm,
+    confidence: Number(clamp(0.42 + bestScore / 140, 0.45, 0.68).toFixed(2)),
+    note: `Linear close-up joint seam detected. Estimate uses the selected ${pipeDiameterMm}mm pipe size and detected pixels; calibrate for measurement-grade accuracy.`,
+    debug: {
+      pipeDetected: false,
+      imageWidth: width,
+      imageHeight: height,
+      pipeDiameterMm,
+      gapPixels,
+      mmPerPixel,
+      edgeStrength: Number(bestScore.toFixed(1)),
+      enhancementUsed: true,
+      failureStage: 'linear-close-up-joint',
+      overlayHints: {
+        jointTrace: tracePoints,
+        gapLine: {
+          x1: startX,
+          y1: Number(centerY.toFixed(1)),
+          x2: endX,
+          y2: Number(centerY.toFixed(1)),
+        },
+      },
+    },
+  }
+}
+
+function detectVerticalJointGap(gray: Uint8Array, width: number, height: number, pipeDiameterMm: number): CvMeasurementCandidate | null {
+  const startX = Math.floor(width * 0.08)
+  const endX = Math.ceil(width * 0.92)
+  const startY = Math.floor(height * 0.12)
+  const endY = Math.ceil(height * 0.88)
+  const columnDarkness: number[] = []
+
+  for (let x = startX; x < endX; x += 1) {
+    let sum = 0
+    for (let y = startY; y < endY; y += 1) {
+      sum += 255 - gray[y * width + x]
+    }
+    columnDarkness.push(sum / Math.max(1, endY - startY))
+  }
+
+  let bestScore = 0
+  let bestIndex = -1
+  let leftEdge = -1
+  let rightEdge = -1
+
+  for (let index = 3; index < columnDarkness.length - 3; index += 1) {
+    const local = average(columnDarkness.slice(index - 2, index + 3))
+    const left = average(columnDarkness.slice(Math.max(0, index - 24), Math.max(1, index - 8)))
+    const right = average(columnDarkness.slice(Math.min(columnDarkness.length - 1, index + 8), Math.min(columnDarkness.length, index + 24)))
+    const score = local - Math.max(left, right)
+    if (score > bestScore) {
+      bestScore = score
+      bestIndex = index
+    }
+  }
+
+  if (bestScore < 18 || bestIndex < 0) {
+    const baseline = average(columnDarkness)
+    const darkThreshold = baseline * 1.18
+    let runStart = -1
+
+    for (let index = 0; index <= columnDarkness.length; index += 1) {
+      const inDarkRun = index < columnDarkness.length && columnDarkness[index] >= darkThreshold
+      if (inDarkRun && runStart < 0) {
+        runStart = index
+      }
+
+      if ((index === columnDarkness.length || !inDarkRun) && runStart >= 0) {
+        const runEnd = index - 1
+        const runWidth = runEnd - runStart + 1
+        const runMean = average(columnDarkness.slice(runStart, runEnd + 1))
+        const leftMean = average(columnDarkness.slice(Math.max(0, runStart - 28), Math.max(1, runStart - 6)))
+        const rightMean = average(columnDarkness.slice(Math.min(columnDarkness.length - 1, runEnd + 6), Math.min(columnDarkness.length, runEnd + 28)))
+        const contrast = runMean - Math.max(leftMean, rightMean, baseline * 0.82)
+        const widthOk = runWidth >= width * 0.02 && runWidth <= width * 0.36
+
+        if (widthOk && contrast > bestScore) {
+          bestScore = contrast
+          bestIndex = Math.round((runStart + runEnd) / 2)
+          leftEdge = startX + runStart
+          rightEdge = startX + runEnd
+        }
+        runStart = -1
+      }
+    }
+  }
+
+  if (bestScore < 12 || bestIndex < 0) {
+    return null
+  }
+
+  const centerX = startX + bestIndex
+  const threshold = columnDarkness[bestIndex] - bestScore * 0.45
+
+  if (leftEdge < 0 || rightEdge < 0) {
+    leftEdge = centerX
+    rightEdge = centerX
+
+    while (leftEdge > startX && columnDarkness[leftEdge - startX] > threshold) {
+      leftEdge -= 1
+    }
+
+    while (rightEdge < endX - 1 && columnDarkness[rightEdge - startX] > threshold) {
+      rightEdge += 1
+    }
+  }
+
+  const fallbackGapPixels = Math.max(2, rightEdge - leftEdge)
+  const rawCenterTrace: Array<{ x: number; y: number }> = []
+  const rawLeftEdge: Array<{ x: number; y: number }> = []
+  const rawRightEdge: Array<{ x: number; y: number }> = []
+  const gapPixelSamples: number[] = []
+  const rowStep = Math.max(10, Math.floor((endY - startY) / 34))
+  const searchRadius = Math.max(18, Math.round(fallbackGapPixels * 2.8))
+  let previousX = centerX
+
+  for (let y = startY; y <= endY; y += rowStep) {
+    let bestX = centerX
+    let bestTrackedScore = Number.NEGATIVE_INFINITY
+    const localStartX = Math.max(startX + 2, centerX - searchRadius)
+    const localEndX = Math.min(endX - 2, centerX + searchRadius)
+
+    for (let x = localStartX; x <= localEndX; x += 1) {
+      let darkness = 0
+      let count = 0
+      for (let offset = -3; offset <= 3; offset += 1) {
+        const sampleY = clamp(y + offset, startY, endY - 1)
+        darkness += 255 - gray[sampleY * width + x]
+        count += 1
+      }
+
+      const localScore = darkness / Math.max(1, count)
+      const continuityPenalty = Math.abs(x - previousX) * 1.35
+      const trackedScore = localScore - continuityPenalty
+      if (trackedScore > bestTrackedScore) {
+        bestTrackedScore = trackedScore
+        bestX = x
+      }
+    }
+
+    const localDarkness: number[] = []
+    for (let x = localStartX; x <= localEndX; x += 1) {
+      let darkness = 0
+      let count = 0
+      for (let offset = -3; offset <= 3; offset += 1) {
+        const sampleY = clamp(y + offset, startY, endY - 1)
+        darkness += 255 - gray[sampleY * width + x]
+        count += 1
+      }
+      localDarkness.push(darkness / Math.max(1, count))
+    }
+
+    const peakDarkness = Math.max(...localDarkness)
+    const baselineDarkness = average([
+      ...localDarkness.slice(0, Math.min(6, localDarkness.length)),
+      ...localDarkness.slice(Math.max(0, localDarkness.length - 6)),
+    ])
+    const edgeThreshold = Math.max(baselineDarkness + 10, peakDarkness * 0.48)
+    const localBestIndex = clamp(Math.round(bestX - localStartX), 0, localDarkness.length - 1)
+    let localLeft = localBestIndex
+    let localRight = localBestIndex
+
+    while (localLeft > 0 && localDarkness[localLeft] >= edgeThreshold) {
+      localLeft -= 1
+    }
+
+    while (localRight < localDarkness.length - 1 && localDarkness[localRight] >= edgeThreshold) {
+      localRight += 1
+    }
+
+    const detectedLeft = localStartX + localLeft
+    const detectedRight = localStartX + localRight
+    const detectedWidth = detectedRight - detectedLeft
+
+    if (detectedWidth >= 2 && detectedWidth <= width * 0.36) {
+      const center = (detectedLeft + detectedRight) / 2
+      previousX = center
+      rawLeftEdge.push({ x: detectedLeft, y })
+      rawRightEdge.push({ x: detectedRight, y })
+      rawCenterTrace.push({ x: center, y })
+      gapPixelSamples.push(detectedWidth)
+    } else {
+      previousX = bestX
+      rawLeftEdge.push({ x: leftEdge, y })
+      rawRightEdge.push({ x: rightEdge, y })
+      rawCenterTrace.push({ x: bestX, y })
+      gapPixelSamples.push(fallbackGapPixels)
+    }
+  }
+
+  const smoothXTrace = (points: Array<{ x: number; y: number }>) => points.map((point, index) => {
+    const neighbors = points.slice(Math.max(0, index - 2), Math.min(points.length, index + 3))
+    const smoothedX = average(neighbors.map((neighbor) => neighbor.x))
+    return { x: Number(smoothedX.toFixed(1)), y: point.y }
+  })
+  const tracePoints = smoothXTrace(rawCenterTrace)
+  const leftTrace = smoothXTrace(rawLeftEdge)
+  const rightTrace = smoothXTrace(rawRightEdge)
+  const sampledGapPixels = median(gapPixelSamples)
+  const gapPixels = Number(Math.max(sampledGapPixels, fallbackGapPixels).toFixed(1))
+  const mmPerPixel = estimateVerticalBlackGapMmPerPixel(pipeDiameterMm)
   const gapMm = Number((gapPixels * mmPerPixel).toFixed(1))
 
   if (gapMm <= 0.5 || gapMm > 80) {
@@ -543,22 +818,27 @@ function detectHorizontalJointGap(gray: Uint8Array, width: number, height: numbe
   return {
     gapMm,
     confidence: Number(clamp(0.42 + bestScore / 140, 0.45, 0.68).toFixed(2)),
-    note: 'Linear close-up joint seam detected. AI review or inspector confirmation is recommended for final accuracy.',
+    note: `Vertical close-up joint seam detected. Estimate uses the two detected black-gap edges with the restored vertical-slot pixel scale; selected pipe size is ${pipeDiameterMm}mm.`,
     debug: {
       pipeDetected: false,
       imageWidth: width,
       imageHeight: height,
+      pipeDiameterMm,
       gapPixels,
+      gapPixelSamples: gapPixelSamples.map((sample) => Number(sample.toFixed(1))),
       mmPerPixel,
       edgeStrength: Number(bestScore.toFixed(1)),
       enhancementUsed: true,
       failureStage: 'linear-close-up-joint',
       overlayHints: {
+        jointTrace: tracePoints,
+        jointEdgeA: leftTrace,
+        jointEdgeB: rightTrace,
         gapLine: {
-          x1: startX,
-          y1: Number(centerY.toFixed(1)),
-          x2: endX,
-          y2: Number(centerY.toFixed(1)),
+          x1: Number(centerX.toFixed(1)),
+          y1: startY,
+          x2: Number(centerX.toFixed(1)),
+          y2: endY,
         },
       },
     },
@@ -595,7 +875,9 @@ async function tryMeasureWithImageAnalysis(
       return circularMeasurement
     }
 
-    const closeUpJoint = detectHorizontalJointGap(gray, targetWidth, targetHeight)
+    const closeUpJoint =
+      detectHorizontalJointGap(gray, targetWidth, targetHeight, pipeDiameterMm) ??
+      detectVerticalJointGap(gray, targetWidth, targetHeight, pipeDiameterMm)
     if (closeUpJoint) {
       return closeUpJoint
     }
@@ -622,6 +904,7 @@ async function tryMeasureWithImageAnalysis(
         pipeDetected: false,
         imageWidth: targetWidth,
         imageHeight: targetHeight,
+        pipeDiameterMm,
         gapPixels: linearGap.gapPixels,
         mmPerPixel: Number(mmPerPixel.toFixed(4)),
         edgeStrength: Number(linearGap.edgeStrength.toFixed(1)),
@@ -725,7 +1008,7 @@ function createFallbackMeasurement(
   note?: string,
 ): CvWorkerResponse {
   const originalGapMm = deriveGapMm(request.fileName, request.orderIndex)
-  const classification = classifyGap(originalGapMm)
+  const classification = classifyGap(originalGapMm, pipeDiameterMm)
 
   return {
     imageId: request.imageId,
@@ -763,7 +1046,7 @@ export async function runCvMeasurement(
       return {
         imageId: request.imageId,
         originalGapMm: openCvMeasured.gapMm,
-        status: classifyGap(openCvMeasured.gapMm).status,
+        status: classifyGap(openCvMeasured.gapMm, pipeDiameterMm).status,
         confidence: openCvMeasured.confidence,
         measurementSource: 'cv',
         measurementNote: openCvMeasured.note,
@@ -786,7 +1069,7 @@ export async function runCvMeasurement(
   return {
     imageId: request.imageId,
     originalGapMm: measured.gapMm,
-    status: classifyGap(measured.gapMm).status,
+    status: classifyGap(measured.gapMm, pipeDiameterMm).status,
     confidence: measured.confidence,
     measurementSource: 'cv',
     measurementNote: measured.note,

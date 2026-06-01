@@ -87,7 +87,7 @@ export const projectService = {
   },
 
   async deleteProject(projectId: string): Promise<void> {
-    await db.transaction('rw', db.projects, db.manholes, db.inspectionImages, db.inspectionResults, async () => {
+    await db.transaction('rw', [db.projects, db.manholes, db.inspectionImages, db.inspectionBlobs, db.inspectionResults], async () => {
       const manholes = await db.manholes.where('projectId').equals(projectId).toArray()
       const manholeIds = new Set(manholes.map((manhole) => manhole.id))
 
@@ -97,6 +97,7 @@ export const projectService = {
       const images = await db.inspectionImages.where('projectId').equals(projectId).toArray()
       for (const image of images) {
         await db.inspectionImages.delete(image.id)
+        await db.inspectionBlobs.delete(image.blobKey)
       }
 
       const results = await db.inspectionResults.where('projectId').equals(projectId).toArray()
