@@ -251,7 +251,17 @@ export async function validateGuidedPhoto(blob?: Blob): Promise<GuidedPhotoValid
     }
   }
 
-  const bitmap = await createImageBitmap(blob)
+  let bitmap: ImageBitmap
+  try {
+    bitmap = await createImageBitmap(blob)
+  } catch {
+    return {
+      status: 'ready',
+      message: 'Guided capture validation could not decode this phone image, but it was added to the queue.',
+      score: 0.5,
+    }
+  }
+
   const scale = Math.min(1, MAX_VALIDATION_DIMENSION / Math.max(bitmap.width, bitmap.height))
   const width = Math.max(1, Math.round(bitmap.width * scale))
   const height = Math.max(1, Math.round(bitmap.height * scale))
@@ -267,9 +277,19 @@ export async function validateGuidedPhoto(blob?: Blob): Promise<GuidedPhotoValid
     }
   }
 
-  context.drawImage(bitmap, 0, 0, width, height)
-  const imageData = context.getImageData(0, 0, width, height)
-  const gray = buildGrayMap(imageData)
+  let gray: Uint8Array
+  try {
+    context.drawImage(bitmap, 0, 0, width, height)
+    const imageData = context.getImageData(0, 0, width, height)
+    gray = buildGrayMap(imageData)
+  } catch {
+    bitmap.close()
+    return {
+      status: 'ready',
+      message: 'Guided capture validation could not read this phone image, but it was added to the queue.',
+      score: 0.5,
+    }
+  }
   bitmap.close()
 
   const center = detectOpeningCenter(gray, width, height)
