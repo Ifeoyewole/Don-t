@@ -135,7 +135,7 @@ export const PhotoUploadPage = ({
               className="sr-only"
               id="upload-input"
               type="file"
-              accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif"
+              accept="image/jpeg,image/png,image/webp,image/*"
               multiple
               onChange={(event) => void handleFileSelection(event.target.files)}
             />

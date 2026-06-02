@@ -165,9 +165,10 @@ export async function createEnhancedImageVariants(blob: Blob, mimeType = 'image/
     ['right-band', width * 0.5, 0, width * 0.5, height],
   ]
 
-  const variants = await Promise.all(
-    cropSpecs.map(([label, sx, sy, sw, sh]) => encodeCanvasVariant(canvas, label, sx, sy, sw, sh, outputMimeType)),
-  )
+  const variants: (EnhancedImageVariant | null)[] = []
+  for (const [label, sx, sy, sw, sh] of cropSpecs) {
+    variants.push(await encodeCanvasVariant(canvas, label, sx, sy, sw, sh, outputMimeType))
+  }
 
   return variants.filter((variant): variant is EnhancedImageVariant => Boolean(variant))
 }
