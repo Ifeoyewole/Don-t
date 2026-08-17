@@ -22,8 +22,8 @@ export interface CvWorkerResponse {
 }
 
 const DEFAULT_PIPE_DIAMETER_MM = 225
-const MAX_PROCESS_DIMENSION = 720
-const ANGLE_STEPS = 48
+const MAX_PROCESS_DIMENSION = 1200
+const ANGLE_STEPS = 72
 const BASE_CLOSE_UP_MM_PER_PIXEL = 0.075
 const VERTICAL_BLACK_GAP_SCALE: Array<{ maxDiameterMm: number; mmPerPixel: number }> = [
   { maxDiameterMm: 150, mmPerPixel: 0.389 },
@@ -58,12 +58,7 @@ function estimateVerticalBlackGapMmPerPixel(pipeDiameterMm: number): number {
   return VERTICAL_BLACK_GAP_SCALE.find((entry) => pipeDiameterMm <= entry.maxDiameterMm)?.mmPerPixel ?? 0.55
 }
 
-function deriveGapMm(seed: string, orderIndex: number): number {
-  const hash = Array.from(seed).reduce((acc, char, index) => acc + char.charCodeAt(0) * (index + 1), 0)
-  const base = (hash % 260) / 10
-  const offset = (orderIndex % 3) * 0.4
-  return Number((base + offset).toFixed(1))
-}
+/** No longer generates fake measurements from filename hashes. */
 
 function buildGrayMap(imageData: ImageData): Uint8Array {
   const gray = new Uint8Array(imageData.width * imageData.height)
@@ -79,23 +74,118 @@ function buildGrayMap(imageData: ImageData): Uint8Array {
   return gray
 }
 
+/**
+ * Measurement-focused image enhancement. Improves edge visibility
+ * for gap measurement WITHOUT distorting or moving pixel geometry.
+ * Works for both iPhone and GoPro MAX images.
+ */
 function enhanceImageData(imageData: ImageData): ImageData {
   const enhanced = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height)
-  const { data } = enhanced
-  let luminanceSum = 0
+  const { data, width, height } = enhanced
+  const pixelCount = width * height
 
-  for (let index = 0; index < data.length; index += 4) {
-    luminanceSum += data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114
+  // Step 1: Edge-preserving denoise
+  const denoiseCopy = new Uint8ClampedArray(data)
+  const denoiseRadius = 2
+  const intensityRange = 25
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const ci = (y * width + x) * 4
+      const cR = denoiseCopy[ci], cG = denoiseCopy[ci + 1], cB = denoiseCopy[ci + 2]
+      let rS = 0, gS = 0, bS = 0, wS = 0
+      for (let dy = -denoiseRadius; dy <= denoiseRadius; dy++) {
+        for (let dx = -denoiseRadius; dx <= denoiseRadius; dx++) {
+          const sx = clamp(x + dx, 0, width - 1)
+          const sy = clamp(y + dy, 0, height - 1)
+          const si = (sy * width + sx) * 4
+          const colorDist = Math.abs(denoiseCopy[si] - cR) + Math.abs(denoiseCopy[si + 1] - cG) + Math.abs(denoiseCopy[si + 2] - cB)
+          const w = Math.exp(-(colorDist * colorDist) / (2 * intensityRange * intensityRange * 3))
+          rS += denoiseCopy[si] * w
+          gS += denoiseCopy[si + 1] * w
+          bS += denoiseCopy[si + 2] * w
+          wS += w
+        }
+      }
+      if (wS > 0) {
+        data[ci] = clamp(Math.round(rS / wS), 0, 255)
+        data[ci + 1] = clamp(Math.round(gS / wS), 0, 255)
+        data[ci + 2] = clamp(Math.round(bS / wS), 0, 255)
+      }
+    }
   }
 
-  const mean = luminanceSum / Math.max(1, data.length / 4)
-  const exposureLift = clamp(128 - mean, -28, 42)
-  const contrast = mean < 105 ? 1.18 : 1.08
+  // Step 2: CLAHE local contrast (8x8 tiles)
+  const lum = new Float32Array(pixelCount)
+  for (let i = 0; i < pixelCount; i++) {
+    const base = i * 4
+    lum[i] = data[base] * 0.299 + data[base + 1] * 0.587 + data[base + 2] * 0.114
+  }
+  const tileCountX = 8, tileCountY = 8, clipLimit = 3.0, bins = 256
+  const tileW = Math.ceil(width / tileCountX)
+  const tileH = Math.ceil(height / tileCountY)
+  const tileCdfs: Float32Array[][] = []
+  for (let ty = 0; ty < tileCountY; ty++) {
+    tileCdfs[ty] = []
+    for (let tx = 0; tx < tileCountX; tx++) {
+      const hist = new Float32Array(bins)
+      let count = 0
+      const sX = tx * tileW, sY = ty * tileH
+      const eX = Math.min(sX + tileW, width), eY = Math.min(sY + tileH, height)
+      for (let y = sY; y < eY; y++) {
+        for (let x = sX; x < eX; x++) {
+          hist[clamp(Math.round(lum[y * width + x]), 0, 255)]++
+          count++
+        }
+      }
+      const limit = Math.max(1, Math.round((clipLimit * count) / bins))
+      let excess = 0
+      for (let b = 0; b < bins; b++) { if (hist[b] > limit) { excess += hist[b] - limit; hist[b] = limit } }
+      const inc = excess / bins
+      for (let b = 0; b < bins; b++) { hist[b] += inc }
+      const cdf = new Float32Array(bins)
+      cdf[0] = hist[0]
+      for (let b = 1; b < bins; b++) { cdf[b] = cdf[b - 1] + hist[b] }
+      const cdfMin = cdf.find((v) => v > 0) ?? 0
+      const denom = Math.max(1, count - cdfMin)
+      for (let b = 0; b < bins; b++) { cdf[b] = ((cdf[b] - cdfMin) / denom) * 255 }
+      tileCdfs[ty][tx] = cdf
+    }
+  }
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = y * width + x
+      const L = lum[idx]
+      const bin = clamp(Math.round(L), 0, 255)
+      const txf = (x - tileW / 2) / tileW, tyf = (y - tileH / 2) / tileH
+      const tx0 = clamp(Math.floor(txf), 0, tileCountX - 1), ty0 = clamp(Math.floor(tyf), 0, tileCountY - 1)
+      const tx1 = clamp(tx0 + 1, 0, tileCountX - 1), ty1 = clamp(ty0 + 1, 0, tileCountY - 1)
+      const wx = clamp(txf - tx0, 0, 1), wy = clamp(tyf - ty0, 0, 1)
+      const mapped = tileCdfs[ty0][tx0][bin] * (1 - wx) * (1 - wy) + tileCdfs[ty0][tx1][bin] * wx * (1 - wy) + tileCdfs[ty1][tx0][bin] * (1 - wx) * wy + tileCdfs[ty1][tx1][bin] * wx * wy
+      const scale = L > 0.5 ? mapped / L : 1
+      const base = idx * 4
+      data[base] = clamp(Math.round(data[base] * scale), 0, 255)
+      data[base + 1] = clamp(Math.round(data[base + 1] * scale), 0, 255)
+      data[base + 2] = clamp(Math.round(data[base + 2] * scale), 0, 255)
+    }
+  }
 
-  for (let index = 0; index < data.length; index += 4) {
-    data[index] = clamp((data[index] - 128) * contrast + 128 + exposureLift, 0, 255)
-    data[index + 1] = clamp((data[index + 1] - 128) * contrast + 128 + exposureLift, 0, 255)
-    data[index + 2] = clamp((data[index + 2] - 128) * contrast + 128 + exposureLift, 0, 255)
+  // Step 3: Unsharp mask
+  const sharpCopy = new Uint8ClampedArray(data)
+  const sharpRadius = 2, sharpAmount = 0.4
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let rB = 0, gB = 0, bB = 0, cnt = 0
+      for (let dy = -sharpRadius; dy <= sharpRadius; dy++) {
+        for (let dx = -sharpRadius; dx <= sharpRadius; dx++) {
+          const si = (clamp(y + dy, 0, height - 1) * width + clamp(x + dx, 0, width - 1)) * 4
+          rB += sharpCopy[si]; gB += sharpCopy[si + 1]; bB += sharpCopy[si + 2]; cnt++
+        }
+      }
+      const i = (y * width + x) * 4
+      data[i] = clamp(Math.round(sharpCopy[i] + sharpAmount * (sharpCopy[i] - rB / cnt)), 0, 255)
+      data[i + 1] = clamp(Math.round(sharpCopy[i + 1] + sharpAmount * (sharpCopy[i + 1] - gB / cnt)), 0, 255)
+      data[i + 2] = clamp(Math.round(sharpCopy[i + 2] + sharpAmount * (sharpCopy[i + 2] - bB / cnt)), 0, 255)
+    }
   }
 
   return enhanced
