@@ -209,8 +209,12 @@ async function processImage(imageId: string): Promise<string | null> {
     type: 'progress',
     imageId,
     inspectionId: resultId,
-    progress: 100,
-    message: measurement.measurementSource === 'fallback' ? 'Completed with estimated fallback' : 'Completed',
+    message:
+      measurement.measurementSource === 'fastapi'
+        ? 'Completed via FastAPI CV'
+        : measurement.measurementSource === 'fallback'
+          ? 'Completed with estimated fallback'
+          : 'Completed',
   })
   emit({ type: 'completed', imageId, inspectionId: resultId })
 

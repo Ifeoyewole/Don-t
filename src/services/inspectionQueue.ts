@@ -12,10 +12,7 @@ export const inspectionQueue = {
   async addFiles(input: QueueFilesInput): Promise<QueuedInspectionImage[]> {
     const existingCount = await db.inspectionImages.where('manholeId').equals(input.manholeId).count()
     const labels = createJointLabels(input.files.length, existingCount + 1)
-    const validations = []
-    for (const file of input.files) {
-      validations.push(await validateGuidedPhoto(file))
-    }
+    const validations = await Promise.all(input.files.map((file) => validateGuidedPhoto(file)))
     const queuedImages: QueuedInspectionImage[] = input.files.map((file, index) => {
       const timestamp = createTimestamp()
       const imageId = createId()

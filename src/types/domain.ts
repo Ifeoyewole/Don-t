@@ -12,7 +12,7 @@ export type InspectionCaptureSource = 'upload' | 'camera'
 export type QueueStatus = 'queued' | 'processing' | 'completed' | 'failed'
 export type InspectionStatus = 'PASS' | 'REVIEW' | 'FAIL'
 export type GuidedPhotoStatus = 'ready' | 'retake'
-export type MeasurementSource = 'cv' | 'ai-assisted' | 'ai-estimated' | 'ai-review' | 'manual' | 'fallback'
+export type MeasurementSource = 'fastapi' | 'cv' | 'ai-assisted' | 'ai-estimated' | 'ai-review' | 'manual' | 'fallback' | 'ai'
 
 export interface MeasurementOverlayHints {
   pipeCenter?: { x: number; y: number }

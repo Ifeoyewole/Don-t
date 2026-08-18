@@ -26,12 +26,14 @@ type DraftOverride = {
 }
 
 const sourceLabels: Record<MeasurementSource, string> = {
+  fastapi: 'FastAPI CV',
   cv: 'CV measured',
   'ai-assisted': 'AI assisted',
   'ai-estimated': 'AI estimated',
   'ai-review': 'AI review',
   manual: 'Manual override',
   fallback: 'Estimated fallback',
+  ai: 'AI measured',
 }
 
 const measurementLabel = (item: InspectionResult) => {
