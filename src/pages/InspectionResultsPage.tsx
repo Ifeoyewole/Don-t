@@ -26,8 +26,8 @@ type DraftOverride = {
 }
 
 const sourceLabels: Record<MeasurementSource, string> = {
-  fastapi: 'FastAPI CV',
-  cv: 'CV measured',
+  fastapi: 'Optical CV Engine',
+  cv: 'CV Measured',
   'ai-assisted': 'AI assisted',
   'ai-estimated': 'AI estimated',
   'ai-review': 'AI review',

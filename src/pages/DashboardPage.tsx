@@ -424,16 +424,16 @@ export const DashboardPage = ({
 
             <div className="readiness-row">
               <div className="readiness-label-group">
-                <span className="readiness-name">Cloud Backend</span>
-                <span className="readiness-detail">FastAPI Cloud Run (europe-west2)</span>
+                <span className="readiness-name">Cloud Synchronization</span>
+                <span className="readiness-detail">Sub-pixel optical verification</span>
               </div>
               <span className="readiness-status is-ready">CONNECTED</span>
             </div>
 
             <div className="readiness-row">
               <div className="readiness-label-group">
-                <span className="readiness-name">Model Version</span>
-                <span className="readiness-detail">99.8% precision benchmark</span>
+                <span className="readiness-name">Inspection Model</span>
+                <span className="readiness-detail">Sub-pixel radial contour profiling</span>
               </div>
               <span className="readiness-badge-spec">joint-v1.0</span>
             </div>

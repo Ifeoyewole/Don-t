@@ -140,6 +140,68 @@ function formatTrail(debugTrail: string[]): string {
   return debugTrail.join(' > ')
 }
 
+export interface BackendHealthResult {
+  online: boolean
+  cloudConnected: boolean
+  modelReady: boolean
+  latencyMs?: number
+  version?: string
+  opencvVersion?: string
+  source: 'cloud' | 'local' | 'offline'
+  error?: string
+}
+
+export async function checkBackendHealth(): Promise<BackendHealthResult> {
+  const isBrowserOnline = typeof window !== 'undefined' ? window.navigator.onLine : true
+  if (!isBrowserOnline) {
+    return {
+      online: false,
+      cloudConnected: false,
+      modelReady: false,
+      source: 'offline',
+    }
+  }
+
+  const startTime = performance.now()
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 4000)
+
+  try {
+    const response = await fetch('/api/v1/cv/health', {
+      method: 'GET',
+      signal: controller.signal,
+      headers: { Accept: 'application/json' },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    const data = await response.json()
+    const latencyMs = Math.round(performance.now() - startTime)
+
+    return {
+      online: true,
+      cloudConnected: true,
+      modelReady: true,
+      latencyMs,
+      version: data.version || '1.0.0',
+      opencvVersion: data.opencv_version,
+      source: 'cloud',
+    }
+  } catch {
+    const hasWorker = isBrowserWorkerAvailable()
+    return {
+      online: true,
+      cloudConnected: false,
+      modelReady: hasWorker,
+      source: hasWorker ? 'local' : 'offline',
+    }
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWorkerResponse> {
   if (!request.blob) {
     throw new Error('No image blob provided for FastAPI measurement.')
@@ -240,7 +302,7 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
     const note =
       data.result_status === 'REJECTED_UNRELIABLE'
         ? `Rejected: ${data.rejection_reason ?? 'Confidence below acceptable threshold'}`
-        : `FastAPI AI/CV: gap ${gapMm.toFixed(1)} mm [${data.result_status ?? 'ACCEPTED_MEASUREMENT'}] (${data.debug_info?.num_samples ?? 0} samples, ${(data.debug_info?.processing_time_ms ?? 0).toFixed(0)}ms)`
+        : `AI/CV: gap ${gapMm.toFixed(1)} mm [${data.result_status ?? 'ACCEPTED_MEASUREMENT'}] (${data.debug_info?.num_samples ?? 0} samples, ${(data.debug_info?.processing_time_ms ?? 0).toFixed(0)}ms)`
 
     return {
       imageId: request.imageId,

@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import type { RealtimeHealthState } from '../hooks/useRealtimeHealth'
 
 export type NavKey =
   | 'dashboard'
@@ -9,9 +10,23 @@ export type NavKey =
   | 'reports'
   | 'settings'
 
+interface InspectorProfile {
+  name: string
+  role: string
+}
+
+const DEFAULT_PROFILE: InspectorProfile = {
+  name: 'Guest',
+  role: 'Field Inspector',
+}
+
+const PROFILE_STORAGE_KEY = 'jointinspect:inspector-session'
+
 type Props = {
   children: ReactNode
   online: boolean
+  health?: RealtimeHealthState
+  onRefreshHealth?: () => void
   navKey: NavKey
   onNavigateHome: () => void
   onNavigateProjects: () => void
@@ -119,6 +134,8 @@ const SearchIcon = () => (
 export const AppShell = ({
   children,
   online,
+  health,
+  onRefreshHealth,
   navKey,
   onNavigateHome,
   onNavigateProjects,
@@ -128,6 +145,63 @@ export const AppShell = ({
   onGlobalSearchChange,
 }: Props) => {
   const [activeModal, setActiveModal] = useState<'calibration' | 'models' | 'settings' | null>(null)
+
+  // Dynamic Inspector Profile Session
+  const [profile, setProfile] = useState<InspectorProfile>(() => {
+    try {
+      const stored = window.localStorage.getItem(PROFILE_STORAGE_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed?.name) return parsed
+      }
+    } catch {}
+    return DEFAULT_PROFILE
+  })
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [editName, setEditName] = useState(profile.name)
+  const [editRole, setEditRole] = useState(profile.role)
+
+  const handleSaveProfile = () => {
+    const next = {
+      name: editName.trim() || 'Guest',
+      role: editRole.trim() || 'Field Inspector',
+    }
+    setProfile(next)
+    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(next))
+    setProfileModalOpen(false)
+  }
+
+  const handleResetProfile = () => {
+    setProfile(DEFAULT_PROFILE)
+    setEditName(DEFAULT_PROFILE.name)
+    setEditRole(DEFAULT_PROFILE.role)
+    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(DEFAULT_PROFILE))
+    setProfileModalOpen(false)
+  }
+
+  // Real-time status derivations
+  const isCloudOnline = health ? health.cloudConnected : online
+  const isModelReady = health ? health.modelReady : true
+
+  const cloudPillClass = isCloudOnline
+    ? 'is-cloud-online'
+    : health?.online
+      ? 'is-cloud-local'
+      : 'is-cloud-offline'
+
+  const cloudLabel = isCloudOnline
+    ? health?.latencyMs
+      ? `Cloud Connected (${health.latencyMs}ms)`
+      : 'Cloud Connected'
+    : health?.online
+      ? 'Local Engine'
+      : 'Offline'
+
+  const cloudTooltip = isCloudOnline
+    ? `Real-time cloud sync active (${health?.latencyMs ?? 0}ms round-trip). Click to ping.`
+    : health?.online
+      ? 'Connected to local device engine. Click to ping cloud service.'
+      : 'Network offline. Inspections stored locally in IndexedDB.'
 
   const handleSidebarClick = (key: NavKey) => {
     if (key === 'dashboard') {
@@ -186,37 +260,54 @@ export const AppShell = ({
         </div>
 
         <div className="topbar-actions">
-          {/* Cloud Connection Badge */}
-          <div className={`status-pill ${online ? 'is-cloud-online' : 'is-cloud-offline'}`} title="Google Cloud Run (europe-west2)">
-            <span className="status-dot-pulse" aria-hidden="true" />
-            <span className="status-pill-text">
-              {online ? 'Cloud Connected' : 'Offline Mode'}
-            </span>
-          </div>
+          {/* Cloud Connection Badge (Click to ping) */}
+          <button
+            type="button"
+            className={`status-pill ${cloudPillClass} status-pill-clickable`}
+            onClick={() => onRefreshHealth?.()}
+            title={cloudTooltip}
+          >
+            <span className={`status-dot-pulse ${health?.isChecking ? 'is-checking' : ''}`} aria-hidden="true" />
+            <span className="status-pill-text">{cloudLabel}</span>
+          </button>
 
-          {/* AI Model Status Badge */}
-          <div className="status-pill is-model-ready" title="YOLOv8-seg + Sewer-ML Defect Model Ready">
+          {/* AI Model Status Badge (Click to view model specs) */}
+          <button
+            type="button"
+            className={`status-pill ${isModelReady ? 'is-model-ready' : 'is-model-loading'} status-pill-clickable`}
+            onClick={() => setActiveModal('models')}
+            title="AI/CV Optical Analysis Pipeline. Click for model telemetry."
+          >
             <span className="status-dot-ready" aria-hidden="true">
               <CheckIcon />
             </span>
-            <span className="status-pill-text">Model Ready</span>
-          </div>
+            <span className="status-pill-text">{isModelReady ? 'Model Ready' : 'Loading Engine'}</span>
+          </button>
 
-          {/* User Profile */}
-          <div className="user-profile" title="Active Inspector Session">
+          {/* Dynamic Inspector Session Profile */}
+          <button
+            type="button"
+            className="user-profile user-profile-btn"
+            onClick={() => {
+              setEditName(profile.name)
+              setEditRole(profile.role)
+              setProfileModalOpen(true)
+            }}
+            title="Active Inspector Session • Click to customize identity"
+          >
             <div className="user-avatar" aria-hidden="true">
-              JD
+              {profile.name.charAt(0).toUpperCase() || 'G'}
             </div>
             <div className="user-details">
-              <span className="user-name">J. Doe</span>
-              <span className="user-role">Lead Inspector</span>
+              <span className="user-name">{profile.name}</span>
+              <span className="user-role">{profile.role}</span>
             </div>
-          </div>
+          </button>
         </div>
       </header>
 
       {/* Offline Alert Strip */}
-      <div className={`offline-banner ${online ? 'is-hidden' : ''}`}>
+      <div className={`offline-banner ${isCloudOnline || (health?.online ?? online) ? 'is-hidden' : ''}`}>
         <CloudIcon />
         <span>Connection lost. Field measurements are cached locally on IndexedDB and will sync once reconnected.</span>
       </div>
@@ -224,129 +315,146 @@ export const AppShell = ({
       {/* Body: Slim Desktop Sidebar + Main Content */}
       <div className="app-layout">
         <aside className="desktop-sidebar" aria-label="Main Navigation">
-          <div className="sidebar-section-title">Operations</div>
-          <nav className="sidebar-nav">
-            <button
-              className={navKey === 'dashboard' ? 'sidebar-item is-active' : 'sidebar-item'}
-              type="button"
-              onClick={() => handleSidebarClick('dashboard')}
-            >
-              <DashboardIcon />
-              <span>Dashboard</span>
-            </button>
-            <button
-              className={navKey === 'projects' ? 'sidebar-item is-active' : 'sidebar-item'}
-              type="button"
-              onClick={() => handleSidebarClick('projects')}
-            >
-              <ProjectsIcon />
-              <span>Projects</span>
-            </button>
-            <button
-              className={navKey === 'inspections' ? 'sidebar-item is-active' : 'sidebar-item'}
-              type="button"
-              onClick={() => handleSidebarClick('inspections')}
-            >
-              <InspectionsIcon />
-              <span>Inspections</span>
-            </button>
-          </nav>
+          <div className="sidebar-top-section">
+            <div className="sidebar-section-title">Operations</div>
+            <nav className="sidebar-nav">
+              <button
+                className={navKey === 'dashboard' ? 'sidebar-item is-active' : 'sidebar-item'}
+                type="button"
+                onClick={() => handleSidebarClick('dashboard')}
+              >
+                <DashboardIcon />
+                <span>Dashboard</span>
+              </button>
+              <button
+                className={navKey === 'projects' ? 'sidebar-item is-active' : 'sidebar-item'}
+                type="button"
+                onClick={() => handleSidebarClick('projects')}
+              >
+                <ProjectsIcon />
+                <span>Projects</span>
+              </button>
+              <button
+                className={navKey === 'inspections' ? 'sidebar-item is-active' : 'sidebar-item'}
+                type="button"
+                onClick={() => handleSidebarClick('inspections')}
+              >
+                <InspectionsIcon />
+                <span>Inspections</span>
+              </button>
+            </nav>
 
-          <div className="sidebar-section-title">Engine & Specs</div>
-          <nav className="sidebar-nav">
-            <button
-              className={navKey === 'calibration' ? 'sidebar-item is-active' : 'sidebar-item'}
-              type="button"
-              onClick={() => handleSidebarClick('calibration')}
-            >
-              <CalibrationIcon />
-              <span>Calibration</span>
-            </button>
-            <button
-              className={navKey === 'models' ? 'sidebar-item is-active' : 'sidebar-item'}
-              type="button"
-              onClick={() => handleSidebarClick('models')}
-            >
-              <ModelsIcon />
-              <span>Models</span>
-            </button>
-            <button
-              className={navKey === 'reports' ? 'sidebar-item is-active' : 'sidebar-item'}
-              type="button"
-              onClick={() => handleSidebarClick('reports')}
-            >
-              <ReportsIcon />
-              <span>Reports</span>
-            </button>
-            <button
-              className={navKey === 'settings' ? 'sidebar-item is-active' : 'sidebar-item'}
-              type="button"
-              onClick={() => handleSidebarClick('settings')}
-            >
-              <SettingsIcon />
-              <span>Settings</span>
-            </button>
-          </nav>
+            <div className="sidebar-section-title">Engine & Specs</div>
+            <nav className="sidebar-nav">
+              <button
+                className={navKey === 'calibration' ? 'sidebar-item is-active' : 'sidebar-item'}
+                type="button"
+                onClick={() => handleSidebarClick('calibration')}
+              >
+                <CalibrationIcon />
+                <span>Calibration</span>
+              </button>
+              <button
+                className={navKey === 'models' ? 'sidebar-item is-active' : 'sidebar-item'}
+                type="button"
+                onClick={() => handleSidebarClick('models')}
+              >
+                <ModelsIcon />
+                <span>Models</span>
+              </button>
+              <button
+                className={navKey === 'reports' ? 'sidebar-item is-active' : 'sidebar-item'}
+                type="button"
+                onClick={() => handleSidebarClick('reports')}
+              >
+                <ReportsIcon />
+                <span>Reports</span>
+              </button>
+              <button
+                className={navKey === 'settings' ? 'sidebar-item is-active' : 'sidebar-item'}
+                type="button"
+                onClick={() => handleSidebarClick('settings')}
+              >
+                <SettingsIcon />
+                <span>Settings</span>
+              </button>
+            </nav>
+          </div>
 
           <div className="sidebar-footer">
             <div className="sidebar-system-badge">
               <div className="badge-row">
-                <span className="live-dot" />
-                <strong>CV Engine v1.0</strong>
+                <span className={`live-dot ${isCloudOnline ? 'is-live' : ''}`} />
+                <strong>Inspection Engine v1.0</strong>
               </div>
-              <span className="badge-sub">europe-west2 • ADC/IAM</span>
+              <span className="badge-sub">{isCloudOnline ? `Live Cloud (${health?.latencyMs ?? 0}ms)` : 'Local Engine'} • Sub-pixel QA</span>
             </div>
           </div>
         </aside>
 
-        {/* Primary Page Content */}
-        <main className="app-content">{children}</main>
+        <main className="content-surface">{children}</main>
       </div>
 
-      {/* Mobile Bottom Navigation */}
-      <nav className="bottom-nav" aria-label="Primary mobile">
-        <button
-          className={navKey === 'dashboard' ? 'nav-item is-active' : 'nav-item'}
-          type="button"
-          onClick={onNavigateHome}
-        >
-          <DashboardIcon />
-          <span>Dashboard</span>
-        </button>
-        <button
-          className={navKey === 'projects' ? 'nav-item is-active' : 'nav-item'}
-          type="button"
-          onClick={onNavigateProjects}
-        >
-          <ProjectsIcon />
-          <span>Projects</span>
-        </button>
-        <button
-          className={navKey === 'inspections' ? 'nav-item is-active' : 'nav-item'}
-          type="button"
-          onClick={() => handleSidebarClick('inspections')}
-        >
-          <InspectionsIcon />
-          <span>Inspect</span>
-        </button>
-        <button
-          className={navKey === 'settings' ? 'nav-item is-active' : 'nav-item'}
-          type="button"
-          onClick={() => setActiveModal('settings')}
-        >
-          <SettingsIcon />
-          <span>Settings</span>
-        </button>
-      </nav>
+      {/* Inspector Profile Customization Modal */}
+      {profileModalOpen && (
+        <div className="modal-backdrop" onClick={() => setProfileModalOpen(false)}>
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3>Inspector Session Identity</h3>
+              </div>
+              <button className="modal-close-btn" type="button" onClick={() => setProfileModalOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="modal-lead">Configure the inspector identity attached to quality assessments and reports.</p>
+              <div className="stitch-two-up" style={{ marginTop: '16px' }}>
+                <label className="field">
+                  <span>Inspector Name</span>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Guest"
+                  />
+                </label>
+                <label className="field">
+                  <span>Role / Title</span>
+                  <input
+                    type="text"
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value)}
+                    placeholder="Field Inspector"
+                  />
+                </label>
+              </div>
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <button className="button button-ghost" type="button" onClick={handleResetProfile}>
+                Reset to Guest
+              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="button button-secondary" type="button" onClick={() => setProfileModalOpen(false)}>
+                  Cancel
+                </button>
+                <button className="button button-primary" type="button" onClick={handleSaveProfile}>
+                  Save Profile
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* Interactive Engine Modals (Calibration, Models, Settings) */}
+      {/* Modals for Engine, Calibration, Models, Settings */}
       {activeModal === 'calibration' && (
         <div className="modal-backdrop" onClick={() => setActiveModal(null)}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title-group">
                 <CalibrationIcon />
-                <h3>Optical Calibration Engine</h3>
+                <h3>Sub-Pixel Geometric Calibration</h3>
               </div>
               <button className="modal-close-btn" type="button" onClick={() => setActiveModal(null)}>
                 ✕
@@ -354,28 +462,28 @@ export const AppShell = ({
             </div>
             <div className="modal-body">
               <p className="modal-lead">
-                Sub-pixel geometric scaling and radial distortion correction for CCTV pipe cameras.
+                Sub-pixel radial boundary tracking using annular edge estimation and adaptive contour sampling.
               </p>
               <div className="spec-grid">
                 <div className="spec-card">
-                  <span className="spec-label">Nominal Scale</span>
+                  <span className="spec-label">Radial Edge Rays</span>
+                  <strong>36 sectors</strong>
+                  <span className="spec-note">10° angular step validation</span>
+                </div>
+                <div className="spec-card">
+                  <span className="spec-label">Sub-Pixel Method</span>
+                  <strong>Zernike Moments</strong>
+                  <span className="spec-note">Gaussian gradient peak interpolation</span>
+                </div>
+                <div className="spec-card">
+                  <span className="spec-label">Nominal Joint Gap</span>
+                  <strong>12.0 mm</strong>
+                  <span className="spec-note">Design tolerance: ±4.0 mm</span>
+                </div>
+                <div className="spec-card">
+                  <span className="spec-label">Pixel Scale Target</span>
                   <strong>1.000 mm/px</strong>
-                  <span className="spec-note">Empirically calibrated from pipe ring</span>
-                </div>
-                <div className="spec-card">
-                  <span className="spec-label">Supported Diameters</span>
-                  <strong>150mm – 900mm</strong>
-                  <span className="spec-note">Clay & Concrete circular geometries</span>
-                </div>
-                <div className="spec-card">
-                  <span className="spec-label">Pass Tolerance</span>
-                  <strong>3.0 – 15.0 mm</strong>
-                  <span className="spec-note">ACCEPTED_MEASUREMENT</span>
-                </div>
-                <div className="spec-card">
-                  <span className="spec-label">Review Tolerance</span>
-                  <strong>15.0 – 25.0 mm</strong>
-                  <span className="spec-note">REVIEW_REQUIRED</span>
+                  <span className="spec-note">Nominal uncalibrated sensor scale</span>
                 </div>
               </div>
               <div className="modal-callout">
@@ -398,7 +506,7 @@ export const AppShell = ({
             <div className="modal-header">
               <div className="modal-title-group">
                 <ModelsIcon />
-                <h3>AI Inspection Models & Telemetry</h3>
+                <h3>AI Inspection Engine & Models</h3>
               </div>
               <button className="modal-close-btn" type="button" onClick={() => setActiveModal(null)}>
                 ✕
@@ -406,33 +514,33 @@ export const AppShell = ({
             </div>
             <div className="modal-body">
               <p className="modal-lead">
-                Hybrid AI segmentation and OpenCV computer vision pipeline deployed on Google Cloud.
+                Sub-pixel optical joint analysis and defect classification pipeline.
               </p>
               <div className="spec-grid">
                 <div className="spec-card">
-                  <span className="spec-label">Joint Segmenter</span>
-                  <strong>joint-seg-v1</strong>
-                  <span className="spec-note">YOLOv8-seg • Sewer-ML Benchmark</span>
+                  <span className="spec-label">Joint Profile Engine</span>
+                  <strong>Sub-Pixel Profiler v1.0</strong>
+                  <span className="spec-note">Radial contour & annular gap solver</span>
                 </div>
                 <div className="spec-card">
-                  <span className="spec-label">CV Engine</span>
-                  <strong>OpenCV 4.12</strong>
-                  <span className="spec-note">Radial edge fitting & validation</span>
+                  <span className="spec-label">Defect Classifier</span>
+                  <strong>Sewer-ML Deep Classifier</strong>
+                  <span className="spec-note">Displaced joint, cracks & intrusion detection</span>
                 </div>
                 <div className="spec-card">
-                  <span className="spec-label">Container Image</span>
-                  <strong>pipe-joint-api:v1</strong>
-                  <span className="spec-note">Artifact Registry (europe-west2)</span>
+                  <span className="spec-label">Measurement Precision</span>
+                  <strong>Nominal ±0.2 mm</strong>
+                  <span className="spec-note">36-ray angular sub-pixel sampling</span>
                 </div>
                 <div className="spec-card">
-                  <span className="spec-label">Training Pipeline</span>
-                  <strong>Vertex AI Custom Job</strong>
-                  <span className="spec-note">joint-inspection-trainer (ADC/IAM)</span>
+                  <span className="spec-label">Processing Pipeline</span>
+                  <strong>{isCloudOnline ? 'Cloud Active' : 'Local Engine'}</strong>
+                  <span className="spec-note">{isCloudOnline ? `Live latency: ${health?.latencyMs ?? 0}ms` : 'Offline fallback active'}</span>
                 </div>
               </div>
               <div className="modal-callout">
-                <strong>Sewer-ML Multi-Defect Classifier</strong>
-                <p>Standard codes: FS (Displaced joint), RO (Roots), AF/BE (Deposits), FO (Obstacle), RB (Fracture/Crack), IS (Intruding seal).</p>
+                <strong>Standard Inspection Defect Codes</strong>
+                <p>FS (Displaced joint), RO (Roots), AF/BE (Deposits), FO (Obstacle), RB (Fracture/Crack), IS (Intruding seal).</p>
               </div>
             </div>
             <div className="modal-footer">

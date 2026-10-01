@@ -148,8 +148,10 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
 
             {error ? <p className="form-error">{error}</p> : null}
 
+            <div className="form-action-divider" />
+
             <div className="page-footer-actions align-right">
-              <button className="button button-secondary" type="button" onClick={onBack}>
+              <button className="button button-ghost" type="button" onClick={onBack}>
                 Back
               </button>
               <button className="button button-primary button-wide-on-desktop" type="button" onClick={handleSave} disabled={saving}>
@@ -163,10 +165,10 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
           <article className="estimate-sidebar">
             <div className="estimate-sidebar-head">
               <h2>Run Estimate</h2>
-              <span>{loadingEstimate ? 'Updating' : 'Ready'}</span>
+              <span className="estimate-status-pill">{loadingEstimate ? 'Updating...' : 'Ready'}</span>
             </div>
             <div className="estimate-highlight">
-              <span>Estimated Pipe Joints</span>
+              <span className="estimate-highlight-label">Estimated Pipe Joints</span>
               <strong>{estimate?.jointsNeeded ?? '--'}</strong>
               <p>Based on {estimate?.unitLengthM ?? '--'}m pipe lengths</p>
             </div>
@@ -181,7 +183,7 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
               </div>
             </div>
             <div className="estimate-message">
-              This helps you anticipate how many pipe-to-pipe joints may need photos in the run.
+              Anticipated pipe-to-pipe joint locations requiring optical inspection along this run.
             </div>
           </article>
         </aside>

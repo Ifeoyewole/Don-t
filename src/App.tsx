@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { db } from './db'
 import { AppShell, type NavKey } from './components/AppShell'
+import { useRealtimeHealth } from './hooks/useRealtimeHealth'
 import { DashboardPage } from './pages/DashboardPage'
 import { CreateProjectPage } from './pages/CreateProjectPage'
 import { InspectionResultsPage } from './pages/InspectionResultsPage'
@@ -213,6 +214,7 @@ const downloadBlob = (blob: Blob, fileName: string) => {
 
 function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.pathname))
+  const { health, checkNow } = useRealtimeHealth()
   const [online, setOnline] = useState(() => window.navigator.onLine)
   const [showAllProjects, setShowAllProjects] = useState(false)
   const [events, setEvents] = useState<string[]>([])
@@ -814,7 +816,9 @@ function App() {
 
   return (
     <AppShell
-      online={online}
+      online={health.online}
+      health={health}
+      onRefreshHealth={checkNow}
       navKey={currentNavKey}
       onNavigateHome={() => navigate('/')}
       onNavigateProjects={() => navigate('/projects')}
