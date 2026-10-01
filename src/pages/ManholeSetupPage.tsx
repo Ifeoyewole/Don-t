@@ -77,17 +77,29 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
 
   return (
     <div className="page-grid manhole-page">
-      <section className="page-hero left-aligned">
+      <button className="page-back-link" type="button" onClick={onBack}>
+        ← Back to Project Details
+      </button>
+
+      <header className="page-hero left-aligned">
         <div>
           <p className="eyebrow">{projectName}</p>
           <h1>Manhole Setup</h1>
           <p className="lead">Enter the manhole details before uploading joint photos for measurement.</p>
         </div>
-      </section>
+      </header>
 
       <section className="split-page-shell">
         <div className="split-main-column">
           <article className="stitch-form-card">
+            <div className="stitch-section-head">
+              <div>
+                <h2>Manhole Specifications</h2>
+                <p className="form-section-subtitle">Define pipe run distance and material classification for tolerance calculation.</p>
+              </div>
+              <span className="form-step-badge">Step 2 of 4</span>
+            </div>
+
             <div className="stitch-two-up">
               <label className="field">
                 <span>Manhole ID</span>
