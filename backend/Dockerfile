@@ -56,7 +56,7 @@ EXPOSE 8000
 
 # Health check probe
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/cv/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8000}/cv/health || exit 1
 
-# Launch production server with uvicorn
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# Launch production server with uvicorn respecting dynamic PORT
+CMD ["sh", "-c", "exec uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]
