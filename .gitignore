@@ -13,6 +13,7 @@ dist-ssr
 test-results/
 *.local
 .env
+.env.local
 .env.*
 !.env.example
 
