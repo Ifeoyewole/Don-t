@@ -402,11 +402,26 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   }
 
   // 7. Resolve Upstream Path on Private Cloud Run Service
-  let targetSubPath = url.replace(/^\/api\/v1\/?/, '').replace(/^\/api\/?/, '')
+  // Strip query parameters injected by Vercel catch-all (e.g. ?...route=health)
+  const [pathOnly, rawQuery] = url.split('?')
+  let targetSubPath = pathOnly.replace(/^\/api\/v1\/?/, '').replace(/^\/api\/?/, '')
   if (!targetSubPath.startsWith('cv/') && !targetSubPath.startsWith('health')) {
     targetSubPath = `cv/${targetSubPath}`
   }
-  const targetUrl = `${GATEWAY_CONFIG.CLOUD_RUN_URL}/${targetSubPath}`
+
+  // Filter out Vercel internal query parameters (...route) from upstream URL
+  let forwardQuery = ''
+  if (rawQuery) {
+    const qParams = new URLSearchParams(rawQuery)
+    qParams.delete('...route')
+    qParams.delete('route')
+    const qs = qParams.toString()
+    if (qs) {
+      forwardQuery = `?${qs}`
+    }
+  }
+
+  const targetUrl = `${GATEWAY_CONFIG.CLOUD_RUN_URL}/${targetSubPath}${forwardQuery}`
 
   // 8. Obtain Short-Lived ID Token for Cloud Run (Vercel OIDC -> GCP WIF)
   const idToken = await getCloudRunIdToken()
