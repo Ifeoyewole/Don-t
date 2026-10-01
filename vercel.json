@@ -2,28 +2,28 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
+      "source": "/api/v1/(.*)",
+      "destination": "https://pipe-joint-api-7d5y5wcyta-nw.a.run.app/api/v1/$1"
     },
     {
       "source": "/cv/(.*)",
-      "destination": "/api/index.py"
+      "destination": "https://pipe-joint-api-7d5y5wcyta-nw.a.run.app/cv/$1"
     },
     {
       "source": "/health",
-      "destination": "/api/index.py"
+      "destination": "https://pipe-joint-api-7d5y5wcyta-nw.a.run.app/health"
     },
     {
       "source": "/docs",
-      "destination": "/api/index.py"
+      "destination": "https://pipe-joint-api-7d5y5wcyta-nw.a.run.app/docs"
     },
     {
       "source": "/redoc",
-      "destination": "/api/index.py"
+      "destination": "https://pipe-joint-api-7d5y5wcyta-nw.a.run.app/redoc"
     },
     {
       "source": "/openapi.json",
-      "destination": "/api/index.py"
+      "destination": "https://pipe-joint-api-7d5y5wcyta-nw.a.run.app/openapi.json"
     }
   ]
 }
