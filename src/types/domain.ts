@@ -14,6 +14,29 @@ export type InspectionStatus = 'PASS' | 'REVIEW' | 'FAIL'
 export type GuidedPhotoStatus = 'ready' | 'retake'
 export type MeasurementSource = 'fastapi' | 'cv' | 'ai-assisted' | 'ai-estimated' | 'ai-review' | 'manual' | 'fallback' | 'ai'
 
+export type MeasurementResultStatus =
+  | 'ACCEPTED_MEASUREMENT'
+  | 'REVIEW_REQUIRED'
+  | 'REJECTED_UNRELIABLE'
+
+export type JointConditionClass =
+  | 'NORMAL'
+  | 'OPEN_JOINT'
+  | 'ANGULAR_DEFLECTION'
+  | 'SURFACE_DAMAGE'
+  | 'DEPOSITS_OBSTACLES'
+  | 'INTRUDING_SEAL'
+  | 'UNKNOWN'
+
+export interface ConfidenceBreakdown {
+  totalConfidence: number
+  qualityFactor: number
+  geometricConsistency: number
+  modelConfidence: number
+  stabilityFactor: number
+  failureRiskRate: number
+}
+
 export interface MeasurementOverlayHints {
   pipeCenter?: { x: number; y: number }
   innerRadiusPx?: number
@@ -39,6 +62,10 @@ export interface CvMeasurementDebug {
   failureStage?: string
   enhancementUsed?: boolean
   overlayHints?: MeasurementOverlayHints
+  resultStatus?: MeasurementResultStatus
+  condition?: JointConditionClass
+  confidenceBreakdown?: ConfidenceBreakdown
+  rejectionReason?: string
 }
 
 export interface AiMeasurementReview {
@@ -65,6 +92,8 @@ export interface MeasurementAudit {
   aiEstimatedGapMm?: number | null
   enhancementUsed?: boolean
   decision: string
+  resultStatus?: MeasurementResultStatus
+  rejectionReason?: string
 }
 
 export interface Project {
@@ -192,6 +221,10 @@ export interface InspectionResult {
   overrideReason?: string
   overrideValueMm?: number
   overrideAt?: string
+  resultStatus?: MeasurementResultStatus
+  condition?: JointConditionClass
+  confidenceBreakdown?: ConfidenceBreakdown
+  rejectionReason?: string
 }
 
 export interface ApplyOverrideInput {

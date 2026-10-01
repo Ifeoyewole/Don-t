@@ -52,6 +52,30 @@ function classifyMeasurement(gapMm: number, cvResult: CvWorkerResponse) {
 }
 
 export function fuseMeasurementWithAi(cvResult: CvWorkerResponse, aiReview?: AiMeasurementReview): FusedMeasurementResult {
+  if (cvResult.resultStatus === 'REJECTED_UNRELIABLE') {
+    return {
+      ...cvResult,
+      originalGapMm: 0,
+      status: 'REVIEW',
+      resultStatus: 'REJECTED_UNRELIABLE',
+      measurementNote: cvResult.rejectionReason
+        ? `Rejected: ${cvResult.rejectionReason}`
+        : cvResult.measurementNote,
+      aiReview,
+      measurementAudit: {
+        originalSource: cvResult.measurementSource,
+        finalSource: cvResult.measurementSource,
+        cvConfidence: cvResult.confidence,
+        aiConfidence: aiReview?.confidence,
+        cvGapMm: 0,
+        resultStatus: 'REJECTED_UNRELIABLE',
+        rejectionReason: cvResult.rejectionReason,
+        enhancementUsed: cvResult.cvDebug?.enhancementUsed,
+        decision: 'Measurement rejected as unreliable; LLM fallback strictly disallowed for physical dimensions.',
+      },
+    }
+  }
+
   const closeUpJoint = isCloseUpJointMeasurement(cvResult)
 
   if (!aiReview) {

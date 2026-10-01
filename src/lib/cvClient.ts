@@ -1,4 +1,11 @@
-import type { CvMeasurementDebug, InspectionStatus, MeasurementOverlayHints } from '../types'
+import type {
+  ConfidenceBreakdown,
+  CvMeasurementDebug,
+  InspectionStatus,
+  JointConditionClass,
+  MeasurementOverlayHints,
+  MeasurementResultStatus,
+} from '../types'
 import type { CvWorkerRequest, CvWorkerResponse } from './cvMeasurement'
 
 type WarmupDebugMessage = {
@@ -92,7 +99,20 @@ interface FastApiMeasurementPayload {
   mean_gap_mm?: number
   min_gap_mm?: number
   max_gap_mm?: number
+  mean_displacement_mm?: number
+  tolerance_exceeded?: boolean
   overall_status?: 'PASS' | 'WARNING' | 'FAIL' | 'REVIEW'
+  result_status?: MeasurementResultStatus
+  condition?: JointConditionClass
+  confidence_breakdown?: {
+    total_confidence: number
+    quality_factor: number
+    geometric_consistency: number
+    model_confidence: number
+    stability_factor: number
+    failure_risk_rate: number
+  }
+  rejection_reason?: string
   overlay_hints?: FastApiOverlayHints
   debug_info?: FastApiCvDebug
   timestamp?: string
@@ -151,13 +171,32 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
     const data: FastApiMeasurementPayload = await response.json()
     const gapMm = Number((data.mean_gap_mm ?? data.debug_info?.raw_mean_gap_mm ?? 0).toFixed(1))
     const status: InspectionStatus =
-      data.overall_status === 'PASS' ? 'PASS' : data.overall_status === 'FAIL' ? 'FAIL' : 'REVIEW'
+      data.result_status === 'REJECTED_UNRELIABLE'
+        ? 'REVIEW'
+        : data.overall_status === 'PASS'
+          ? 'PASS'
+          : data.overall_status === 'FAIL'
+            ? 'FAIL'
+            : 'REVIEW'
 
     const stdGap = data.debug_info?.std_gap_mm ?? 0
-    const confidence =
+    const rawFallbackConfidence =
       typeof data.debug_info?.std_gap_mm === 'number'
         ? Math.max(0.72, Math.min(0.98, Number((1 - stdGap / Math.max(1, gapMm)).toFixed(2))))
         : 0.9
+
+    const totalConfidence = data.confidence_breakdown?.total_confidence ?? rawFallbackConfidence
+
+    const confidenceBreakdown: ConfidenceBreakdown | undefined = data.confidence_breakdown
+      ? {
+          totalConfidence: data.confidence_breakdown.total_confidence,
+          qualityFactor: data.confidence_breakdown.quality_factor,
+          geometricConsistency: data.confidence_breakdown.geometric_consistency,
+          modelConfidence: data.confidence_breakdown.model_confidence,
+          stabilityFactor: data.confidence_breakdown.stability_factor,
+          failureRiskRate: data.confidence_breakdown.failure_risk_rate,
+        }
+      : undefined
 
     const overlayHints: MeasurementOverlayHints = {
       pipeCenter: data.overlay_hints?.center
@@ -181,7 +220,7 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
     }
 
     const cvDebug: CvMeasurementDebug = {
-      pipeDetected: true,
+      pipeDetected: data.result_status !== 'REJECTED_UNRELIABLE',
       pipeDiameterMm: data.pipe_diameter_mm ?? request.pipeDiameterMm,
       mmPerPixel: data.pixels_per_mm ? Number((1 / data.pixels_per_mm).toFixed(4)) : undefined,
       innerRadiusPx: data.debug_info?.inner_radius_px ?? data.overlay_hints?.inner_circle?.radius_px,
@@ -192,15 +231,28 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
           ? Number((data.debug_info.outer_radius_px - data.debug_info.inner_radius_px).toFixed(1))
           : undefined,
       overlayHints,
+      resultStatus: data.result_status,
+      condition: data.condition,
+      confidenceBreakdown,
+      rejectionReason: data.rejection_reason,
     }
+
+    const note =
+      data.result_status === 'REJECTED_UNRELIABLE'
+        ? `Rejected: ${data.rejection_reason ?? 'Confidence below acceptable threshold'}`
+        : `FastAPI AI/CV: gap ${gapMm.toFixed(1)} mm [${data.result_status ?? 'ACCEPTED_MEASUREMENT'}] (${data.debug_info?.num_samples ?? 0} samples, ${(data.debug_info?.processing_time_ms ?? 0).toFixed(0)}ms)`
 
     return {
       imageId: request.imageId,
       originalGapMm: gapMm,
       status,
-      confidence,
+      confidence: totalConfidence,
       measurementSource: 'fastapi',
-      measurementNote: `FastAPI OpenCV: gap ${gapMm.toFixed(1)} mm (${data.debug_info?.num_samples ?? 0} samples, ${(data.debug_info?.processing_time_ms ?? 0).toFixed(0)}ms)`,
+      measurementNote: note,
+      resultStatus: data.result_status ?? (totalConfidence >= 0.7 ? 'ACCEPTED_MEASUREMENT' : 'REVIEW_REQUIRED'),
+      condition: data.condition,
+      confidenceBreakdown,
+      rejectionReason: data.rejection_reason,
       cvDebug,
       overlayHints,
     }

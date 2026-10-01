@@ -190,6 +190,10 @@ async function processImage(imageId: string): Promise<string | null> {
     measurementAudit: measurement.measurementAudit,
     processedAt: createTimestamp(),
     overrideApplied: false,
+    resultStatus: measurement.resultStatus,
+    condition: measurement.condition,
+    confidenceBreakdown: measurement.confidenceBreakdown,
+    rejectionReason: measurement.rejectionReason,
   }
 
   await db.transaction('rw', db.inspectionImages, db.inspectionResults, async () => {
@@ -315,6 +319,10 @@ export const processor = {
       aiReview: measurement.aiReview,
       overlayHints: measurement.overlayHints,
       measurementAudit: measurement.measurementAudit,
+      resultStatus: measurement.resultStatus,
+      condition: measurement.condition,
+      confidenceBreakdown: measurement.confidenceBreakdown,
+      rejectionReason: measurement.rejectionReason,
     }
 
     await db.inspectionResults.put(updated)

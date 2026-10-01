@@ -36,6 +36,22 @@ const sourceLabels: Record<MeasurementSource, string> = {
   ai: 'AI measured',
 }
 
+const trustStatusLabels: Record<string, { label: string; className: string }> = {
+  ACCEPTED_MEASUREMENT: { label: '✓ Accepted Measurement', className: 'trust-accepted' },
+  REVIEW_REQUIRED: { label: '⚠ Review Required', className: 'trust-review' },
+  REJECTED_UNRELIABLE: { label: '✕ Rejected (Unreliable)', className: 'trust-rejected' },
+}
+
+const conditionLabels: Record<string, string> = {
+  NORMAL: 'Normal Joint',
+  OPEN_JOINT: 'Open Joint',
+  ANGULAR_DEFLECTION: 'Angular Deflection',
+  SURFACE_DAMAGE: 'Surface Damage',
+  DEPOSITS_OBSTACLES: 'Deposits / Obstacles',
+  INTRUDING_SEAL: 'Intruding Sealing Material',
+  UNKNOWN: 'Unclassified Condition',
+}
+
 const measurementLabel = (item: InspectionResult) => {
   const source = item.measurementSource ?? 'cv'
   return item.measurementNote || sourceLabels[source]
@@ -180,14 +196,34 @@ const ResultCard = ({
         <Overlay debug={item.cvDebug} hints={resolveOverlayHints(item)} />
         <div className="result-media-top">
           <StatusBadge status={item.status} />
+          {item.resultStatus && (
+            <span className={`trust-badge ${trustStatusLabels[item.resultStatus]?.className ?? ''}`}>
+              {trustStatusLabels[item.resultStatus]?.label ?? item.resultStatus}
+            </span>
+          )}
           <span className={`source-chip source-${(item.measurementSource ?? 'cv').replaceAll('-', '-')}`}>{sourceLabel(item)}</span>
         </div>
         <div className="result-media-bottom">
           <strong>Joint {item.jointLabel}</strong>
+          {item.condition && (
+            <span className={`condition-tag condition-${item.condition.toLowerCase().replaceAll('_', '-')}`}>
+              {conditionLabels[item.condition] ?? item.condition}
+            </span>
+          )}
         </div>
       </div>
 
       <div className="inspection-result-body">
+        {item.resultStatus === 'REJECTED_UNRELIABLE' && (
+          <div className="rejection-callout">
+            <div className="rejection-callout-header">
+              <span className="rejection-callout-icon">✕</span>
+              <strong>Measurement Rejected (Zero Guessing Policy)</strong>
+            </div>
+            <p>{item.rejectionReason || 'Detection confidence is below acceptable threshold. Zero artificial guessing enforced.'}</p>
+          </div>
+        )}
+
         <div className="inspection-gap-row">
           <span>{item.measurementSource === 'ai-review' ? 'Detected gap:' : item.measurementSource === 'ai-estimated' && !item.cvDebug?.pipeDetected ? 'Estimated gap:' : 'Measured gap:'}</span>
           <strong>{measurementValueLabel(item)}</strong>
@@ -197,6 +233,48 @@ const ResultCard = ({
           <span>Status:</span>
           <strong>{item.status}</strong>
         </div>
+
+        {item.condition && (
+          <div className="inspection-condition-row">
+            <span>Classified Condition:</span>
+            <span className={`condition-pill condition-${item.condition.toLowerCase().replaceAll('_', '-')}`}>
+              {conditionLabels[item.condition] ?? item.condition}
+            </span>
+          </div>
+        )}
+
+        {item.confidenceBreakdown && (
+          <div className="confidence-breakdown-panel">
+            <div className="confidence-breakdown-head">
+              <span>Confidence Factors</span>
+              <strong>{Math.round(item.confidenceBreakdown.totalConfidence * 100)}%</strong>
+            </div>
+            <div className="confidence-factor-grid">
+              <div className="factor-item">
+                <span className="factor-label">Quality (Q)</span>
+                <span className="factor-value">{Math.round(item.confidenceBreakdown.qualityFactor * 100)}%</span>
+              </div>
+              <div className="factor-item">
+                <span className="factor-label">Geometry (G)</span>
+                <span className="factor-value">{Math.round(item.confidenceBreakdown.geometricConsistency * 100)}%</span>
+              </div>
+              <div className="factor-item">
+                <span className="factor-label">Model (M)</span>
+                <span className="factor-value">{Math.round(item.confidenceBreakdown.modelConfidence * 100)}%</span>
+              </div>
+              <div className="factor-item">
+                <span className="factor-label">Stability (S)</span>
+                <span className="factor-value">{Math.round(item.confidenceBreakdown.stabilityFactor * 100)}%</span>
+              </div>
+            </div>
+            <div className="risk-rate-indicator">
+              <span>Estimated Failure Risk:</span>
+              <strong className={item.confidenceBreakdown.failureRiskRate > 0.05 ? 'risk-high' : 'risk-low'}>
+                {(item.confidenceBreakdown.failureRiskRate * 100).toFixed(1)}%
+              </strong>
+            </div>
+          </div>
+        )}
 
         <div className="inspection-note-block">
           <span>Measurement Review</span>

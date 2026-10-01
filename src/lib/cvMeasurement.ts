@@ -1,4 +1,12 @@
-import type { CvMeasurementDebug, InspectionStatus, MeasurementOverlayHints, MeasurementSource } from '../types'
+import type {
+  ConfidenceBreakdown,
+  CvMeasurementDebug,
+  InspectionStatus,
+  JointConditionClass,
+  MeasurementOverlayHints,
+  MeasurementResultStatus,
+  MeasurementSource,
+} from '../types'
 import { loadOpenCv } from './opencv'
 import { classifyGap } from '../utils'
 
@@ -19,6 +27,10 @@ export interface CvWorkerResponse {
   measurementNote?: string
   cvDebug?: CvMeasurementDebug
   overlayHints?: MeasurementOverlayHints
+  resultStatus?: MeasurementResultStatus
+  condition?: JointConditionClass
+  confidenceBreakdown?: ConfidenceBreakdown
+  rejectionReason?: string
 }
 
 const DEFAULT_PIPE_DIAMETER_MM = 225
@@ -1092,27 +1104,29 @@ async function tryMeasureWithOpenCv(
   }
 }
 
-function createFallbackMeasurement(
+function createRejectedMeasurement(
   request: CvWorkerRequest,
   pipeDiameterMm: number,
   note?: string,
 ): CvWorkerResponse {
-  const originalGapMm = deriveGapMm(request.fileName, request.orderIndex)
-  const classification = classifyGap(originalGapMm, pipeDiameterMm)
-
   return {
     imageId: request.imageId,
-    originalGapMm,
-    status: classification.status,
-    confidence: 0.72,
+    originalGapMm: 0,
+    status: 'REVIEW',
+    confidence: 0.1,
+    resultStatus: 'REJECTED_UNRELIABLE',
     measurementSource: 'fallback',
     measurementNote:
       note ??
-      `Estimated from file metadata because the CV pipeline could not confirm the ${pipeDiameterMm}mm pipe geometry.`,
+      `CV pipeline could not verify verifiable ${pipeDiameterMm}mm pipe geometry. Guided retake required.`,
+    rejectionReason: 'geometry_unverifiable',
     cvDebug: {
       pipeDetected: false,
-      failureStage: 'fallback-derived-from-metadata',
-      enhancementUsed: false,
+      failureStage: 'geometry-unverifiable',
+      enhancementUsed: true,
+      pipeDiameterMm,
+      resultStatus: 'REJECTED_UNRELIABLE',
+      rejectionReason: 'geometry_unverifiable',
     },
   }
 }
@@ -1127,80 +1141,51 @@ export async function runCvMeasurement(
 ): Promise<CvWorkerResponse> {
   const pipeDiameterMm = request.pipeDiameterMm ?? DEFAULT_PIPE_DIAMETER_MM
   if (!request.blob) {
-    return {
-      imageId: request.imageId,
-      originalGapMm: 0,
-      status: 'fail',
-      confidence: 0,
-      measurementSource: 'fallback',
-      measurementNote: 'No image data provided for measurement.',
-      cvDebug: { pipeDetected: false, failureStage: 'missing-blob', enhancementUsed: false }
+    return createRejectedMeasurement(request, pipeDiameterMm, 'No image data provided for measurement.')
+  }
+
+  if (options?.skipOpenCv) {
+    return createRejectedMeasurement(request, pipeDiameterMm, options.fallbackNote)
+  }
+
+  if (!options?.disableOpenCv) {
+    const openCvMeasured = await tryMeasureWithOpenCv(request.blob, pipeDiameterMm)
+    if (openCvMeasured) {
+      const classification = classifyGap(openCvMeasured.gapMm, pipeDiameterMm)
+      return {
+        imageId: request.imageId,
+        originalGapMm: openCvMeasured.gapMm,
+        status: classification.status,
+        confidence: openCvMeasured.confidence,
+        resultStatus: openCvMeasured.confidence >= 0.7 ? 'ACCEPTED_MEASUREMENT' : 'REVIEW_REQUIRED',
+        measurementSource: 'cv',
+        measurementNote: openCvMeasured.note,
+        cvDebug: openCvMeasured.debug,
+        overlayHints: openCvMeasured.debug.overlayHints,
+      }
     }
   }
 
-  try {
-    const formData = new FormData()
-    formData.append('file', request.blob, request.fileName)
-    // You would normally also pass pipeDiameterMm here if the API supported it
-    // formData.append('pipeDiameterMm', pipeDiameterMm.toString())
+  const measured = await tryMeasureWithImageAnalysis(request.blob, pipeDiameterMm)
+  if (!measured) {
+    return createRejectedMeasurement(
+      request,
+      pipeDiameterMm,
+      options?.fallbackNote ??
+        'Guided joint photo required. The current image did not expose enough pipe geometry for a reliable gap measurement.',
+    )
+  }
 
-    const response = await fetch('http://localhost:8000/process-image', {
-      method: 'POST',
-      body: formData,
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.warn('API Error:', errorData)
-      return {
-        imageId: request.imageId,
-        originalGapMm: 0,
-        status: 'fail',
-        confidence: 0,
-        measurementSource: 'fallback',
-        measurementNote: errorData.detail ?? 'API rejected the image. No pipe detected.',
-        cvDebug: {
-          pipeDetected: false,
-          failureStage: 'api-rejection',
-          enhancementUsed: false,
-        }
-      }
-    }
-
-    const data = await response.json()
-    
-    // Check if the API successfully processed the measurement
-    if (data.status === 'success' && data.measurements) {
-        return {
-          imageId: request.imageId,
-          originalGapMm: data.measurements.originalGapMm,
-          status: data.measurements.status,
-          confidence: data.measurements.confidence,
-          measurementSource: data.measurements.measurementSource,
-          measurementNote: data.measurements.measurementNote,
-          cvDebug: data.measurements.cvDebug,
-        }
-    }
-
-    return {
-      imageId: request.imageId,
-      originalGapMm: 0,
-      status: 'review',
-      confidence: 0,
-      measurementSource: 'fallback',
-      measurementNote: 'API returned unexpected format.',
-      cvDebug: { pipeDetected: false, failureStage: 'api-error', enhancementUsed: false }
-    }
-  } catch (err) {
-    console.error('Failed to contact Python backend:', err)
-    return {
-      imageId: request.imageId,
-      originalGapMm: 0,
-      status: 'review',
-      confidence: 0,
-      measurementSource: 'fallback',
-      measurementNote: 'Backend API is unreachable. Is the Python server running?',
-      cvDebug: { pipeDetected: false, failureStage: 'api-unreachable', enhancementUsed: false }
-    }
+  const classification = classifyGap(measured.gapMm, pipeDiameterMm)
+  return {
+    imageId: request.imageId,
+    originalGapMm: measured.gapMm,
+    status: classification.status,
+    confidence: measured.confidence,
+    resultStatus: measured.confidence >= 0.7 ? 'ACCEPTED_MEASUREMENT' : 'REVIEW_REQUIRED',
+    measurementSource: 'cv',
+    measurementNote: measured.note,
+    cvDebug: measured.debug,
+    overlayHints: measured.debug.overlayHints,
   }
 }
