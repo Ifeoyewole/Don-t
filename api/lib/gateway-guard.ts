@@ -9,7 +9,6 @@
  * - Unified error sanitization
  */
 
-import { GATEWAY_CONFIG } from './config'
 
 const FORBIDDEN_HEADER_PREFIXES = [
   'x-serverless-authorization',
@@ -89,7 +88,7 @@ export function validateMagicBytes(buffer: Buffer): boolean {
   return false
 }
 
-export function sanitizeErrorResponse(error: unknown, requestId: string): { detail: string; request_id: string } {
+export function sanitizeErrorResponse(_error: unknown, requestId: string): { detail: string; request_id: string } {
   // Never leak stack traces, internal IP addresses, or raw system exceptions to the browser
   return {
     detail: 'An error occurred while processing the inspection request.',
