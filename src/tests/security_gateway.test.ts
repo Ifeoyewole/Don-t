@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { isMaliciousPath, sanitizeForwardHeaders, validateMagicBytes } from '../../api/lib/gateway-guard'
-import { checkRateLimit } from '../../api/lib/rate-limiter'
-import { DisabledUserAuthProvider, PluggableUserAuthProvider } from '../../api/lib/auth-abstraction'
+import { isMaliciousPath, sanitizeForwardHeaders, validateMagicBytes } from '../../api/_lib/gateway-guard'
+import { checkRateLimit } from '../../api/_lib/rate-limiter'
+import { DisabledUserAuthProvider, PluggableUserAuthProvider } from '../../api/_lib/auth-abstraction'
 
 describe('Vercel Secure API Gateway Security Controls', () => {
   it('blocks known scanner and malicious paths', () => {
