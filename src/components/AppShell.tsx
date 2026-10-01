@@ -395,6 +395,50 @@ export const AppShell = ({
         <main className="content-surface">{children}</main>
       </div>
 
+      {/* Mobile & Tablet Floating Bottom Navigation Bar */}
+      <nav className="bottom-nav" aria-label="Mobile Navigation">
+        <button
+          className={navKey === 'dashboard' ? 'nav-item is-active' : 'nav-item'}
+          type="button"
+          onClick={() => handleSidebarClick('dashboard')}
+        >
+          <DashboardIcon />
+          <span>Dashboard</span>
+        </button>
+        <button
+          className={navKey === 'projects' ? 'nav-item is-active' : 'nav-item'}
+          type="button"
+          onClick={() => handleSidebarClick('projects')}
+        >
+          <ProjectsIcon />
+          <span>Projects</span>
+        </button>
+        <button
+          className={navKey === 'inspections' ? 'nav-item is-active' : 'nav-item'}
+          type="button"
+          onClick={() => handleSidebarClick('inspections')}
+        >
+          <InspectionsIcon />
+          <span>Inspections</span>
+        </button>
+        <button
+          className={navKey === 'reports' ? 'nav-item is-active' : 'nav-item'}
+          type="button"
+          onClick={() => handleSidebarClick('reports')}
+        >
+          <ReportsIcon />
+          <span>Reports</span>
+        </button>
+        <button
+          className={activeModal === 'models' ? 'nav-item is-active' : 'nav-item'}
+          type="button"
+          onClick={() => setActiveModal('models')}
+        >
+          <ModelsIcon />
+          <span>Engine</span>
+        </button>
+      </nav>
+
       {/* Inspector Profile Customization Modal */}
       {profileModalOpen && (
         <div className="modal-backdrop" onClick={() => setProfileModalOpen(false)}>
