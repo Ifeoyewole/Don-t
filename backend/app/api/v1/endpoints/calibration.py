@@ -35,6 +35,12 @@ async def get_camera_profile(camera_id: str) -> CameraProfile:
     return profile
 
 
+try:
+    from backend.app.config import settings
+except ImportError:
+    from app.config import settings
+
+
 @router.post(
     "/calibration/profiles",
     response_model=CameraProfile,
@@ -43,5 +49,10 @@ async def get_camera_profile(camera_id: str) -> CameraProfile:
 )
 async def register_camera_profile(profile: CameraProfile) -> CameraProfile:
     """Register custom camera intrinsic matrix and lens distortion coefficients."""
+    if not settings.CALIBRATION_MUTATION_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Calibration profile modification is restricted in production pending administrative role delegation.",
+        )
     camera_calibrator.register_profile(profile)
     return profile

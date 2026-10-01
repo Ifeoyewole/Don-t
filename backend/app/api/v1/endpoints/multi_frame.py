@@ -42,9 +42,9 @@ class MultiFrameMeasurementResponse(BaseModel):
     summary="Compute Multi-Frame Fused Gap Measurements with MAD Outlier Rejection",
 )
 async def measure_multi_frame_burst(
-    files: List[UploadFile] = File(..., description="List of consecutive CCTV video frames (minimum 2 frames)."),
-    pipe_diameter_mm: float = Form(100.0, gt=0.0),
-    max_gap_mm: Optional[float] = Form(15.0, gt=0.0),
+    files: List[UploadFile] = File(..., description="List of consecutive CCTV video frames (2 to 30 frames)."),
+    pipe_diameter_mm: float = Form(100.0, gt=0.0, le=5000.0),
+    max_gap_mm: Optional[float] = Form(15.0, gt=0.0, le=500.0),
 ) -> MultiFrameMeasurementResponse:
     """Analyze consecutive CCTV frames, reject transient outlier spikes, and emit robust median measurement."""
     if len(files) < 2:
@@ -52,13 +52,26 @@ async def measure_multi_frame_burst(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Multi-frame measurement requires at least 2 consecutive frames.",
         )
+    if len(files) > 30:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Multi-frame measurement exceeds maximum burst sequence limit of 30 frames.",
+        )
 
     measured_gaps: List[float] = []
+    total_payload_bytes = 0
+    max_total_bytes = 30 * 1024 * 1024  # 30 MB
 
     for file in files:
         content = await file.read()
         if not content:
             continue
+        total_payload_bytes += len(content)
+        if total_payload_bytes > max_total_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Total multi-frame payload exceeds {max_total_bytes} bytes limit.",
+            )
         try:
             image_bgr = decode_image_bytes(content)
             res = measure_circular_gap(

@@ -41,6 +41,7 @@ async def measure_joint_gap(
         100.0,
         description="Known reference pipe diameter in millimeters for pixel scaling.",
         gt=0.0,
+        le=5000.0,
     ),
     camera_id: Optional[str] = Form(
         None,
@@ -50,21 +51,25 @@ async def measure_joint_gap(
         None,
         description="Target nominal gap width in millimeters.",
         gt=0.0,
+        le=500.0,
     ),
     min_gap_mm: Optional[float] = Form(
         None,
         description="Minimum acceptable gap in millimeters.",
         gt=0.0,
+        le=500.0,
     ),
     max_gap_mm: Optional[float] = Form(
         None,
         description="Maximum acceptable gap in millimeters.",
         gt=0.0,
+        le=500.0,
     ),
     warning_margin_mm: Optional[float] = Form(
         None,
         description="Warning tolerance margin buffer in millimeters.",
         ge=0.0,
+        le=100.0,
     ),
     return_debug_image: bool = Form(
         True,
@@ -79,8 +84,8 @@ async def measure_joint_gap(
     min_segmentation_confidence: Optional[float] = Form(
         0.40,
         description="Configurable baseline confidence threshold for AI joint segmenter.",
-        ge=0.0,
-        le=1.0,
+        ge=0.20,
+        le=0.95,
     ),
 ) -> MeasurementResponse:
     """Execute end-to-end AI/CV pipe joint measurement pipeline:
@@ -98,6 +103,12 @@ async def measure_joint_gap(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Uploaded file payload is empty.",
+            )
+
+        if len(content) > 15 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Uploaded image payload exceeds 15 MB limit.",
             )
 
         image_bgr = decode_image_bytes(content)

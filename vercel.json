@@ -1,29 +1,48 @@
 {
   "version": 2,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains; preload"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(self), microphone=(), geolocation=(), payment=(), usb=()"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' blob: data:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; form-action 'self';"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
-      "source": "/api/v1/(.*)",
-      "destination": "https://pipe-joint-api-7d5y5wcyta-nw.a.run.app/api/v1/$1"
+      "source": "/api/v1/cv/(.*)",
+      "destination": "/api/v1/cv/$1"
     },
     {
       "source": "/cv/(.*)",
-      "destination": "https://pipe-joint-api-7d5y5wcyta-nw.a.run.app/cv/$1"
+      "destination": "/api/v1/cv/$1"
     },
     {
       "source": "/health",
-      "destination": "https://pipe-joint-api-7d5y5wcyta-nw.a.run.app/health"
-    },
-    {
-      "source": "/docs",
-      "destination": "https://pipe-joint-api-7d5y5wcyta-nw.a.run.app/docs"
-    },
-    {
-      "source": "/redoc",
-      "destination": "https://pipe-joint-api-7d5y5wcyta-nw.a.run.app/redoc"
-    },
-    {
-      "source": "/openapi.json",
-      "destination": "https://pipe-joint-api-7d5y5wcyta-nw.a.run.app/openapi.json"
+      "destination": "/api/v1/cv/health"
     }
   ]
 }

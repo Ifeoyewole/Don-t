@@ -12,19 +12,28 @@ class Settings(BaseModel):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
+    ENABLE_DOCS: bool = os.getenv("ENABLE_DOCS", "false").lower() in ("true", "1", "yes")
+    CALIBRATION_MUTATION_ENABLED: bool = os.getenv("CALIBRATION_MUTATION_ENABLED", "false").lower() in ("true", "1", "yes")
 
-    # CORS Configuration
+    # Strict CORS Configuration - Wildcard origin forbidden in production
     CORS_ORIGINS: List[str] = Field(
         default_factory=lambda: [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "https://localhost:5173",
-            "https://127.0.0.1:5173",
-            "*",
+            origin.strip()
+            for origin in os.getenv(
+                "CORS_ORIGINS",
+                "https://joint-inspection.vercel.app,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000",
+            ).split(",")
+            if origin.strip() and origin.strip() != "*"
         ]
     )
+
+    # Payload & File Security Limits
+    MAX_UPLOAD_SIZE_BYTES: int = 15 * 1024 * 1024  # 15 MB
+    MAX_MULTI_FRAME_BYTES: int = 30 * 1024 * 1024  # 30 MB
+    MAX_MULTI_FRAME_COUNT: int = 30
+    MAX_IMAGE_DIMENSION_PX: int = 8192
+    MAX_IMAGE_TOTAL_PIXELS: int = 50_000_000
 
     # Computer Vision Quality Thresholds
     DEFAULT_BLUR_THRESHOLD: float = 100.0
