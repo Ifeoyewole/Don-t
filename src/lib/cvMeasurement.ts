@@ -1126,44 +1126,81 @@ export async function runCvMeasurement(
   },
 ): Promise<CvWorkerResponse> {
   const pipeDiameterMm = request.pipeDiameterMm ?? DEFAULT_PIPE_DIAMETER_MM
-  if (options?.skipOpenCv) {
-    return createFallbackMeasurement(request, pipeDiameterMm, options.fallbackNote)
-  }
-
-  if (!options?.disableOpenCv) {
-    const openCvMeasured = await tryMeasureWithOpenCv(request.blob, pipeDiameterMm)
-    if (openCvMeasured) {
-      return {
-        imageId: request.imageId,
-        originalGapMm: openCvMeasured.gapMm,
-        status: classifyGap(openCvMeasured.gapMm, pipeDiameterMm).status,
-        confidence: openCvMeasured.confidence,
-        measurementSource: 'cv',
-        measurementNote: openCvMeasured.note,
-        cvDebug: openCvMeasured.debug,
-        overlayHints: openCvMeasured.debug.overlayHints,
-      }
+  if (!request.blob) {
+    return {
+      imageId: request.imageId,
+      originalGapMm: 0,
+      status: 'fail',
+      confidence: 0,
+      measurementSource: 'fallback',
+      measurementNote: 'No image data provided for measurement.',
+      cvDebug: { pipeDetected: false, failureStage: 'missing-blob', enhancementUsed: false }
     }
   }
 
-  const measured = await tryMeasureWithImageAnalysis(request.blob, pipeDiameterMm)
+  try {
+    const formData = new FormData()
+    formData.append('file', request.blob, request.fileName)
+    // You would normally also pass pipeDiameterMm here if the API supported it
+    // formData.append('pipeDiameterMm', pipeDiameterMm.toString())
 
-  if (!measured) {
-    return createFallbackMeasurement(
-      request,
-      pipeDiameterMm,
-      options?.fallbackNote ?? 'Guided joint photo required. The current image did not expose enough pipe geometry for a reliable gap measurement.',
-    )
-  }
+    const response = await fetch('http://localhost:8000/process-image', {
+      method: 'POST',
+      body: formData,
+    })
 
-  return {
-    imageId: request.imageId,
-    originalGapMm: measured.gapMm,
-    status: classifyGap(measured.gapMm, pipeDiameterMm).status,
-    confidence: measured.confidence,
-    measurementSource: 'cv',
-    measurementNote: measured.note,
-    cvDebug: measured.debug,
-    overlayHints: measured.debug.overlayHints,
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.warn('API Error:', errorData)
+      return {
+        imageId: request.imageId,
+        originalGapMm: 0,
+        status: 'fail',
+        confidence: 0,
+        measurementSource: 'fallback',
+        measurementNote: errorData.detail ?? 'API rejected the image. No pipe detected.',
+        cvDebug: {
+          pipeDetected: false,
+          failureStage: 'api-rejection',
+          enhancementUsed: false,
+        }
+      }
+    }
+
+    const data = await response.json()
+    
+    // Check if the API successfully processed the measurement
+    if (data.status === 'success' && data.measurements) {
+        return {
+          imageId: request.imageId,
+          originalGapMm: data.measurements.originalGapMm,
+          status: data.measurements.status,
+          confidence: data.measurements.confidence,
+          measurementSource: data.measurements.measurementSource,
+          measurementNote: data.measurements.measurementNote,
+          cvDebug: data.measurements.cvDebug,
+        }
+    }
+
+    return {
+      imageId: request.imageId,
+      originalGapMm: 0,
+      status: 'review',
+      confidence: 0,
+      measurementSource: 'fallback',
+      measurementNote: 'API returned unexpected format.',
+      cvDebug: { pipeDetected: false, failureStage: 'api-error', enhancementUsed: false }
+    }
+  } catch (err) {
+    console.error('Failed to contact Python backend:', err)
+    return {
+      imageId: request.imageId,
+      originalGapMm: 0,
+      status: 'review',
+      confidence: 0,
+      measurementSource: 'fallback',
+      measurementNote: 'Backend API is unreachable. Is the Python server running?',
+      cvDebug: { pipeDetected: false, failureStage: 'api-unreachable', enhancementUsed: false }
+    }
   }
 }
