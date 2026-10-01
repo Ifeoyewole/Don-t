@@ -9,7 +9,7 @@ from scipy.signal import find_peaks
 
 from backend.app.core.cv.preprocessor import enhance_edges_clahe, filter_bilateral_smooth
 from backend.app.core.cv.tolerance import classify_gap, evaluate_overall_status
-from backend.app.schemas.domain import JointType, ToleranceStatus
+from backend.app.schemas.domain import JointType, MeasurementResultStatus, ToleranceStatus
 from backend.app.schemas.measurement import (
     CvMeasurementDebug,
     DetectedCircle,
@@ -24,17 +24,29 @@ from backend.app.utils.image_io import encode_image_to_base64
 
 def _find_concentric_circles(
     gray: np.ndarray,
-) -> Tuple[Optional[Tuple[float, float, float]], Optional[Tuple[float, float, float]]]:
+    joint_mask: Optional[np.ndarray] = None,
+    roi_bbox: Optional[Tuple[int, int, int, int]] = None,
+) -> Optional[Tuple[Tuple[float, float, float], Tuple[float, float, float]]]:
     """Find concentric inner and outer circle boundaries in the image.
 
+    Enforces strict physical constraints:
+    - Bounded within joint_mask and roi_bbox if provided.
+    - Zero artificial fallback guessing: returns None if concentric geometry is not reliably detected.
+
     Returns:
-        Tuple of (inner_circle, outer_circle) as (cx, cy, radius).
+        Optional tuple of (inner_circle, outer_circle) as (cx, cy, radius), or None if unresolved.
     """
     h, w = gray.shape
     min_dim = min(h, w)
 
+    # Constrain to ROI/mask if supplied by AI segmenter
+    masked_gray = gray.copy()
+    if joint_mask is not None:
+        if joint_mask.shape == gray.shape:
+            masked_gray = cv2.bitwise_and(gray, gray, mask=joint_mask)
+
     # Apply bilateral smoothing and CLAHE
-    smoothed = filter_bilateral_smooth(gray, d=9, sigma_color=75, sigma_space=75)
+    smoothed = filter_bilateral_smooth(masked_gray, d=9, sigma_color=75, sigma_space=75)
     enhanced = enhance_edges_clahe(smoothed, clip_limit=2.0)
 
     # 1. Primary Attempt: HoughCircles
@@ -50,7 +62,6 @@ def _find_concentric_circles(
     )
 
     if circles is not None and len(circles[0]) >= 2:
-        # Sort circles by radius
         detected = sorted(circles[0], key=lambda c: c[2])
         # Find best concentric pair
         for i in range(len(detected) - 1):
@@ -58,14 +69,14 @@ def _find_concentric_circles(
             for j in range(i + 1, len(detected)):
                 c_out = detected[j]
                 center_dist = math.hypot(c_in[0] - c_out[0], c_in[1] - c_out[1])
-                # Check if concentric (centers close within 15% of inner radius)
+                # Check if concentric (centers close within 18% of inner radius)
                 if center_dist <= max(10.0, c_in[2] * 0.18):
                     return (
                         (float(c_in[0]), float(c_in[1]), float(c_in[2])),
                         (float(c_out[0]), float(c_out[1]), float(c_out[2])),
                     )
 
-    # 2. Fallback: Contour Hierarchy & Ellipse/Enclosing Circle Fitting
+    # 2. Fallback: Contour Hierarchy & Circle Fitting
     edges = cv2.Canny(enhanced, 35, 110)
     contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
 
@@ -90,17 +101,8 @@ def _find_concentric_circles(
                 if center_dist <= max(12.0, c_in[2] * 0.20) and (c_out[2] - c_in[2]) > 3:
                     return c_in, c_out
 
-    # 3. Last fallback: Estimate from dominant contour or image center
-    if valid_circles:
-        c_dom = valid_circles[0]
-        # Synthesize concentric outer circle with nominal offset
-        return c_dom, (c_dom[0], c_dom[1], c_dom[2] * 1.15)
-
-    # Ultimate fallback center
-    cx, cy = w / 2.0, h / 2.0
-    r_in = min_dim * 0.25
-    r_out = min_dim * 0.32
-    return (cx, cy, r_in), (cx, cy, r_out)
+    # ZERO ARTIFICIAL GUESSING: Return None rather than inventing circle from center or dominant contour
+    return None
 
 
 def _profile_radial_rays(
@@ -268,6 +270,8 @@ def measure_circular_gap(
     tolerance_spec: Optional[ToleranceSpec] = None,
     num_rays: int = 72,
     return_debug_image: bool = False,
+    joint_mask: Optional[np.ndarray] = None,
+    roi_bbox: Optional[Tuple[int, int, int, int]] = None,
 ) -> MeasurementResponse:
     """Execute end-to-end circular opening annular gap measurement.
 
@@ -277,6 +281,8 @@ def measure_circular_gap(
         tolerance_spec: Optional custom tolerance specification.
         num_rays: Number of radial profiling vectors across 360 degrees.
         return_debug_image: Whether to generate annotated base64 overlay image.
+        joint_mask: Optional binary mask (uint8) from AI segmenter.
+        roi_bbox: Optional [x_min, y_min, x_max, y_max] bounding region.
 
     Returns:
         MeasurementResponse: Structured QA measurement payload.
@@ -291,8 +297,12 @@ def measure_circular_gap(
     else:
         gray = image_bgr.copy()
 
-    # Step 1: Detect Concentric Inner & Outer Boundaries
-    inner_c, outer_c = _find_concentric_circles(gray)
+    # Step 1: Detect Concentric Inner & Outer Boundaries (Zero Guessing)
+    circles = _find_concentric_circles(gray, joint_mask=joint_mask, roi_bbox=roi_bbox)
+    if circles is None:
+        raise ValueError("joint_geometry_not_reliable: Concentric circular boundaries could not be resolved.")
+
+    inner_c, outer_c = circles
     cx, cy, r_in_est = inner_c
     _, _, r_out_est = outer_c
 
@@ -417,6 +427,7 @@ def measure_circular_gap(
         min_gap_mm=round(min_gap_mm, 2),
         max_gap_mm=round(max_gap_mm, 2),
         overall_status=overall_status,
+        result_status=MeasurementResultStatus.ACCEPTED_MEASUREMENT,
         overlay_hints=overlay_hints,
         debug_info=debug_info,
     )

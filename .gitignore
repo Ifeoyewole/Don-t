@@ -27,6 +27,14 @@ test-results/
 *.sln
 *.sw?
 /node_modules
-/dist
-/tests/
 /stitch_pipecheck_field_inspection_app/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+

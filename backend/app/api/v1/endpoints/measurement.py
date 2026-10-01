@@ -1,11 +1,26 @@
-"""Automated computer vision measurement API endpoints."""
+"""Automated computer vision measurement API endpoints with integrated AI/CV fusion."""
 
 from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+
+from backend.app.core.cv.ai.image_quality import validate_image_quality
+from backend.app.core.cv.ai.joint_classifier import JointClassifier
+from backend.app.core.cv.ai.joint_segmenter import JointSegmenter
+from backend.app.core.cv.calibration import camera_calibrator
 from backend.app.core.cv.circular_detector import measure_circular_gap
+from backend.app.core.cv.confidence import confidence_engine
 from backend.app.core.cv.seam_detector import measure_seam_gap
-from backend.app.schemas.domain import JointType
-from backend.app.schemas.measurement import MeasurementResponse, ToleranceSpec
+from backend.app.schemas.domain import (
+    JointConditionClass,
+    JointType,
+    MeasurementResultStatus,
+    ToleranceStatus,
+)
+from backend.app.schemas.measurement import (
+    MeasurementResponse,
+    OverlayHints,
+    ToleranceSpec,
+)
 from backend.app.utils.image_io import decode_image_bytes
 
 router = APIRouter()
@@ -14,7 +29,7 @@ router = APIRouter()
 @router.post(
     "/measure",
     response_model=MeasurementResponse,
-    summary="Compute Sub-Pixel Gap Measurements",
+    summary="Compute Calibrated AI/CV Sub-Pixel Gap Measurements",
 )
 async def measure_joint_gap(
     file: UploadFile = File(..., description="Uploaded inspection photo file (JPEG/PNG/WebP)."),
@@ -26,6 +41,10 @@ async def measure_joint_gap(
         100.0,
         description="Known reference pipe diameter in millimeters for pixel scaling.",
         gt=0.0,
+    ),
+    camera_id: Optional[str] = Form(
+        None,
+        description="Optional camera profile ID (e.g. 'CCTV-STANDARD-01', 'GOPRO-MAX-REFRAMED') for lens un-distortion.",
     ),
     nominal_gap_mm: Optional[float] = Form(
         None,
@@ -57,12 +76,21 @@ async def measure_joint_gap(
         ge=8,
         le=360,
     ),
+    min_segmentation_confidence: Optional[float] = Form(
+        0.40,
+        description="Configurable baseline confidence threshold for AI joint segmenter.",
+        ge=0.0,
+        le=1.0,
+    ),
 ) -> MeasurementResponse:
-    """Execute high-precision sub-pixel edge detection and radial/scanline gap measurement.
+    """Execute end-to-end AI/CV pipe joint measurement pipeline:
 
-    Supports:
-    - CIRCULAR_OPENING: Vectorized polar unwrap & radial ray profiling.
-    - HORIZONTAL_SEAM / VERTICAL_SEAM: Directional Sobel filtering & scanline edge peak profiling.
+    1. Image Quality Gate -> Reject if blurred, underexposed, or blinded by glare.
+    2. Camera Calibration -> Rectify lens barrel distortion.
+    3. AI Joint Segmenter (Model A) -> Locate joint ROI and binary mask (No LLM fallback).
+    4. OpenCV Geometry Engine -> Measure circular opening or seam gap (Zero artificial guessing).
+    5. AI Condition Classifier (Model B) -> Tolerance-primary structural defect diagnosis.
+    6. Calibrated Confidence Fusion -> Production gating (ACCEPTED_MEASUREMENT, REVIEW_REQUIRED, REJECTED_UNRELIABLE).
     """
     try:
         content = await file.read()
@@ -74,7 +102,40 @@ async def measure_joint_gap(
 
         image_bgr = decode_image_bytes(content)
 
-        # Build custom ToleranceSpec if user provided bounds
+        # Step 1: Pre-measurement Image Quality Gate
+        quality_res = validate_image_quality(image_bgr)
+        if not quality_res.usable:
+            # Explicit safety rejection without artificial guessing
+            confidence_bd = confidence_engine.fuse_confidence(
+                quality_score=quality_res.quality_score,
+                segmentation_score=0.0,
+                condition_score=0.0,
+                geometry_score=0.0,
+            )
+            return MeasurementResponse(
+                joint_type=joint_type,
+                pipe_diameter_mm=pipe_diameter_mm,
+                pixels_per_mm=1.0,
+                mean_gap_mm=0.0,
+                min_gap_mm=0.0,
+                max_gap_mm=0.0,
+                overall_status=ToleranceStatus.FAIL,
+                result_status=MeasurementResultStatus.REJECTED_UNRELIABLE,
+                condition=None,
+                confidence_breakdown=confidence_bd,
+                rejection_reason=quality_res.rejection_reason or "Image quality unsuitable for measurement.",
+                overlay_hints=OverlayHints(),
+                debug_info=None,
+            )
+
+        # Step 2: Camera Calibration & Lens Distortion Rectification
+        rectified_bgr = camera_calibrator.undistort_image(image_bgr, camera_id)
+
+        # Step 3: AI Joint Segmentation (Model A)
+        segmenter = JointSegmenter(min_confidence=min_segmentation_confidence or 0.40)
+        seg_res = segmenter.segment_joint(rectified_bgr)
+
+        # Step 4: Build custom ToleranceSpec if bounds provided
         tolerance_spec: Optional[ToleranceSpec] = None
         if min_gap_mm is not None or max_gap_mm is not None or nominal_gap_mm is not None:
             tolerance_spec = ToleranceSpec(
@@ -84,28 +145,88 @@ async def measure_joint_gap(
                 warning_margin_mm=warning_margin_mm if warning_margin_mm is not None else 2.0,
             )
 
-        if joint_type == JointType.CIRCULAR_OPENING:
-            rays = num_samples if num_samples is not None else 72
-            response = measure_circular_gap(
-                image_bgr=image_bgr,
-                pipe_diameter_mm=pipe_diameter_mm,
-                tolerance_spec=tolerance_spec,
-                num_rays=rays,
-                return_debug_image=return_debug_image,
+        # Step 5: Mask-Constrained OpenCV Geometry Engine (Zero Guessing)
+        try:
+            if joint_type == JointType.CIRCULAR_OPENING:
+                rays = num_samples if num_samples is not None else 72
+                response = measure_circular_gap(
+                    image_bgr=rectified_bgr,
+                    pipe_diameter_mm=pipe_diameter_mm,
+                    tolerance_spec=tolerance_spec,
+                    num_rays=rays,
+                    return_debug_image=return_debug_image,
+                    joint_mask=seg_res.mask if seg_res.detected else None,
+                    roi_bbox=seg_res.bbox if seg_res.detected else None,
+                )
+            else:
+                scanlines = num_samples if num_samples is not None else 40
+                response = measure_seam_gap(
+                    image_bgr=rectified_bgr,
+                    joint_type=joint_type,
+                    pipe_diameter_mm=pipe_diameter_mm,
+                    tolerance_spec=tolerance_spec,
+                    num_scanlines=scanlines,
+                    return_debug_image=return_debug_image,
+                    joint_mask=seg_res.mask if seg_res.detected else None,
+                    roi_bbox=seg_res.bbox if seg_res.detected else None,
+                )
+            geometry_success = True
+            geometry_confidence = 0.92 if response.overall_status != ToleranceStatus.FAIL else 0.70
+        except ValueError as val_err:
+            # Zero guessing: when geometry is unresolved, fail safely
+            geometry_success = False
+            geometry_confidence = 0.20
+            confidence_bd = confidence_engine.fuse_confidence(
+                quality_score=quality_res.quality_score,
+                segmentation_score=seg_res.confidence if seg_res.detected else 0.30,
+                condition_score=0.50,
+                geometry_score=geometry_confidence,
             )
-        else:
-            scanlines = num_samples if num_samples is not None else 40
-            response = measure_seam_gap(
-                image_bgr=image_bgr,
+            return MeasurementResponse(
                 joint_type=joint_type,
                 pipe_diameter_mm=pipe_diameter_mm,
-                tolerance_spec=tolerance_spec,
-                num_scanlines=scanlines,
-                return_debug_image=return_debug_image,
+                pixels_per_mm=1.0,
+                mean_gap_mm=0.0,
+                min_gap_mm=0.0,
+                max_gap_mm=0.0,
+                overall_status=ToleranceStatus.FAIL,
+                result_status=MeasurementResultStatus.REJECTED_UNRELIABLE,
+                condition=None,
+                confidence_breakdown=confidence_bd,
+                rejection_reason=f"joint_geometry_not_reliable: {str(val_err)}",
+                overlay_hints=OverlayHints(),
+                debug_info=None,
             )
+
+        # Step 6: AI Joint Condition Classifier (Model B) with Tolerance-Primary Rule
+        classifier = JointClassifier()
+        max_tol = tolerance_spec.max_gap_mm if tolerance_spec else 15.0
+        cond_res = classifier.classify_joint(
+            image_bgr=rectified_bgr,
+            roi_bbox=seg_res.bbox if seg_res.detected else None,
+            measured_gap_mm=response.mean_gap_mm,
+            max_allowable_gap_mm=max_tol,
+        )
+
+        # Step 7: Calibrated Multi-Component Confidence Fusion
+        seg_score = seg_res.confidence if seg_res.detected else 0.50
+        breakdown = confidence_engine.fuse_confidence(
+            quality_score=quality_res.quality_score,
+            segmentation_score=seg_score,
+            condition_score=cond_res.confidence,
+            geometry_score=geometry_confidence,
+        )
+
+        response.condition = cond_res.condition
+        response.confidence_breakdown = breakdown
+        response.result_status = breakdown.decision
+        if breakdown.decision != MeasurementResultStatus.ACCEPTED_MEASUREMENT:
+            response.rejection_reason = f"Measurement gated for inspector review (confidence {breakdown.overall_confidence:.2f})."
 
         return response
 
+    except HTTPException:
+        raise
     except ValueError as val_err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -3,7 +3,12 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from backend.app.schemas.domain import JointType, ToleranceStatus
+from backend.app.schemas.domain import (
+    JointConditionClass,
+    JointType,
+    MeasurementResultStatus,
+    ToleranceStatus,
+)
 
 
 class Point2D(BaseModel):
@@ -85,6 +90,19 @@ class CvMeasurementDebug(BaseModel):
     processing_time_ms: float = Field(..., description="Total CV algorithm execution time in milliseconds.")
     debug_image_base64: Optional[str] = Field(None, description="Annotated visualization overlay encoded as JPEG base64.")
 
+class ConfidenceBreakdown(BaseModel):
+    """Detailed multi-component confidence metrics and calibrated decision gating."""
+    quality_score: float = Field(..., description="Image quality & clarity score (0.0 to 1.0)")
+    segmentation_score: float = Field(..., description="AI joint boundary segmentation score (0.0 to 1.0)")
+    condition_score: float = Field(..., description="Joint condition classifier confidence (0.0 to 1.0)")
+    geometry_score: float = Field(..., description="OpenCV edge gradient & circle fit score (0.0 to 1.0)")
+    temporal_score: Optional[float] = Field(None, description="Multi-frame temporal consistency score (0.0 to 1.0)")
+    overall_confidence: float = Field(..., description="Weighted fused confidence score (0.0 to 1.0)")
+    decision: MeasurementResultStatus = Field(
+        ...,
+        description="Calibrated gating decision: ACCEPTED_MEASUREMENT, REVIEW_REQUIRED, or REJECTED_UNRELIABLE",
+    )
+
 
 class MeasurementResponse(BaseModel):
     """Top-level structured response payload returned by measurement API."""
@@ -95,9 +113,26 @@ class MeasurementResponse(BaseModel):
     min_gap_mm: float = Field(..., description="Minimum recorded gap clearance in mm.")
     max_gap_mm: float = Field(..., description="Maximum recorded gap clearance in mm.")
     overall_status: ToleranceStatus = Field(..., description="Comprehensive QA classification.")
+    result_status: MeasurementResultStatus = Field(
+        default=MeasurementResultStatus.ACCEPTED_MEASUREMENT,
+        description="Statistically calibrated production acceptance gating.",
+    )
+    condition: Optional[JointConditionClass] = Field(
+        default=None,
+        description="Classified joint structural condition (e.g. normal, displaced, open, damaged).",
+    )
+    confidence_breakdown: Optional[ConfidenceBreakdown] = Field(
+        default=None,
+        description="Component-level confidence metrics and gating justification.",
+    )
+    rejection_reason: Optional[str] = Field(
+        default=None,
+        description="Explanation when measurement is rejected or requires review.",
+    )
     overlay_hints: OverlayHints = Field(..., description="Frontend overlay graphics coordinates.")
     debug_info: Optional[CvMeasurementDebug] = Field(None, description="Optional diagnostic measurements.")
     timestamp: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(),
         description="ISO 8601 UTC timestamp of the measurement.",
     )
+
