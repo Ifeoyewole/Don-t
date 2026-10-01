@@ -43,6 +43,10 @@
     {
       "source": "/health",
       "destination": "/api/v1/cv/[...route]"
+    },
+    {
+      "source": "/((?!api/|cv/|health).*)",
+      "destination": "/index.html"
     }
   ]
 }
