@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { db } from './db'
-import { AppShell } from './components/AppShell'
+import { AppShell, type NavKey } from './components/AppShell'
 import { DashboardPage } from './pages/DashboardPage'
 import { CreateProjectPage } from './pages/CreateProjectPage'
 import { InspectionResultsPage } from './pages/InspectionResultsPage'
@@ -33,6 +33,7 @@ import type {
 
 type Route =
   | { key: 'dashboard' }
+  | { key: 'projects' }
   | { key: 'create-project' }
   | { key: 'edit-project'; projectId: string }
   | { key: 'new-manhole'; projectId: string }
@@ -52,6 +53,8 @@ type UiProjectSummary = ProjectSummary & {
 const parseRoute = (pathname: string): Route => {
   const segments = pathname.split('/').filter(Boolean)
   if (!segments.length) return { key: 'dashboard' }
+  if (segments[0] === 'projects' && segments.length === 1) return { key: 'projects' }
+  if (segments[0] === 'dashboard') return { key: 'dashboard' }
   if (segments[0] === 'projects' && segments[1] === 'new') return { key: 'create-project' }
   if (segments[0] === 'projects' && segments[2] === 'edit') return { key: 'edit-project', projectId: segments[1] }
   if (segments[0] === 'projects' && segments[2] === 'manholes' && segments[3] === 'new') {
@@ -222,6 +225,7 @@ function App() {
   const [currentProjectSummary, setCurrentProjectSummary] = useState<ProjectInspectionSummary | null>(null)
   const [currentManholeSummary, setCurrentManholeSummary] = useState<ManholeInspectionSummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [globalSearch, setGlobalSearch] = useState('')
 
   useEffect(() => {
     const onPopstate = () => {
@@ -369,7 +373,7 @@ function App() {
     try {
       await refreshProjects()
 
-      if (route.key === 'dashboard' || route.key === 'create-project') {
+      if (route.key === 'dashboard' || route.key === 'projects' || route.key === 'create-project') {
         clearVisualState()
         setCurrentProject(null)
         setProjectManholes([])
@@ -523,10 +527,11 @@ function App() {
       )
     }
 
-    if (route.key === 'dashboard') {
+    if (route.key === 'dashboard' || route.key === 'projects') {
       return (
         <DashboardPage
           projects={projects}
+          viewMode={route.key === 'projects' ? 'projects' : 'dashboard'}
           showAllProjects={showAllProjects}
           onToggleProjects={() => setShowAllProjects((current) => !current)}
           onNewProject={() => navigate('/projects/new')}
@@ -539,6 +544,8 @@ function App() {
             }
             navigate(`/projects/${projectId}/manholes/new`)
           }}
+          searchQuery={globalSearch}
+          onSearchChange={setGlobalSearch}
         />
       )
     }
@@ -790,12 +797,44 @@ function App() {
     return null
   })()
 
+  const currentNavKey: NavKey =
+    route.key === 'dashboard'
+      ? 'dashboard'
+      : route.key === 'projects' ||
+          route.key === 'create-project' ||
+          route.key === 'edit-project' ||
+          route.key === 'new-manhole' ||
+          route.key === 'edit-manhole'
+        ? 'projects'
+        : route.key === 'results' || route.key === 'upload' || route.key === 'upload-inspection'
+          ? 'inspections'
+          : route.key === 'summary'
+            ? 'reports'
+            : 'dashboard'
+
   return (
     <AppShell
       online={online}
-      navKey={route.key === 'dashboard' ? 'dashboard' : 'projects'}
+      navKey={currentNavKey}
       onNavigateHome={() => navigate('/')}
-      onNavigateProjects={() => navigate('/')}
+      onNavigateProjects={() => navigate('/projects')}
+      onNavigateInspections={() => {
+        const withInspections = projects.find((p) => (p.completedInspections ?? 0) > 0)
+        if (withInspections) {
+          navigate(`/projects/${withInspections.id}/summary`)
+          return
+        }
+        navigate('/projects')
+      }}
+      onNavigateReports={() => {
+        if (projects.length > 0) {
+          navigate(`/projects/${projects[0].id}/summary`)
+          return
+        }
+        navigate('/projects')
+      }}
+      globalSearchQuery={globalSearch}
+      onGlobalSearchChange={setGlobalSearch}
     >
       {page}
     </AppShell>
