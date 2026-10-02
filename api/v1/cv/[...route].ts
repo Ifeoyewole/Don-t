@@ -11,7 +11,8 @@
  * 7. Sanitizes all error responses returned to the client
  */
 
-import type { IncomingMessage, ServerResponse } from 'http'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import { getVercelOidcToken } from '@vercel/oidc'
 
 // ==========================================
 // 1. GATEWAY CONFIGURATION IDENTIFIERS
@@ -237,14 +238,22 @@ export async function getCloudRunIdToken(): Promise<string | null> {
     return cachedIdToken.token
   }
 
-  const vercelOidcToken =
-    process.env.VERCEL_OIDC_TOKEN ||
-    process.env.TEST_VERCEL_OIDC_TOKEN
+  let vercelOidcToken: string | null = null
+  try {
+    vercelOidcToken = await getVercelOidcToken()
+  } catch (_err) {
+    // In local dev/testing without active Vercel request context, fallback to env var
+    vercelOidcToken =
+      process.env.VERCEL_OIDC_TOKEN ||
+      process.env.TEST_VERCEL_OIDC_TOKEN ||
+      null
+  }
 
   if (!vercelOidcToken) {
     if (process.env.DEV_CLOUD_RUN_ID_TOKEN) {
       return process.env.DEV_CLOUD_RUN_ID_TOKEN
     }
+    console.warn('[GATEWAY-AUTH] No Vercel OIDC token available from runtime context or environment')
     return null
   }
 
@@ -269,7 +278,12 @@ export async function getCloudRunIdToken(): Promise<string | null> {
     })
 
     if (!stsResponse.ok) {
-      console.error('[GATEWAY-AUTH] STS token exchange failed:', stsResponse.status, await stsResponse.text())
+      const errText = await stsResponse.text()
+      console.error('[GATEWAY-AUTH] Step 1 Google STS token exchange failed:', {
+        status: stsResponse.status,
+        audience: stsAudience,
+        error: errText,
+      })
       return null
     }
 
@@ -294,19 +308,25 @@ export async function getCloudRunIdToken(): Promise<string | null> {
     })
 
     if (!idTokenResponse.ok) {
-      console.error('[GATEWAY-AUTH] IAM generateIdToken failed:', idTokenResponse.status, await idTokenResponse.text())
+      const errText = await idTokenResponse.text()
+      console.error('[GATEWAY-AUTH] Step 2 IAM generateIdToken failed:', {
+        status: idTokenResponse.status,
+        serviceAccount: GATEWAY_CONFIG.GCP_SERVICE_ACCOUNT_EMAIL,
+        targetAudience: GATEWAY_CONFIG.CLOUD_RUN_URL,
+        error: errText,
+      })
       return null
     }
 
-    const idTokenData = (await idTokenResponse.json()) as { token: string }
+    const idTokenData = (await idTokenResponse.json()) as { token: string; expireTime?: string }
     cachedIdToken = {
       token: idTokenData.token,
-      expiresAtMs: now + 3600_000,
+      expiresAtMs: now + 3000_000, // 50 minutes cache
     }
 
     return idTokenData.token
   } catch (err) {
-    console.error('[GATEWAY-AUTH] Error exchanging OIDC for GCP ID Token:', err)
+    console.error('[GATEWAY-AUTH] Workload Identity exchange exception:', err instanceof Error ? err.message : String(err))
     return null
   }
 }
