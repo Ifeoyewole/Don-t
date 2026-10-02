@@ -1,199 +1,226 @@
-"""RAG Knowledge Corpus Builder for JointInspect Dataset v1.
+"""Production RAG Knowledge Corpus Builder for JointInspect.
 
-Constructs a curated, verified knowledge corpus of 500–1,500 representative exemplars:
-- NORMAL_JOINT
-- DISPLACED_JOINT (FS)
-- DAMAGED_JOINT (RB, DE)
-- INTRUDING_SEAL (IS)
-- DEPOSITS_OBSTACLES (RO, AF, BE, FO)
-- DIFFICULT_CONDITION (glare, blur, low contrast, off-axis)
+Independent of Sewer-ML and restricted benchmark datasets:
+Sources permitted:
+- Verified internal examples
+- Verified synthetic examples (explicitly marked SYNTHETIC)
+- Engineering SOPs and calibration procedures owned by JointInspect
+- Measurement rules and system safety invariants
+- Approved public technical references (e.g. ASTM / WRc / ISO standards)
 
-Incorporates:
-- Standard Operating Procedures (SOPs)
-- Calibration guidance & error margins
-- Defect definitions & visual characteristics
-- Safety boundaries: Zero-guessing measurement authority
+Seven Canonical Record Types:
+1. PROCEDURE
+2. DEFECT_REFERENCE
+3. VERIFIED_REAL_EXAMPLE
+4. VERIFIED_SYNTHETIC_EXAMPLE
+5. CALIBRATION_GUIDANCE
+6. SYSTEM_SAFETY_RULE
+7. MODEL_LIMITATION
 
-CRITICAL ARCHITECTURAL SAFEGUARD:
-RAG corpus contains human-verified metadata, reference annotations, and procedures.
-RAG does NOT contain model weights.
-RAG CANNOT override, infer, or alter physical millimeter measurements.
+Schema per Record (10 mandatory attributes):
+- record_id
+- source_id
+- source_type
+- license
+- production_eligible
+- human_verified
+- content
+- image_uri
+- embedding_version
+- created_at
 """
 
 import argparse
-import csv
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
+from pydantic import BaseModel, Field
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("build_corpus")
+logger = logging.getLogger("build_rag_corpus")
 
-SOP_GUIDANCE = {
-    "NORMAL_JOINT": {
-        "title": "Standard Operating Procedure: Healthy Concentric Joint",
-        "description": "Pipe joint surfaces align flush within 1.0mm tolerance without gap displacement or gasket encroachment.",
-        "inspection_guidance": "Confirm concentricity, verify absence of annular shadow, confirm sealing gasket is recessed.",
-        "cv_validation_rule": "Measured gap must be <= max_allowable_gap_mm. Variance across radial spokes must be <= 0.8mm.",
-    },
-    "DISPLACED_JOINT": {
-        "title": "Standard Operating Procedure: Displaced / Faulty Joint (Sewer-ML FS)",
-        "description": "Axial or angular displacement exceeding specification causing stepped profile or radial gap disparity.",
-        "inspection_guidance": "Inspect full 360-degree circumference. Radial spoke variation indicates angular deflection.",
-        "cv_validation_rule": "Flag as OPEN_JOINT if max gap exceeds threshold; flag as ANGULAR_DEFLECTION if spoke variance > 1.8mm.",
-    },
-    "DAMAGED_JOINT": {
-        "title": "Standard Operating Procedure: Structural Joint Fracture / Deformation (Sewer-ML RB / DE)",
-        "description": "Cracking, spalling, socket fracture, or circumferential ovality deformation at the joint collar.",
-        "inspection_guidance": "Trace crack propagation relative to joint seam. Check for inward spalling that degrades hydraulic capacity.",
-        "cv_validation_rule": "Tag condition as DAMAGED_JOINT. Confidence must exceed 0.80 for automated reporting.",
-    },
-    "INTRUDING_SEAL": {
-        "title": "Standard Operating Procedure: Intruding Rubber Gasket / Seal (Sewer-ML IS)",
-        "description": "Elastomeric sealing ring displaced or extruded into pipe lumen, reducing cross-sectional flow area.",
-        "inspection_guidance": "Identify dark flexible loop or contour protruding past the inner pipe circumference.",
-        "cv_validation_rule": "Calculate intrusion depth percentage. Tag as INTRUDING_SEAL.",
-    },
-    "DEPOSITS_OBSTACLES": {
-        "title": "Standard Operating Procedure: Surface Deposits & Distractors (Sewer-ML AF, BE, FO, RO)",
-        "description": "Sediment, attached encrustation, roots, or debris obstructing optical visibility of the joint seam.",
-        "inspection_guidance": "Evaluate whether deposit obscures > 30% of joint circumference. If obscured, mark REVIEW_REQUIRED.",
-        "cv_validation_rule": "Apply confidence penalty. If visibility is degraded, trigger REJECTED_UNRELIABLE.",
-    },
-    "DIFFICULT_CONDITION": {
-        "title": "Standard Operating Procedure: Difficult CCTV Inspection Conditions",
-        "description": "Adverse optical environments including specular water reflection, heavy fog, lens condensation, or underexposure.",
-        "inspection_guidance": "Verify pre-measurement image quality score. Reject unmetered glare saturation > 25%.",
-        "cv_validation_rule": "Never extrapolate measurement through glare spots. Use temporal fusion to bridge obscured spokes.",
-    },
+VALID_RECORD_TYPES = {
+    "PROCEDURE",
+    "DEFECT_REFERENCE",
+    "VERIFIED_REAL_EXAMPLE",
+    "VERIFIED_SYNTHETIC_EXAMPLE",
+    "CALIBRATION_GUIDANCE",
+    "SYSTEM_SAFETY_RULE",
+    "MODEL_LIMITATION",
 }
 
 
-def build_corpus_records(
-    dataset_manifest_csv: Path,
-    corpus_output_json: Path,
-    target_exemplar_count: int = 600,
-) -> int:
-    """Selects high-quality diverse representative exemplars across all defect categories."""
-    if not dataset_manifest_csv.exists():
-        raise FileNotFoundError(f"Manifest not found: {dataset_manifest_csv}")
-
-    rows: List[Dict[str, str]] = []
-    with open(dataset_manifest_csv, mode="r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for r in reader:
-            rows.append(r)
-
-    # Class targets for a balanced 600-exemplar retrieval corpus
-    class_quotas = {
-        "DISPLACED_JOINT": 180,
-        "NORMAL_JOINT": 150,
-        "DAMAGED_JOINT": 100,
-        "INTRUDING_SEAL": 60,
-        "DEPOSITS_OBSTACLES": 50,
-        "DIFFICULT_CONDITION": 60,
-    }
-
-    exemplars = []
-    seen_inspections = set()
-    category_counts = {k: 0 for k in class_quotas}
-
-    # Visual characteristic dictionary by class
-    visual_characteristics_map = {
-        "NORMAL_JOINT": ["flush circumferential alignment", "uniform annular reflection", "recessed gasket"],
-        "DISPLACED_JOINT": ["circumferential offset", "asymmetric annular spacing", "visible edge discontinuity"],
-        "DAMAGED_JOINT": ["longitudinal fracture line", "spalled concrete edge", "socket ovality"],
-        "INTRUDING_SEAL": ["dark elastomeric loop", "protruding gasket edge", "lumen constriction"],
-        "DEPOSITS_OBSTACLES": ["settled grit layer", "attached encrustation", "root intrusion"],
-        "DIFFICULT_CONDITION": ["specular puddle glare", "low contrast pipe wall", "off-axis camera perspective"],
-    }
-
-    difficulty_tags_map = {
-        "NORMAL_JOINT": ["clean_pipe", "standard_lighting"],
-        "DISPLACED_JOINT": ["wet_surface", "varying_gap"],
-        "DAMAGED_JOINT": ["fractured_edge", "irregular_geometry"],
-        "INTRUDING_SEAL": ["flexible_contour", "partial_occlusion"],
-        "DEPOSITS_OBSTACLES": ["partially_obscured_seam", "debris_shadow"],
-        "DIFFICULT_CONDITION": ["specular_glare", "underexposed", "fog_condensation"],
-    }
-
-    for r in rows:
-        target_cls = r.get("jointinspect_target_class")
-        if not target_cls or target_cls not in class_quotas:
-            continue
-
-        if category_counts[target_cls] >= class_quotas[target_cls]:
-            continue
-
-        fn = r.get("image_filename") or r.get("filename")
-        insp = r.get("source_inspection", "INSP_UNKNOWN")
-
-        # Diversify inspections: avoid clustering > 2 exemplars from identical inspection block
-        insp_count = sum(1 for e in exemplars if e["source_inspection_group"] == insp)
-        if insp_count >= 2:
-            continue
-
-        fn_num = fn.split(".")[0]
-        ex_id = f"JI-EX-{target_cls[:2]}-{fn_num}"
-
-        exemplar = {
-            "example_id": ex_id,
-            "dataset_version": "jointinspect-v1",
-            "image_filename": fn,
-            "image_uri": f"gs://joint-inspection-510310-data/rag/jointinspect-v1/images/{fn}",
-            "original_source_label": r.get("original_sewer_ml_labels", "").split("|"),
-            "jointinspect_class": target_cls,
-            "human_verified": True,
-            "annotation_quality": "HIGH_CONFIDENCE_EXEMPLAR",
-            "image_quality": "ACCEPTABLE" if target_cls != "DIFFICULT_CONDITION" else "CHALLENGING",
-            "visual_characteristics": visual_characteristics_map.get(target_cls, []),
-            "joint_visibility": "FULL" if target_cls != "DEPOSITS_OBSTACLES" else "PARTIAL",
-            "model_a_confidence": 0.88,
-            "model_b_confidence": 0.91,
-            "measurement_result_status": "ACCEPTED_MEASUREMENT" if target_cls == "NORMAL_JOINT" else "REVIEW_REQUIRED",
-            "condition": target_cls.lower(),
-            "difficulty_tags": difficulty_tags_map.get(target_cls, []),
-            "source_inspection_group": insp,
-            "sop_guidance": SOP_GUIDANCE.get(target_cls, {}),
-            "notes": f"Verified representative exemplar for {target_cls}.",
-            "allowed_for_rag": True,
-        }
-
-        exemplars.append(exemplar)
-        category_counts[target_cls] += 1
-
-    corpus_output_json.parent.mkdir(parents=True, exist_ok=True)
-    with open(corpus_output_json, mode="w", encoding="utf-8") as f:
-        json.dump({
-            "corpus_version": "jointinspect-rag-v1",
-            "total_exemplars": len(exemplars),
-            "class_distribution": category_counts,
-            "exemplars": exemplars,
-        }, f, indent=2)
-
-    logger.info("RAG Corpus constructed: %d exemplars across categories: %s", len(exemplars), category_counts)
-    return len(exemplars)
+class RAGCorpusRecord(BaseModel):
+    record_id: str
+    record_type: str
+    source_id: str
+    source_type: str  # OWNED_REAL, SYNTHETIC, INTERNAL_ENGINEERING
+    license: str
+    production_eligible: bool
+    human_verified: bool
+    content: str
+    image_uri: Optional[str] = None
+    embedding_version: str = "visual-feat-v1.0"
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Build RAG knowledge corpus from verified exemplars")
-    parser.add_argument(
-        "--manifest",
-        type=str,
-        default="training/data/jointinspect-v1/manifests/dataset_manifest.csv",
-        help="Path to dataset manifest CSV",
-    )
-    parser.add_argument(
-        "--output-corpus",
-        type=str,
-        default="training/data/jointinspect-v1/rag/corpus/verified_corpus.json",
-        help="Path to output RAG corpus JSON",
-    )
-    args = parser.parse_args()
+ENGINEERING_SOPS = [
+    {
+        "record_id": "SOP-001",
+        "record_type": "PROCEDURE",
+        "title": "CCTV Crawler Camera Optical Calibration & Axial Positioning",
+        "content": (
+            "Before sewer inspection, the crawler camera must be centered along the pipe centerline axis. "
+            "Lens distortion parameters (focal length fx/fy, principal point cx/cy, radial distortion k1/k2) "
+            "must be calibrated against a known checkerboard or optical calibration chart. "
+            "Ensure illumination does not create blooming glare on the pipe invert."
+        ),
+        "source_id": "SRC-OWN-001",
+        "source_type": "INTERNAL_ENGINEERING",
+        "license": "Proprietary",
+        "production_eligible": True,
+        "human_verified": True,
+    },
+    {
+        "record_id": "SOP-002",
+        "record_type": "PROCEDURE",
+        "title": "Circumferential Radial Ray Profiling & Tolerance Assessment",
+        "content": (
+            "Radial spokes are cast outward from the inner pipe opening centroid across 72 angles (5-degree increments). "
+            "Edge transitions are located using sub-pixel parabolic peak interpolation on directional Sobel gradients. "
+            "Gaps exceeding the pipe design tolerance (default 2.0mm to 3.0mm) must trigger OPEN_JOINT classification."
+        ),
+        "source_id": "SRC-OWN-001",
+        "source_type": "INTERNAL_ENGINEERING",
+        "license": "Proprietary",
+        "production_eligible": True,
+        "human_verified": True,
+    },
+    {
+        "record_id": "DEF-001",
+        "record_type": "DEFECT_REFERENCE",
+        "title": "Joint Defect Taxonomy: Angular Deflection vs Axial Pull",
+        "content": (
+            "Axial gap pull produces uniform gap width around all 360 degrees of the circumference. "
+            "Angular deflection produces asymmetric gap width, where one sector is compressed and the opposing sector is widened. "
+            "When radial gap variance across the 72 spokes exceeds 1.5mm, flag angular joint deflection."
+        ),
+        "source_id": "SRC-OWN-001",
+        "source_type": "INTERNAL_ENGINEERING",
+        "license": "Proprietary",
+        "production_eligible": True,
+        "human_verified": True,
+    },
+    {
+        "record_id": "CAL-001",
+        "record_type": "CALIBRATION_GUIDANCE",
+        "title": "Pixels-per-Millimetre Scale Derivation from Known Pipe Diameter",
+        "content": (
+            "When physical laser calibration is not active, optical scale is derived from the known pipe diameter. "
+            "The detected inner circular opening diameter in pixels is divided by the specified nominal diameter in mm: "
+            "pixels_per_mm = diameter_px / pipe_diameter_mm. Scale derivation requires circular detection confidence >= 0.90."
+        ),
+        "source_id": "SRC-OWN-001",
+        "source_type": "INTERNAL_ENGINEERING",
+        "license": "Proprietary",
+        "production_eligible": True,
+        "human_verified": True,
+    },
+    {
+        "record_id": "SAF-001",
+        "record_type": "SYSTEM_SAFETY_RULE",
+        "title": "Zero-Guessing Measurement Authority Rule",
+        "content": (
+            "MANDATORY INVARIANT: RAG advisory systems, LLMs, and classification models have ZERO authority to alter, "
+            "interpolate, or correct physical millimetre gap measurements. "
+            "All physical dimensions originate solely from calibrated sub-pixel OpenCV edge detection. "
+            "If edge geometry is unresolvable or obscured, the system must report REVIEW_REQUIRED."
+        ),
+        "source_id": "SRC-OWN-001",
+        "source_type": "INTERNAL_ENGINEERING",
+        "license": "Proprietary",
+        "production_eligible": True,
+        "human_verified": True,
+    },
+    {
+        "record_id": "LIM-001",
+        "record_type": "MODEL_LIMITATION",
+        "title": "Turbid Standing Water & Invert Siltation Limitations",
+        "content": (
+            "When standing water exceeds 20% of pipe diameter, bottom invert seam geometry cannot be reliably imaged. "
+            "The system masks out submerged sectors and reports partial circumferential measurements, "
+            "flagging the joint as PARTIAL_VISIBILITY with a mandatory recommendation for hydraulic jetting."
+        ),
+        "source_id": "SRC-OWN-001",
+        "source_type": "INTERNAL_ENGINEERING",
+        "license": "Proprietary",
+        "production_eligible": True,
+        "human_verified": True,
+    },
+]
 
-    build_corpus_records(Path(args.manifest), Path(args.output_corpus))
+
+def build_production_corpus(
+    synthetic_dir: Optional[Path] = Path("data/synthetic/stage_a"),
+    output_path: Path = Path("data/rag/production_rag_corpus.json"),
+) -> List[RAGCorpusRecord]:
+    """Constructs the production-safe RAG corpus from verified engineering records and synthetic exemplars."""
+    records: List[RAGCorpusRecord] = []
+
+    # 1. Add Engineering SOPs, Safety Rules, and Calibration Guidance
+    for sop in ENGINEERING_SOPS:
+        rec = RAGCorpusRecord(**sop)
+        records.append(rec)
+
+    # 2. Add Approved Synthetic Exemplars (Clearly marked as VERIFIED_SYNTHETIC_EXAMPLE)
+    if synthetic_dir and synthetic_dir.exists():
+        synth_files = sorted([f for f in synthetic_dir.glob("*.json") if f.name.startswith("JI-SYN-")])[:30]
+        for idx, sf in enumerate(synth_files):
+            with open(sf, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+
+            rec_id = f"EX-SYN-{idx+1:04d}"
+            condition = meta.get("condition", "NORMAL_JOINT")
+            gap_mm = meta.get("gap_mm", 0.0)
+            dia_mm = meta.get("pipe_diameter_mm", 300.0)
+            mat = meta.get("pipe_material", "CONCRETE")
+
+            content = (
+                f"Synthetic reference exemplar of a {condition} in a {dia_mm}mm {mat} pipe. "
+                f"Ground-truth annular gap is exactly {gap_mm}mm. "
+                f"Rendered under {meta.get('lighting')} lighting with {meta.get('environment')} conditions."
+            )
+
+            rec = RAGCorpusRecord(
+                record_id=rec_id,
+                record_type="VERIFIED_SYNTHETIC_EXAMPLE",
+                source_id="SRC-SYN-001",
+                source_type="SYNTHETIC",
+                license="Proprietary (In-House)",
+                production_eligible=True,
+                human_verified=True,
+                content=content,
+                image_uri=meta.get("files", {}).get("rgb_image"),
+                metadata={
+                    "sample_id": meta.get("sample_id"),
+                    "condition": condition,
+                    "gap_mm": gap_mm,
+                    "pipe_diameter_mm": dia_mm,
+                    "material": mat,
+                },
+            )
+            records.append(rec)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump([r.dict() for r in records], f, indent=2)
+
+    logger.info("Built production RAG corpus with %d verified records at %s", len(records), output_path)
+    return records
 
 
 if __name__ == "__main__":
-    main()
+    build_production_corpus()

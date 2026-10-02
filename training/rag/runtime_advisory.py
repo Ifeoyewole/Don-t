@@ -44,13 +44,14 @@ class JointInspectionPipeline:
 
     def __init__(self, corpus_path: Path, indexes_dir: Path):
         with open(corpus_path, mode="r", encoding="utf-8") as f:
-            self.corpus = json.load(f)
-        self.exemplars = self.corpus["exemplars"]
+            data = json.load(f)
+        self.exemplars = data.get("exemplars", data) if isinstance(data, dict) else data
 
         embeddings_file = indexes_dir / "visual_embeddings_v1.npy"
         matrix = np.load(str(embeddings_file))
-        ids = [e["example_id"] for e in self.exemplars]
+        ids = [e.get("record_id", e.get("example_id", f"REC-{i:04d}")) for i, e in enumerate(self.exemplars)]
         self.retriever = VisualSimilarityRetriever(matrix, ids, self.exemplars)
+
 
     def process_inspection_frame(
         self,
