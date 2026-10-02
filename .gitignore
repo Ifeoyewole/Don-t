@@ -41,7 +41,9 @@ scratch/
 MultiLabel_SewerDefect_SSL/
 dataset-staging/
 training/data/
+!training/data/physical_ground_truth/
 data/
+
 *.onnx
 *.pt
 *.pth
