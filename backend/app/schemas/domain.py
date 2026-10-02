@@ -32,6 +32,7 @@ class JointConditionClass(str, Enum):
     OPEN_JOINT = "open_joint"
     DAMAGED_JOINT = "damaged_joint"
     INTRUDING_SEAL = "intruding_seal"
+    CLASSIFICATION_UNAVAILABLE = "classification_unavailable"
 
 
 class MeasurementResultStatus(str, Enum):

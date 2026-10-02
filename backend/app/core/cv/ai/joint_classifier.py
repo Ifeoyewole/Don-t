@@ -114,31 +114,26 @@ class JointClassifier:
                 }
 
             except Exception:
-                predicted_cond = JointConditionClass.NORMAL_JOINT
-                top_conf = 0.50
-                prob_dict = {cls.value: 0.20 for cls in self._classes}
+                predicted_cond = JointConditionClass.CLASSIFICATION_UNAVAILABLE
+                top_conf = 0.0
+                prob_dict = {cls.value: 0.0 for cls in self._classes}
         else:
-            # Baseline placeholder distribution when weights are not yet deployed
-            predicted_cond = JointConditionClass.NORMAL_JOINT
-            top_conf = 0.70
-            prob_dict = {
-                JointConditionClass.NORMAL_JOINT.value: 0.70,
-                JointConditionClass.DISPLACED_JOINT.value: 0.10,
-                JointConditionClass.OPEN_JOINT.value: 0.10,
-                JointConditionClass.DAMAGED_JOINT.value: 0.05,
-                JointConditionClass.INTRUDING_SEAL.value: 0.05,
-            }
+            # Model weights not loaded: strictly report CLASSIFICATION_UNAVAILABLE with 0.0 confidence
+            # NEVER default to NORMAL_JOINT or invent synthetic probabilities
+            predicted_cond = JointConditionClass.CLASSIFICATION_UNAVAILABLE
+            top_conf = 0.0
+            prob_dict = {cls.value: 0.0 for cls in self._classes}
 
         # 2. Apply Tolerance-Primary Dimensional Authority for OPEN_JOINT
-        # If OpenCV measured gap exceeds design tolerance, the ground-truth is OPEN_JOINT
+        # If OpenCV measured gap exceeds design tolerance, the authoritative ground-truth is OPEN_JOINT
         is_override = False
         if measured_gap_mm is not None and max_allowable_gap_mm is not None:
             if measured_gap_mm > max_allowable_gap_mm:
                 predicted_cond = JointConditionClass.OPEN_JOINT
                 is_override = True
-                # Elevate open_joint probability and confidence
-                top_conf = max(top_conf, 0.95)
-                prob_dict[JointConditionClass.OPEN_JOINT.value] = 0.95
+                # Physical measurement is primary authority
+                top_conf = 1.0
+                prob_dict[JointConditionClass.OPEN_JOINT.value] = 1.0
 
         return JointConditionResult(
             condition=predicted_cond,

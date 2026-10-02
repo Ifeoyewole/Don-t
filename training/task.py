@@ -143,11 +143,19 @@ def run_training():
                 },
             }
 
-    # Export immutable candidate model weights
-    export_filename = f"pipe_joint_{args.model_type}_v1.onnx"
-    export_path = checkpoints_dir / export_filename
-    with open(export_path, "wb") as f:
-        f.write(f"ONNX_PIPE_JOINT_MODEL_{args.model_type.upper()}_V1_WEIGHTS_HASH_{git_hash}".encode("utf-8"))
+    # Export model weights only for real training runs (Stage >= 1)
+    if args.stage >= 1:
+        export_filename = f"pipe_joint_{args.model_type}_v1.onnx"
+        export_path = checkpoints_dir / export_filename
+        # Real training writes actual model weights in train_segmenter/train_classifier
+        gcs_checkpoint_path = f"gs://{args.data_bucket}/models/{args.model_type}/candidates/v1/{export_filename}"
+        run_status = "COMPLETED"
+    else:
+        # Stage 0: Strictly pipeline verification dry-run. NO fake ONNX files created!
+        export_path = None
+        gcs_checkpoint_path = None
+        run_status = "PIPELINE_DRY_RUN"
+        logger.info("Stage 0 Dry Run: verified pipeline plumbing. NO ONNX model generated.")
 
     end_dt = datetime.datetime.now(datetime.timezone.utc)
     duration_sec = (end_dt - start_dt).total_seconds()
@@ -155,8 +163,6 @@ def run_training():
     # Estimate cloud compute cost (e2-standard-4 is ~$0.134/hr in europe-west2)
     hourly_rate = 0.134 if args.accelerator == "NONE" else 0.55
     estimated_cost_usd = round((duration_sec / 3600.0) * hourly_rate, 4)
-
-    gcs_checkpoint_path = f"gs://{args.data_bucket}/models/{args.model_type}/candidates/v1/{export_filename}"
 
     run_record = {
         "run_id": run_id,
@@ -175,17 +181,18 @@ def run_training():
         "duration_sec": round(duration_sec, 2),
         "training_count": train_count,
         "validation_count": val_count,
-        "metrics": final_metrics,
+        "metrics": final_metrics if args.stage >= 1 else {"status": "dry_run_no_weights"},
         "checkpoint_path": gcs_checkpoint_path,
         "estimated_cost_usd": estimated_cost_usd,
-        "status": "COMPLETED",
+        "status": run_status,
+        "note": "Stage 0 dry run only. Real training requires approved commercial data." if args.stage == 0 else "Real training run.",
     }
 
     # Record to training_runs.jsonl
     runs_log_path = Path("training/data/jointinspect-v1/manifests/training_runs.jsonl")
     record_training_run(run_record, runs_log_path)
 
-    logger.info("Training run %s completed successfully in %.1fs. Output saved to %s", run_id, duration_sec, export_path)
+    logger.info("Task completed with status: %s (duration: %.1fs)", run_status, duration_sec)
 
 
 if __name__ == "__main__":

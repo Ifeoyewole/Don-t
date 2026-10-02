@@ -141,5 +141,8 @@ class JointSegmenter:
         return JointSegmentationResult(
             detected=False,
             confidence=0.0,
-            reason="Trained joint segmentation model weights not loaded. Manual review required.",
+            bbox=None,
+            mask=None,
+            contour_polygon=[],
+            reason="MODEL_UNAVAILABLE: Trained joint segmentation model weights not loaded. Manual review required.",
         )
