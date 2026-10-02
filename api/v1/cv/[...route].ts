@@ -425,7 +425,19 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   // Strip query parameters injected by Vercel catch-all (e.g. ?...route=health)
   const [pathOnly, rawQuery] = url.split('?')
   let targetSubPath = pathOnly.replace(/^\/api\/v1\/?/, '').replace(/^\/api\/?/, '')
-  if (!targetSubPath.startsWith('cv/') && !targetSubPath.startsWith('health')) {
+  const matchedPath = (req.headers['x-matched-path'] as string) || ''
+
+  if (targetSubPath.includes('[...route]')) {
+    if (matchedPath.includes('health') || url.includes('health')) {
+      targetSubPath = 'cv/health'
+    } else {
+      targetSubPath = matchedPath.replace(/^\/api\/v1\/?/, '').replace(/^\/api\/?/, '') || 'cv/health'
+    }
+  }
+
+  if (targetSubPath === 'health' || targetSubPath === '/health') {
+    targetSubPath = 'cv/health'
+  } else if (!targetSubPath.startsWith('cv/')) {
     targetSubPath = `cv/${targetSubPath}`
   }
 
