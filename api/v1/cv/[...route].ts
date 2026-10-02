@@ -66,7 +66,7 @@ export interface UserAuthProvider {
 }
 
 export class DisabledUserAuthProvider implements UserAuthProvider {
-  async verifyRequest(_req: IncomingMessage): Promise<AuthenticatedUser | null> {
+  async verifyRequest(_req?: IncomingMessage | Record<string, unknown>): Promise<AuthenticatedUser | null> {
     return {
       id: 'guest_operator',
       roles: ['INSPECTOR'],
@@ -238,10 +238,10 @@ export async function getCloudRunIdToken(): Promise<string | null> {
     return cachedIdToken.token
   }
 
-  let vercelOidcToken: string | null = null
+  let vercelOidcToken: string | null
   try {
     vercelOidcToken = await getVercelOidcToken()
-  } catch (_err) {
+  } catch {
     // In local dev/testing without active Vercel request context, fallback to env var
     vercelOidcToken =
       process.env.VERCEL_OIDC_TOKEN ||

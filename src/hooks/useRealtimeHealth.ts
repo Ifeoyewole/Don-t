@@ -42,7 +42,9 @@ export function useRealtimeHealth(pollIntervalMs = 20000) {
   }, [])
 
   useEffect(() => {
-    void checkNow()
+    const timerId = setTimeout(() => {
+      void checkNow()
+    }, 0)
 
     const intervalId = setInterval(() => {
       if (document.visibilityState === 'visible') {
@@ -72,6 +74,7 @@ export function useRealtimeHealth(pollIntervalMs = 20000) {
     document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
+      clearTimeout(timerId)
       clearInterval(intervalId)
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)

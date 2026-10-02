@@ -15,9 +15,13 @@ export interface AuthenticatedUser {
   metadata?: Record<string, unknown>
 }
 
+export interface RequestLike {
+  headers: Record<string, string | string[] | undefined>
+}
+
 export interface UserAuthProvider {
   readonly providerName: string
-  verifyRequest(request: any): Promise<AuthenticatedUser | null>
+  verifyRequest(request: RequestLike): Promise<AuthenticatedUser | null>
 }
 
 /**
@@ -27,7 +31,7 @@ export interface UserAuthProvider {
 export class DisabledUserAuthProvider implements UserAuthProvider {
   readonly providerName = 'disabled'
 
-  async verifyRequest(_request: any): Promise<AuthenticatedUser | null> {
+  async verifyRequest(_request?: RequestLike | Record<string, unknown>): Promise<AuthenticatedUser | null> {
     return {
       id: 'anonymous-inspections',
       roles: ['INSPECTOR'],
@@ -42,7 +46,7 @@ export class DisabledUserAuthProvider implements UserAuthProvider {
 export class PluggableUserAuthProvider implements UserAuthProvider {
   readonly providerName = 'provider'
 
-  async verifyRequest(request: any): Promise<AuthenticatedUser | null> {
+  async verifyRequest(request: RequestLike): Promise<AuthenticatedUser | null> {
     const authHeader = request.headers['authorization'] || request.headers['Authorization']
     if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
       return null
@@ -68,7 +72,7 @@ export const activeAuthProvider: UserAuthProvider =
     ? new PluggableUserAuthProvider()
     : new DisabledUserAuthProvider()
 
-export async function verifyGatewayUser(request: any): Promise<AuthenticatedUser | null> {
+export async function verifyGatewayUser(request: RequestLike): Promise<AuthenticatedUser | null> {
   if (GATEWAY_CONFIG.USER_AUTH_MODE === 'disabled') {
     return activeAuthProvider.verifyRequest(request)
   }

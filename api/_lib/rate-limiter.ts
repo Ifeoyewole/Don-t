@@ -19,6 +19,13 @@ export interface RateLimitStore {
   increment(key: string, windowSeconds: number): Promise<{ count: number; ttl: number }>
 }
 
+export interface HttpRequestLike {
+  headers: Record<string, string | string[] | undefined>
+  url?: string
+  method?: string
+  socket?: { remoteAddress?: string }
+}
+
 /**
  * High-performance in-memory sliding window store with auto-expiry.
  */
@@ -43,7 +50,7 @@ class MemoryRateLimitStore implements RateLimitStore {
 
 const activeStore: RateLimitStore = new MemoryRateLimitStore()
 
-export function getClientIp(req: any): string {
+export function getClientIp(req: HttpRequestLike): string {
   const xForwardedFor = req.headers['x-forwarded-for']
   if (typeof xForwardedFor === 'string') {
     return xForwardedFor.split(',')[0].trim()
@@ -70,7 +77,7 @@ export function getRouteCategory(path: string, method: string): RouteCategory {
   return 'measure'
 }
 
-export async function checkRateLimit(req: any, routeCategory?: RouteCategory): Promise<RateLimitResult> {
+export async function checkRateLimit(req: HttpRequestLike, routeCategory?: RouteCategory): Promise<RateLimitResult> {
   const ip = getClientIp(req)
   const category = routeCategory || getRouteCategory(req.url || '', req.method || 'GET')
 

@@ -154,7 +154,9 @@ export const AppShell = ({
         const parsed = JSON.parse(stored)
         if (parsed?.name) return parsed
       }
-    } catch {}
+    } catch {
+      // Ignore localStorage parsing errors and fallback to default profile
+    }
     return DEFAULT_PROFILE
   })
   const [profileModalOpen, setProfileModalOpen] = useState(false)
