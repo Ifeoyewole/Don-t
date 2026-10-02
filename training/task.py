@@ -112,42 +112,44 @@ def run_training():
     checkpoints_dir = local_work_dir / "checkpoints" / run_id
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
-    # Simulated supervised convergence with metrics calculation
+    # Training execution based on stage
     final_metrics = {}
-    for epoch in range(1, args.epochs + 1):
-        time.sleep(0.3)
-        train_loss = 0.55 / (1.0 + 0.18 * epoch)
-        val_metric = min(0.92, 0.50 + 0.08 * epoch)
-
-        if args.model_type == "segmenter":
-            logger.info("Epoch [%d/%d] - train_loss: %.4f - val_mIoU: %.4f - val_mAP50: %.4f", epoch, args.epochs, train_loss, val_metric, val_metric * 0.95)
-            final_metrics = {
-                "mean_iou": round(val_metric, 3),
-                "map_50": round(val_metric * 0.95, 3),
-                "precision": round(val_metric * 0.96, 3),
-                "recall": round(val_metric * 0.93, 3),
-                "f1_score": round(val_metric * 0.945, 3),
-            }
-        else:
-            logger.info("Epoch [%d/%d] - train_loss: %.4f - val_macro_f1: %.4f - val_accuracy: %.4f", epoch, args.epochs, train_loss, val_metric, val_metric * 0.98)
-            final_metrics = {
-                "macro_f1": round(val_metric, 3),
-                "weighted_f1": round(val_metric * 0.99, 3),
-                "accuracy": round(val_metric * 0.98, 3),
-                "per_class_f1": {
-                    "normal_joint": round(val_metric * 0.98, 3),
-                    "displaced_joint": round(val_metric * 0.96, 3),
-                    "open_joint": round(val_metric * 0.93, 3),
-                    "damaged_joint": round(val_metric * 0.91, 3),
-                    "intruding_seal": round(val_metric * 0.90, 3),
-                },
-            }
-
-    # Export model weights only for real training runs (Stage >= 1)
     if args.stage >= 1:
+        # Determine training data source (approved synthetic or production dataset)
+        data_source_dir = Path("data/synthetic/stage_a")
+        if not data_source_dir.exists():
+            data_source_dir = Path("data/production/jointinspect-v1/images")
+
+        logger.info("Executing REAL Supervised Training on dataset: %s", data_source_dir)
+        if args.model_type == "segmenter":
+            from training.train_segmenter import train_model_a
+            final_metrics = train_model_a(
+                dataset_dir=data_source_dir,
+                output_dir=checkpoints_dir,
+                epochs=args.epochs,
+                batch_size=args.batch_size,
+                learning_rate=args.learning_rate,
+                model_version=f"seg-v1-stage{args.stage}",
+            )
+        elif args.model_type == "classifier":
+            from training.train_classifier import train_model_b
+            final_metrics = train_model_b(
+                dataset_dir=data_source_dir,
+                output_dir=checkpoints_dir,
+                epochs=args.epochs,
+                batch_size=args.batch_size,
+                learning_rate=args.learning_rate,
+                model_version=f"cls-v1-stage{args.stage}",
+            )
+        else:
+            from training.train_segmenter import train_model_a
+            from training.train_classifier import train_model_b
+            m_a = train_model_a(dataset_dir=data_source_dir, output_dir=checkpoints_dir, epochs=args.epochs, model_version=f"seg-v1-stage{args.stage}")
+            m_b = train_model_b(dataset_dir=data_source_dir, output_dir=checkpoints_dir, epochs=args.epochs, model_version=f"cls-v1-stage{args.stage}")
+            final_metrics = {"segmenter": m_a, "classifier": m_b}
+
         export_filename = f"pipe_joint_{args.model_type}_v1.onnx"
         export_path = checkpoints_dir / export_filename
-        # Real training writes actual model weights in train_segmenter/train_classifier
         gcs_checkpoint_path = f"gs://{args.data_bucket}/models/{args.model_type}/candidates/v1/{export_filename}"
         run_status = "COMPLETED"
     else:
@@ -155,7 +157,9 @@ def run_training():
         export_path = None
         gcs_checkpoint_path = None
         run_status = "PIPELINE_DRY_RUN"
+        final_metrics = {"dry_run_verified": True, "samples_inspected": 0, "status": "PIPELINE_DRY_RUN"}
         logger.info("Stage 0 Dry Run: verified pipeline plumbing. NO ONNX model generated.")
+
 
     end_dt = datetime.datetime.now(datetime.timezone.utc)
     duration_sec = (end_dt - start_dt).total_seconds()

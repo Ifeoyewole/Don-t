@@ -1,0 +1,21 @@
+{
+  "model_version": "seg-smoke-v1",
+  "dataset_version": "jointinspect-synthetic-v1",
+  "dataset_manifest_sha256": "synth_stage_a_manifest_sha",
+  "git_commit": "local_build",
+  "training_run_id": "run_seg_1790941252",
+  "architecture": "LightweightConvEncoderDecoder-v1",
+  "weights_sha256": "d71199e098e778d176a262bb0f750357d7ab46fa4c339d193b89d162558e0b76",
+  "training_date": "2026-10-02T11:40:52.803181+00:00",
+  "validation_metrics": {
+    "mean_iou": 0.0351,
+    "dice_score": 0.0608,
+    "precision": 0.4169,
+    "recall": 0.039,
+    "final_train_loss": 1.5458,
+    "train_samples": 80,
+    "val_samples": 20
+  },
+  "production_approved": false,
+  "approved_by": null
+}
