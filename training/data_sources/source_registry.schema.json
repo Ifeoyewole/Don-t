@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CommercialDataSourceRegistry",
+  "description": "Schema for validating commercial training and benchmark data sources for JointInspect",
+  "type": "object",
+  "required": ["registry_version", "last_updated", "sources"],
+  "properties": {
+    "registry_version": { "type": "string" },
+    "last_updated": { "type": "string", "format": "date-time" },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "source_id",
+          "name",
+          "source_type",
+          "license_name",
+          "commercial_training_allowed",
+          "commercial_deployment_allowed",
+          "modification_allowed",
+          "redistribution_allowed",
+          "attribution_required",
+          "share_alike_required",
+          "provenance_verified",
+          "production_eligible",
+          "benchmark_only",
+          "approval_status"
+        ],
+        "properties": {
+          "source_id": { "type": "string" },
+          "name": { "type": "string" },
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "OWNED_REAL",
+              "PARTNER_DATA",
+              "PUBLIC_LICENSED",
+              "SYNTHETIC",
+              "BENCHMARK_ONLY"
+            ]
+          },
+          "source_url": { "type": ["string", "null"] },
+          "provider": { "type": "string" },
+          "license_name": { "type": "string" },
+          "license_url": { "type": ["string", "null"] },
+          "license_text_reference": { "type": "string" },
+          "commercial_training_allowed": { "type": "boolean" },
+          "commercial_deployment_allowed": { "type": "boolean" },
+          "modification_allowed": { "type": "boolean" },
+          "redistribution_allowed": { "type": "boolean" },
+          "attribution_required": { "type": "boolean" },
+          "share_alike_required": { "type": "boolean" },
+          "provenance_verified": { "type": "boolean" },
+          "production_eligible": { "type": "boolean" },
+          "benchmark_only": { "type": "boolean" },
+          "rights_document_reference": { "type": ["string", "null"] },
+          "approval_status": {
+            "type": "string",
+            "enum": [
+              "APPROVED_PRODUCTION",
+              "APPROVED_BENCHMARK_ONLY",
+              "PENDING_REVIEW",
+              "REJECTED",
+              "UNKNOWN_RIGHTS"
+            ]
+          },
+          "reviewed_by": { "type": ["string", "null"] },
+          "reviewed_at": { "type": ["string", "null"] },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}
