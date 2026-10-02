@@ -153,7 +153,12 @@ def export_classifier_onnx(
             initializer=[w1_init, b1_init, w_fc_init, b_fc_init],
         )
 
-        model = helper.make_model(graph, producer_name="JointInspect-Supervised-Training")
+        model = helper.make_model(
+            graph,
+            producer_name="JointInspect-Supervised-Training",
+            opset_imports=[helper.make_opsetid("", 17)],
+            ir_version=10,
+        )
         onnx.checker.check_model(model)
         onnx.save(model, str(output_path))
         logger.info("Successfully exported genuine ONNX graph for Model B to %s (%d bytes)", output_path, output_path.stat().st_size)

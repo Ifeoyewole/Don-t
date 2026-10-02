@@ -1,0 +1,982 @@
+{
+  "total_test_images": 18,
+  "unique_images": 11,
+  "duplicate_images": 7,
+  "opencv_accepted": 18,
+  "opencv_zero_guessing_rejections": 0,
+  "acceptance_rate_pct": 100.0,
+  "results": [
+    {
+      "file_name": "test 1.jpeg",
+      "folder": "public",
+      "resolution": "960x1280",
+      "sha256": "9d5879d312b362a5de70d5b939c90817c6f8deb93baf523331eb013f800fc770",
+      "dhash": "0b0f070786f2be3a",
+      "is_duplicate": false,
+      "duplicate_of": null,
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "FAIL",
+        "mean_gap_mm": 31.32,
+        "min_gap_mm": 3.17,
+        "max_gap_mm": 83.6,
+        "pixels_per_mm": 1.5789,
+        "inner_radius_px": 236.83,
+        "outer_radius_px": 286.28
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.4301,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.3655,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1247,
+          "DISPLACED_JOINT": 0.0993,
+          "DAMAGED_JOINT": 0.1128,
+          "INTRUDING_SEAL": 0.1627,
+          "DEPOSITS_OBSTACLES": 0.3655,
+          "DIFFICULT_CONDITION": 0.1351
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.7844,
+          "record_id": "EX-SYN-0012",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0012",
+          "guidance": "Synthetic reference exemplar of a DEPOSITS_OBSTACLES in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 0.5mm. Rendered under dim_lighting lighting with wet conditions...."
+        },
+        {
+          "similarity_score": 0.7458,
+          "record_id": "EX-SYN-0023",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0023",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 500.0mm METAL pipe. Ground-truth annular gap is exactly 1.0mm. Rendered under harsh_specular lighting with standing_water cond..."
+        }
+      ]
+    },
+    {
+      "file_name": "test 2.jpeg",
+      "folder": "public",
+      "resolution": "960x1280",
+      "sha256": "77a1c6f8d8ff96d244be00ba09f726bcf0b4b590189f3f3acdcd887383f80ed8",
+      "dhash": "0f1f1f0f1f0b0717",
+      "is_duplicate": false,
+      "duplicate_of": null,
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "FAIL",
+        "mean_gap_mm": 63.69,
+        "min_gap_mm": 1.81,
+        "max_gap_mm": 103.31,
+        "pixels_per_mm": 1.6552,
+        "inner_radius_px": 248.28,
+        "outer_radius_px": 353.69
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.3732,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.5163,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1014,
+          "DISPLACED_JOINT": 0.066,
+          "DAMAGED_JOINT": 0.0767,
+          "INTRUDING_SEAL": 0.1296,
+          "DEPOSITS_OBSTACLES": 0.5163,
+          "DIFFICULT_CONDITION": 0.11
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.9734,
+          "record_id": "EX-SYN-0023",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0023",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 500.0mm METAL pipe. Ground-truth annular gap is exactly 1.0mm. Rendered under harsh_specular lighting with standing_water cond..."
+        },
+        {
+          "similarity_score": 0.9562,
+          "record_id": "EX-SYN-0012",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0012",
+          "guidance": "Synthetic reference exemplar of a DEPOSITS_OBSTACLES in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 0.5mm. Rendered under dim_lighting lighting with wet conditions...."
+        }
+      ]
+    },
+    {
+      "file_name": "test 3.jpeg",
+      "folder": "public",
+      "resolution": "960x1280",
+      "sha256": "ecc89cfa94a827de12fcdc77f41db38e5b58898f10876d7b787ebbb0ca3c189c",
+      "dhash": "0f0f0f0f0f0f0707",
+      "is_duplicate": false,
+      "duplicate_of": null,
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "FAIL",
+        "mean_gap_mm": 40.84,
+        "min_gap_mm": 1.08,
+        "max_gap_mm": 80.54,
+        "pixels_per_mm": 1.8499,
+        "inner_radius_px": 277.49,
+        "outer_radius_px": 353.03
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.3788,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.5012,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1044,
+          "DISPLACED_JOINT": 0.069,
+          "DAMAGED_JOINT": 0.0801,
+          "INTRUDING_SEAL": 0.1324,
+          "DEPOSITS_OBSTACLES": 0.5012,
+          "DIFFICULT_CONDITION": 0.1129
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.9581,
+          "record_id": "EX-SYN-0012",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0012",
+          "guidance": "Synthetic reference exemplar of a DEPOSITS_OBSTACLES in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 0.5mm. Rendered under dim_lighting lighting with wet conditions...."
+        },
+        {
+          "similarity_score": 0.9556,
+          "record_id": "EX-SYN-0016",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0016",
+          "guidance": "Synthetic reference exemplar of a DAMAGED_JOINT in a 600.0mm CLAY pipe. Ground-truth annular gap is exactly 4.0mm. Rendered under central_cctv lighting with dry conditions...."
+        }
+      ]
+    },
+    {
+      "file_name": "test 4.jpeg",
+      "folder": "public",
+      "resolution": "960x1280",
+      "sha256": "aaaa300795580fcc90fc0fca060a749f51a05310621478be446d77a21a66de73",
+      "dhash": "d8edecfffecf4f0f",
+      "is_duplicate": false,
+      "duplicate_of": null,
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "REVIEW",
+        "mean_gap_mm": 20.74,
+        "min_gap_mm": 20.74,
+        "max_gap_mm": 20.74,
+        "pixels_per_mm": 2.0733,
+        "inner_radius_px": 311.0,
+        "outer_radius_px": 354.0
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.4267,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.3762,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1174,
+          "DISPLACED_JOINT": 0.0949,
+          "DAMAGED_JOINT": 0.1111,
+          "INTRUDING_SEAL": 0.1689,
+          "DEPOSITS_OBSTACLES": 0.3762,
+          "DIFFICULT_CONDITION": 0.1315
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.8381,
+          "record_id": "EX-SYN-0012",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0012",
+          "guidance": "Synthetic reference exemplar of a DEPOSITS_OBSTACLES in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 0.5mm. Rendered under dim_lighting lighting with wet conditions...."
+        },
+        {
+          "similarity_score": 0.8132,
+          "record_id": "EX-SYN-0023",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0023",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 500.0mm METAL pipe. Ground-truth annular gap is exactly 1.0mm. Rendered under harsh_specular lighting with standing_water cond..."
+        }
+      ]
+    },
+    {
+      "file_name": "test 5.jpeg",
+      "folder": "public",
+      "resolution": "960x1280",
+      "sha256": "614217ad8ddfc7b47f4a8ffeba2ae132ba90856bc91a1e59168e710e192d585d",
+      "dhash": "031f0f3e73e36722",
+      "is_duplicate": false,
+      "duplicate_of": null,
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "PASS",
+        "mean_gap_mm": 4.12,
+        "min_gap_mm": 4.12,
+        "max_gap_mm": 4.12,
+        "pixels_per_mm": 2.6667,
+        "inner_radius_px": 400.0,
+        "outer_radius_px": 411.0
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.4202,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.4194,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1159,
+          "DISPLACED_JOINT": 0.0869,
+          "DAMAGED_JOINT": 0.1002,
+          "INTRUDING_SEAL": 0.1539,
+          "DEPOSITS_OBSTACLES": 0.4194,
+          "DIFFICULT_CONDITION": 0.1237
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.8887,
+          "record_id": "EX-SYN-0023",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0023",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 500.0mm METAL pipe. Ground-truth annular gap is exactly 1.0mm. Rendered under harsh_specular lighting with standing_water cond..."
+        },
+        {
+          "similarity_score": 0.8683,
+          "record_id": "EX-SYN-0012",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0012",
+          "guidance": "Synthetic reference exemplar of a DEPOSITS_OBSTACLES in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 0.5mm. Rendered under dim_lighting lighting with wet conditions...."
+        }
+      ]
+    },
+    {
+      "file_name": "test 6.jpeg",
+      "folder": "public",
+      "resolution": "1280x960",
+      "sha256": "211e2e7ec063e54e09b744c4f69ec77f462d26b8a6956b47e5efa74a5d1f53b6",
+      "dhash": "044c0a080e0e4c4f",
+      "is_duplicate": false,
+      "duplicate_of": null,
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "FAIL",
+        "mean_gap_mm": 32.66,
+        "min_gap_mm": 0.59,
+        "max_gap_mm": 64.29,
+        "pixels_per_mm": 1.6956,
+        "inner_radius_px": 254.33,
+        "outer_radius_px": 309.71
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.3665,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.4816,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.086,
+          "DISPLACED_JOINT": 0.0665,
+          "DAMAGED_JOINT": 0.0827,
+          "INTRUDING_SEAL": 0.1696,
+          "DEPOSITS_OBSTACLES": 0.4816,
+          "DIFFICULT_CONDITION": 0.1137
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.9158,
+          "record_id": "EX-SYN-0029",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0029",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 375.0mm PVC pipe. Ground-truth annular gap is exactly 10.0mm. Rendered under asymmetric_shadow lighting with dirty_lens condit..."
+        },
+        {
+          "similarity_score": 0.9014,
+          "record_id": "EX-SYN-0005",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0005",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 375.0mm PVC pipe. Ground-truth annular gap is exactly 3.0mm. Rendered under wet_specular lighting with turbid_fog conditions...."
+        }
+      ]
+    },
+    {
+      "file_name": "test 7.jpeg",
+      "folder": "public",
+      "resolution": "1098x1280",
+      "sha256": "997bd597a3173ae9a1f8a7466a2c49e2e934b31b1ecc635bc7cdac3d3432dc69",
+      "dhash": "0f1f1f172f1f1f0d",
+      "is_duplicate": false,
+      "duplicate_of": null,
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "FAIL",
+        "mean_gap_mm": 31.48,
+        "min_gap_mm": 1.79,
+        "max_gap_mm": 57.79,
+        "pixels_per_mm": 2.2322,
+        "inner_radius_px": 334.83,
+        "outer_radius_px": 405.11
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.4131,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.3848,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1263,
+          "DISPLACED_JOINT": 0.0953,
+          "DAMAGED_JOINT": 0.1057,
+          "INTRUDING_SEAL": 0.153,
+          "DEPOSITS_OBSTACLES": 0.3848,
+          "DIFFICULT_CONDITION": 0.1349
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.9824,
+          "record_id": "EX-SYN-0023",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0023",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 500.0mm METAL pipe. Ground-truth annular gap is exactly 1.0mm. Rendered under harsh_specular lighting with standing_water cond..."
+        },
+        {
+          "similarity_score": 0.9737,
+          "record_id": "EX-SYN-0012",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0012",
+          "guidance": "Synthetic reference exemplar of a DEPOSITS_OBSTACLES in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 0.5mm. Rendered under dim_lighting lighting with wet conditions...."
+        }
+      ]
+    },
+    {
+      "file_name": "WhatsApp Image 2026-05-21 at 9.29.57 PM.jpeg",
+      "folder": "public",
+      "resolution": "1254x1254",
+      "sha256": "b4390f10982081479219fd2859ce8ef3920de90027956738172fa1cc2b8c5b21",
+      "dhash": "0f4f0f0f0f0f2b0f",
+      "is_duplicate": false,
+      "duplicate_of": null,
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "FAIL",
+        "mean_gap_mm": 23.64,
+        "min_gap_mm": 1.21,
+        "max_gap_mm": 49.03,
+        "pixels_per_mm": 2.4883,
+        "inner_radius_px": 373.25,
+        "outer_radius_px": 432.07
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.4067,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.4387,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1105,
+          "DISPLACED_JOINT": 0.0815,
+          "DAMAGED_JOINT": 0.0957,
+          "INTRUDING_SEAL": 0.1523,
+          "DEPOSITS_OBSTACLES": 0.4387,
+          "DIFFICULT_CONDITION": 0.1213
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.9937,
+          "record_id": "EX-SYN-0023",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0023",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 500.0mm METAL pipe. Ground-truth annular gap is exactly 1.0mm. Rendered under harsh_specular lighting with standing_water cond..."
+        },
+        {
+          "similarity_score": 0.9924,
+          "record_id": "EX-SYN-0011",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0011",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 250.0mm METAL pipe. Ground-truth annular gap is exactly 0.0mm. Rendered under central_cctv lighting with dry conditions...."
+        }
+      ]
+    },
+    {
+      "file_name": "WhatsApp Image 2026-10-01 at 15.05.04 (1).jpeg",
+      "folder": "scratch",
+      "resolution": "1280x960",
+      "sha256": "594b2b4284f4883351df4228f76f19146a0e434579929b8353d1322edd112c6d",
+      "dhash": "7ec743e1e1c151d9",
+      "is_duplicate": false,
+      "duplicate_of": null,
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "FAIL",
+        "mean_gap_mm": 34.65,
+        "min_gap_mm": 0.45,
+        "max_gap_mm": 68.77,
+        "pixels_per_mm": 2.2104,
+        "inner_radius_px": 331.56,
+        "outer_radius_px": 408.15
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.4112,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.4499,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1088,
+          "DISPLACED_JOINT": 0.0796,
+          "DAMAGED_JOINT": 0.0934,
+          "INTRUDING_SEAL": 0.1502,
+          "DEPOSITS_OBSTACLES": 0.4499,
+          "DIFFICULT_CONDITION": 0.118
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.9732,
+          "record_id": "EX-SYN-0028",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0028",
+          "guidance": "Synthetic reference exemplar of a DAMAGED_JOINT in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 7.5mm. Rendered under harsh_specular lighting with standing_water condit..."
+        },
+        {
+          "similarity_score": 0.9648,
+          "record_id": "EX-SYN-0026",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0026",
+          "guidance": "Synthetic reference exemplar of a OPEN_JOINT in a 200.0mm CONCRETE pipe. Ground-truth annular gap is exactly 4.0mm. Rendered under central_cctv lighting with dry conditions...."
+        }
+      ]
+    },
+    {
+      "file_name": "WhatsApp Image 2026-10-01 at 15.05.04.jpeg",
+      "folder": "scratch",
+      "resolution": "1280x960",
+      "sha256": "211e2e7ec063e54e09b744c4f69ec77f462d26b8a6956b47e5efa74a5d1f53b6",
+      "dhash": "044c0a080e0e4c4f",
+      "is_duplicate": true,
+      "duplicate_of": "test 6.jpeg",
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "FAIL",
+        "mean_gap_mm": 32.66,
+        "min_gap_mm": 0.59,
+        "max_gap_mm": 64.29,
+        "pixels_per_mm": 1.6956,
+        "inner_radius_px": 254.33,
+        "outer_radius_px": 309.71
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.3665,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.4816,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.086,
+          "DISPLACED_JOINT": 0.0665,
+          "DAMAGED_JOINT": 0.0827,
+          "INTRUDING_SEAL": 0.1696,
+          "DEPOSITS_OBSTACLES": 0.4816,
+          "DIFFICULT_CONDITION": 0.1137
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.9158,
+          "record_id": "EX-SYN-0029",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0029",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 375.0mm PVC pipe. Ground-truth annular gap is exactly 10.0mm. Rendered under asymmetric_shadow lighting with dirty_lens condit..."
+        },
+        {
+          "similarity_score": 0.9014,
+          "record_id": "EX-SYN-0005",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0005",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 375.0mm PVC pipe. Ground-truth annular gap is exactly 3.0mm. Rendered under wet_specular lighting with turbid_fog conditions...."
+        }
+      ]
+    },
+    {
+      "file_name": "WhatsApp Image 2026-10-01 at 15.05.05 (1).jpeg",
+      "folder": "scratch",
+      "resolution": "960x1280",
+      "sha256": "aaaa300795580fcc90fc0fca060a749f51a05310621478be446d77a21a66de73",
+      "dhash": "d8edecfffecf4f0f",
+      "is_duplicate": true,
+      "duplicate_of": "test 4.jpeg",
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "REVIEW",
+        "mean_gap_mm": 20.74,
+        "min_gap_mm": 20.74,
+        "max_gap_mm": 20.74,
+        "pixels_per_mm": 2.0733,
+        "inner_radius_px": 311.0,
+        "outer_radius_px": 354.0
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.4267,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.3762,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1174,
+          "DISPLACED_JOINT": 0.0949,
+          "DAMAGED_JOINT": 0.1111,
+          "INTRUDING_SEAL": 0.1689,
+          "DEPOSITS_OBSTACLES": 0.3762,
+          "DIFFICULT_CONDITION": 0.1315
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.8381,
+          "record_id": "EX-SYN-0012",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0012",
+          "guidance": "Synthetic reference exemplar of a DEPOSITS_OBSTACLES in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 0.5mm. Rendered under dim_lighting lighting with wet conditions...."
+        },
+        {
+          "similarity_score": 0.8132,
+          "record_id": "EX-SYN-0023",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0023",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 500.0mm METAL pipe. Ground-truth annular gap is exactly 1.0mm. Rendered under harsh_specular lighting with standing_water cond..."
+        }
+      ]
+    },
+    {
+      "file_name": "WhatsApp Image 2026-10-01 at 15.05.05 (2).jpeg",
+      "folder": "scratch",
+      "resolution": "960x1280",
+      "sha256": "77a1c6f8d8ff96d244be00ba09f726bcf0b4b590189f3f3acdcd887383f80ed8",
+      "dhash": "0f1f1f0f1f0b0717",
+      "is_duplicate": true,
+      "duplicate_of": "test 2.jpeg",
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "FAIL",
+        "mean_gap_mm": 63.69,
+        "min_gap_mm": 1.81,
+        "max_gap_mm": 103.31,
+        "pixels_per_mm": 1.6552,
+        "inner_radius_px": 248.28,
+        "outer_radius_px": 353.69
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.3732,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.5163,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1014,
+          "DISPLACED_JOINT": 0.066,
+          "DAMAGED_JOINT": 0.0767,
+          "INTRUDING_SEAL": 0.1296,
+          "DEPOSITS_OBSTACLES": 0.5163,
+          "DIFFICULT_CONDITION": 0.11
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.9734,
+          "record_id": "EX-SYN-0023",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0023",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 500.0mm METAL pipe. Ground-truth annular gap is exactly 1.0mm. Rendered under harsh_specular lighting with standing_water cond..."
+        },
+        {
+          "similarity_score": 0.9562,
+          "record_id": "EX-SYN-0012",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0012",
+          "guidance": "Synthetic reference exemplar of a DEPOSITS_OBSTACLES in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 0.5mm. Rendered under dim_lighting lighting with wet conditions...."
+        }
+      ]
+    },
+    {
+      "file_name": "WhatsApp Image 2026-10-01 at 15.05.05 (3).jpeg",
+      "folder": "scratch",
+      "resolution": "960x1280",
+      "sha256": "ecc89cfa94a827de12fcdc77f41db38e5b58898f10876d7b787ebbb0ca3c189c",
+      "dhash": "0f0f0f0f0f0f0707",
+      "is_duplicate": true,
+      "duplicate_of": "test 3.jpeg",
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "FAIL",
+        "mean_gap_mm": 40.84,
+        "min_gap_mm": 1.08,
+        "max_gap_mm": 80.54,
+        "pixels_per_mm": 1.8499,
+        "inner_radius_px": 277.49,
+        "outer_radius_px": 353.03
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.3788,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.5012,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1044,
+          "DISPLACED_JOINT": 0.069,
+          "DAMAGED_JOINT": 0.0801,
+          "INTRUDING_SEAL": 0.1324,
+          "DEPOSITS_OBSTACLES": 0.5012,
+          "DIFFICULT_CONDITION": 0.1129
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.9581,
+          "record_id": "EX-SYN-0012",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0012",
+          "guidance": "Synthetic reference exemplar of a DEPOSITS_OBSTACLES in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 0.5mm. Rendered under dim_lighting lighting with wet conditions...."
+        },
+        {
+          "similarity_score": 0.9556,
+          "record_id": "EX-SYN-0016",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0016",
+          "guidance": "Synthetic reference exemplar of a DAMAGED_JOINT in a 600.0mm CLAY pipe. Ground-truth annular gap is exactly 4.0mm. Rendered under central_cctv lighting with dry conditions...."
+        }
+      ]
+    },
+    {
+      "file_name": "WhatsApp Image 2026-10-01 at 15.05.05 (4).jpeg",
+      "folder": "scratch",
+      "resolution": "960x1280",
+      "sha256": "614217ad8ddfc7b47f4a8ffeba2ae132ba90856bc91a1e59168e710e192d585d",
+      "dhash": "031f0f3e73e36722",
+      "is_duplicate": true,
+      "duplicate_of": "test 5.jpeg",
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "PASS",
+        "mean_gap_mm": 4.12,
+        "min_gap_mm": 4.12,
+        "max_gap_mm": 4.12,
+        "pixels_per_mm": 2.6667,
+        "inner_radius_px": 400.0,
+        "outer_radius_px": 411.0
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.4202,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.4194,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1159,
+          "DISPLACED_JOINT": 0.0869,
+          "DAMAGED_JOINT": 0.1002,
+          "INTRUDING_SEAL": 0.1539,
+          "DEPOSITS_OBSTACLES": 0.4194,
+          "DIFFICULT_CONDITION": 0.1237
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.8887,
+          "record_id": "EX-SYN-0023",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0023",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 500.0mm METAL pipe. Ground-truth annular gap is exactly 1.0mm. Rendered under harsh_specular lighting with standing_water cond..."
+        },
+        {
+          "similarity_score": 0.8683,
+          "record_id": "EX-SYN-0012",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0012",
+          "guidance": "Synthetic reference exemplar of a DEPOSITS_OBSTACLES in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 0.5mm. Rendered under dim_lighting lighting with wet conditions...."
+        }
+      ]
+    },
+    {
+      "file_name": "WhatsApp Image 2026-10-01 at 15.05.05 (5).jpeg",
+      "folder": "scratch",
+      "resolution": "1280x960",
+      "sha256": "211e2e7ec063e54e09b744c4f69ec77f462d26b8a6956b47e5efa74a5d1f53b6",
+      "dhash": "044c0a080e0e4c4f",
+      "is_duplicate": true,
+      "duplicate_of": "test 6.jpeg",
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "FAIL",
+        "mean_gap_mm": 32.66,
+        "min_gap_mm": 0.59,
+        "max_gap_mm": 64.29,
+        "pixels_per_mm": 1.6956,
+        "inner_radius_px": 254.33,
+        "outer_radius_px": 309.71
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.3665,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.4816,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.086,
+          "DISPLACED_JOINT": 0.0665,
+          "DAMAGED_JOINT": 0.0827,
+          "INTRUDING_SEAL": 0.1696,
+          "DEPOSITS_OBSTACLES": 0.4816,
+          "DIFFICULT_CONDITION": 0.1137
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.9158,
+          "record_id": "EX-SYN-0029",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0029",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 375.0mm PVC pipe. Ground-truth annular gap is exactly 10.0mm. Rendered under asymmetric_shadow lighting with dirty_lens condit..."
+        },
+        {
+          "similarity_score": 0.9014,
+          "record_id": "EX-SYN-0005",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0005",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 375.0mm PVC pipe. Ground-truth annular gap is exactly 3.0mm. Rendered under wet_specular lighting with turbid_fog conditions...."
+        }
+      ]
+    },
+    {
+      "file_name": "WhatsApp Image 2026-10-01 at 15.05.05.jpeg",
+      "folder": "scratch",
+      "resolution": "960x1280",
+      "sha256": "9d5879d312b362a5de70d5b939c90817c6f8deb93baf523331eb013f800fc770",
+      "dhash": "0b0f070786f2be3a",
+      "is_duplicate": true,
+      "duplicate_of": "test 1.jpeg",
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "FAIL",
+        "mean_gap_mm": 31.32,
+        "min_gap_mm": 3.17,
+        "max_gap_mm": 83.6,
+        "pixels_per_mm": 1.5789,
+        "inner_radius_px": 236.83,
+        "outer_radius_px": 286.28
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.4301,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.3655,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1247,
+          "DISPLACED_JOINT": 0.0993,
+          "DAMAGED_JOINT": 0.1128,
+          "INTRUDING_SEAL": 0.1627,
+          "DEPOSITS_OBSTACLES": 0.3655,
+          "DIFFICULT_CONDITION": 0.1351
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.7844,
+          "record_id": "EX-SYN-0012",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0012",
+          "guidance": "Synthetic reference exemplar of a DEPOSITS_OBSTACLES in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 0.5mm. Rendered under dim_lighting lighting with wet conditions...."
+        },
+        {
+          "similarity_score": 0.7458,
+          "record_id": "EX-SYN-0023",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0023",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 500.0mm METAL pipe. Ground-truth annular gap is exactly 1.0mm. Rendered under harsh_specular lighting with standing_water cond..."
+        }
+      ]
+    },
+    {
+      "file_name": "WhatsApp Image 2026-10-01 at 15.05.06 (1).jpeg",
+      "folder": "scratch",
+      "resolution": "810x1080",
+      "sha256": "991d324d486df5f0d268c166d6b9397215277870e1f72c4484a95e9a21a1a104",
+      "dhash": "830f131f0d190e0d",
+      "is_duplicate": false,
+      "duplicate_of": null,
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "REVIEW",
+        "mean_gap_mm": 0.93,
+        "min_gap_mm": 0.93,
+        "max_gap_mm": 0.93,
+        "pixels_per_mm": 2.1467,
+        "inner_radius_px": 322.0,
+        "outer_radius_px": 324.0
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.4078,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "DEPOSITS_OBSTACLES",
+        "confidence": 0.4497,
+        "tolerance_overridden": false,
+        "distribution": {
+          "NORMAL_JOINT": 0.1122,
+          "DISPLACED_JOINT": 0.0805,
+          "DAMAGED_JOINT": 0.0927,
+          "INTRUDING_SEAL": 0.1453,
+          "DEPOSITS_OBSTACLES": 0.4497,
+          "DIFFICULT_CONDITION": 0.1195
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.9532,
+          "record_id": "EX-SYN-0023",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0023",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 500.0mm METAL pipe. Ground-truth annular gap is exactly 1.0mm. Rendered under harsh_specular lighting with standing_water cond..."
+        },
+        {
+          "similarity_score": 0.9351,
+          "record_id": "EX-SYN-0012",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0012",
+          "guidance": "Synthetic reference exemplar of a DEPOSITS_OBSTACLES in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 0.5mm. Rendered under dim_lighting lighting with wet conditions...."
+        }
+      ]
+    },
+    {
+      "file_name": "WhatsApp Image 2026-10-01 at 15.05.06.jpeg",
+      "folder": "scratch",
+      "resolution": "926x1080",
+      "sha256": "c913a5110fc145ddc3ba4980f162a84d7f8ac1cc00a80e8c39fbf2000dfd4023",
+      "dhash": "0f1f1f172f1f1f0d",
+      "is_duplicate": false,
+      "duplicate_of": null,
+      "opencv_measurement": {
+        "status": "ACCEPTED",
+        "overall_status": "FAIL",
+        "mean_gap_mm": 44.78,
+        "min_gap_mm": 1.72,
+        "max_gap_mm": 120.47,
+        "pixels_per_mm": 1.7432,
+        "inner_radius_px": 261.49,
+        "outer_radius_px": 339.56
+      },
+      "ai_segmenter": {
+        "model_available": true,
+        "mean_joint_confidence": 0.4125,
+        "segmentation_mask_generated": true
+      },
+      "ai_classifier": {
+        "model_available": true,
+        "predicted_class": "OPEN_JOINT",
+        "confidence": 0.3845,
+        "tolerance_overridden": true,
+        "distribution": {
+          "NORMAL_JOINT": 0.1262,
+          "DISPLACED_JOINT": 0.0953,
+          "DAMAGED_JOINT": 0.1058,
+          "INTRUDING_SEAL": 0.1532,
+          "DEPOSITS_OBSTACLES": 0.3845,
+          "DIFFICULT_CONDITION": 0.135
+        }
+      },
+      "rag_advisory": [
+        {
+          "similarity_score": 0.9807,
+          "record_id": "EX-SYN-0023",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0023",
+          "guidance": "Synthetic reference exemplar of a INTRUDING_SEAL in a 500.0mm METAL pipe. Ground-truth annular gap is exactly 1.0mm. Rendered under harsh_specular lighting with standing_water cond..."
+        },
+        {
+          "similarity_score": 0.9732,
+          "record_id": "EX-SYN-0012",
+          "record_type": "VERIFIED_SYNTHETIC_EXAMPLE",
+          "title": "EX-SYN-0012",
+          "guidance": "Synthetic reference exemplar of a DEPOSITS_OBSTACLES in a 300.0mm CLAY pipe. Ground-truth annular gap is exactly 0.5mm. Rendered under dim_lighting lighting with wet conditions...."
+        }
+      ]
+    }
+  ]
+}

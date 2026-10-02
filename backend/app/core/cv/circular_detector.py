@@ -45,8 +45,19 @@ def _find_concentric_circles(
         if joint_mask.shape == gray.shape:
             masked_gray = cv2.bitwise_and(gray, gray, mask=joint_mask)
 
+    # Resolution scaling for rapid circle localization
+    scale = 1.0
+    if max(h, w) > 640:
+        scale = 640.0 / max(h, w)
+        det_gray = cv2.resize(masked_gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+    else:
+        det_gray = masked_gray
+
+    det_h, det_w = det_gray.shape
+    det_min_dim = min(det_h, det_w)
+
     # Apply bilateral smoothing and CLAHE
-    smoothed = filter_bilateral_smooth(masked_gray, d=9, sigma_color=75, sigma_space=75)
+    smoothed = filter_bilateral_smooth(det_gray, d=5, sigma_color=50, sigma_space=50)
     enhanced = enhance_edges_clahe(smoothed, clip_limit=2.0)
 
     # 1. Primary Attempt: HoughCircles
@@ -54,15 +65,17 @@ def _find_concentric_circles(
         enhanced,
         cv2.HOUGH_GRADIENT,
         dp=1.2,
-        minDist=int(min_dim * 0.05),
+        minDist=int(det_min_dim * 0.05),
         param1=90,
         param2=30,
-        minRadius=int(min_dim * 0.05),
-        maxRadius=int(min_dim * 0.48),
+        minRadius=int(det_min_dim * 0.05),
+        maxRadius=int(det_min_dim * 0.48),
     )
 
     if circles is not None and len(circles[0]) >= 2:
-        detected = sorted(circles[0], key=lambda c: c[2])
+        # Keep top 40 largest candidates to prevent quadratic nested looping
+        candidates = sorted(circles[0], key=lambda c: c[2], reverse=True)[:40]
+        detected = sorted(candidates, key=lambda c: c[2])
         # Find best concentric pair
         for i in range(len(detected) - 1):
             c_in = detected[i]
@@ -72,34 +85,45 @@ def _find_concentric_circles(
                 # Check if concentric (centers close within 18% of inner radius)
                 if center_dist <= max(10.0, c_in[2] * 0.18):
                     return (
-                        (float(c_in[0]), float(c_in[1]), float(c_in[2])),
-                        (float(c_out[0]), float(c_out[1]), float(c_out[2])),
+                        (float(c_in[0] / scale), float(c_in[1] / scale), float(c_in[2] / scale)),
+                        (float(c_out[0] / scale), float(c_out[1] / scale), float(c_out[2] / scale)),
                     )
 
     # 2. Fallback: Contour Hierarchy & Circle Fitting
     edges = cv2.Canny(enhanced, 35, 110)
-    contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     valid_circles = []
+    min_cand_dim = int(det_min_dim * 0.08)
     for cnt in contours:
+        if len(cnt) < 15:
+            continue
+        _, _, bw, bh = cv2.boundingRect(cnt)
+        if bw < min_cand_dim or bh < min_cand_dim:
+            continue
         area = cv2.contourArea(cnt)
         perimeter = cv2.arcLength(cnt, True)
         if perimeter > 0 and area > 100:
             circularity = 4 * math.pi * (area / (perimeter * perimeter))
-            if circularity > 0.5:
+            if circularity > 0.45:
                 (x, y), radius = cv2.minEnclosingCircle(cnt)
-                if radius > min_dim * 0.05 and radius < min_dim * 0.48:
-                    valid_circles.append((float(x), float(y), float(radius)))
+                if radius > det_min_dim * 0.05 and radius < det_min_dim * 0.48:
+                    valid_circles.append((float(x), float(y), float(radius), circularity))
 
     if len(valid_circles) >= 2:
+        # Sort by circularity/radius and keep top 40 to avoid quadratic search on noise
+        valid_circles = sorted(valid_circles, key=lambda c: (c[3], c[2]), reverse=True)[:40]
         valid_circles = sorted(valid_circles, key=lambda c: c[2])
         for i in range(len(valid_circles) - 1):
-            c_in = valid_circles[i]
+            c_in = valid_circles[i][:3]
             for j in range(i + 1, len(valid_circles)):
-                c_out = valid_circles[j]
+                c_out = valid_circles[j][:3]
                 center_dist = math.hypot(c_in[0] - c_out[0], c_in[1] - c_out[1])
                 if center_dist <= max(12.0, c_in[2] * 0.20) and (c_out[2] - c_in[2]) > 3:
-                    return c_in, c_out
+                    return (
+                        (float(c_in[0] / scale), float(c_in[1] / scale), float(c_in[2] / scale)),
+                        (float(c_out[0] / scale), float(c_out[1] / scale), float(c_out[2] / scale)),
+                    )
 
     # ZERO ARTIFICIAL GUESSING: Return None rather than inventing circle from center or dominant contour
     return None
