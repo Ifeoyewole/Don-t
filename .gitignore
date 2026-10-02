@@ -38,4 +38,6 @@ __pycache__/
 .venv/
 venv/
 scratch/
-
+MultiLabel_SewerDefect_SSL/
+dataset-staging/
+training/data/
