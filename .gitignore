@@ -40,4 +40,13 @@ venv/
 scratch/
 MultiLabel_SewerDefect_SSL/
 dataset-staging/
-training/data/
+training/data/
+data/
+*.onnx
+*.pt
+*.pth
+models/segmenter/candidates/*.onnx
+models/segmenter/production/*.onnx
+models/classifier/candidates/*.onnx
+models/classifier/production/*.onnx
+
