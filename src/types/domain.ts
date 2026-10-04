@@ -66,6 +66,8 @@ export interface CvMeasurementDebug {
   condition?: JointConditionClass
   confidenceBreakdown?: ConfidenceBreakdown
   rejectionReason?: string
+  externalClassifier?: ExternalClassifierResult
+  modelComparison?: ModelComparisonResult
 }
 
 export interface AiMeasurementReview {
@@ -94,6 +96,39 @@ export interface MeasurementAudit {
   decision: string
   resultStatus?: MeasurementResultStatus
   rejectionReason?: string
+}
+
+export interface ExternalClassTopK {
+  index: number
+  raw_class_name: string
+  raw_class_code?: string
+  score: number
+  jointinspect_mapping?: string | null
+}
+
+export interface ExternalClassifierResult {
+  model_id: string
+  source: string
+  raw_class_code?: string
+  raw_class_name: string
+  confidence: number
+  top_k: ExternalClassTopK[]
+  jointinspect_mapping?: string | null
+  mapping_status: 'DIRECT' | 'GROUPED' | 'UNMAPPED' | 'AMBIGUOUS' | string
+  advisory_only: boolean
+  status: 'SUCCESS' | 'LOW_CONFIDENCE_CLASSIFICATION' | 'EXTERNAL_CLASSIFIER_UNAVAILABLE' | string
+}
+
+export interface ModelComparisonResult {
+  wrc_baseline_prediction?: string | null
+  wrc_baseline_score?: number | null
+  native_model_b_prediction?: string | null
+  native_model_b_score?: number | null
+  vertex_observation?: string | null
+  wrc_vs_native_agreement: 'AGREE' | 'DISAGREE' | 'NOT_COMPARABLE' | 'UNMAPPED' | string
+  wrc_vs_vertex_agreement: 'AGREE' | 'DISAGREE' | 'NOT_COMPARABLE' | 'UNMAPPED' | string
+  native_vs_vertex_agreement: 'AGREE' | 'DISAGREE' | 'NOT_COMPARABLE' | 'UNMAPPED' | string
+  human_review_required: boolean
 }
 
 export interface Project {
@@ -225,6 +260,8 @@ export interface InspectionResult {
   condition?: JointConditionClass
   confidenceBreakdown?: ConfidenceBreakdown
   rejectionReason?: string
+  externalClassifier?: ExternalClassifierResult
+  modelComparison?: ModelComparisonResult
 }
 
 export interface ApplyOverrideInput {

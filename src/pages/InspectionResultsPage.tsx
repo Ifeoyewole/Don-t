@@ -276,6 +276,110 @@ const ResultCard = ({
           </div>
         )}
 
+        {/* AI Visual Assessment: WRc External Baseline (Advisory Only) */}
+        {(item.externalClassifier || item.cvDebug?.externalClassifier) && (
+          <div className="wrc-baseline-card" style={{
+            margin: '12px 0',
+            padding: '12px 14px',
+            background: 'var(--color-surface-subtle, rgba(255, 255, 255, 0.04))',
+            borderRadius: '8px',
+            border: '1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.08))',
+            fontSize: '0.85rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontWeight: 600, color: 'var(--color-text-secondary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.72rem' }}>
+                AI Visual Assessment (Advisory Baseline)
+              </span>
+              <span style={{
+                fontSize: '0.7rem',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                background: 'rgba(56, 189, 248, 0.15)',
+                color: '#38bdf8',
+                fontWeight: 600
+              }}>
+                WRc InceptionResNetV2
+              </span>
+            </div>
+
+            {(() => {
+              const ext = item.externalClassifier || item.cvDebug?.externalClassifier;
+              if (!ext) return null;
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Raw WRc Prediction:</span>
+                      <div style={{ fontWeight: 600, color: '#f8fafc' }}>
+                        {ext.raw_class_name} {ext.raw_class_code ? `(${ext.raw_class_code})` : ''}
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Model Score:</span>
+                      <div style={{ fontWeight: 600, color: '#f8fafc' }}>
+                        {Math.round(ext.confidence * 100)}%
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', paddingTop: '6px' }}>
+                    <div>
+                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>JointInspect Mapping:</span>
+                      <div style={{ fontWeight: 500, color: ext.jointinspect_mapping ? '#e2e8f0' : '#64748b' }}>
+                        {ext.jointinspect_mapping || 'Unmapped'} ({ext.mapping_status})
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Authority Status:</span>
+                      <div style={{ color: '#fbbf24', fontSize: '0.75rem', fontWeight: 500 }}>
+                        Advisory Baseline (No Tolerance Authority)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Beta Multi-System Comparison Telemetry */}
+        {(item.modelComparison || item.cvDebug?.modelComparison) && (
+          <div className="model-comparison-card" style={{
+            margin: '8px 0 12px 0',
+            padding: '10px 12px',
+            background: 'rgba(0, 0, 0, 0.25)',
+            borderRadius: '6px',
+            border: '1px dashed rgba(255, 255, 255, 0.12)',
+            fontSize: '0.8rem'
+          }}>
+            <div style={{ fontWeight: 600, color: '#94a3b8', marginBottom: '6px', fontSize: '0.72rem', textTransform: 'uppercase' }}>
+              Beta Multi-System Comparison
+            </div>
+            {(() => {
+              const comp = item.modelComparison || item.cvDebug?.modelComparison;
+              if (!comp) return null;
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8' }}>WRc vs Native Agreement:</span>
+                    <span style={{
+                      fontWeight: 600,
+                      color: comp.wrc_vs_native_agreement === 'AGREE' ? '#4ade80' : comp.wrc_vs_native_agreement === 'DISAGREE' ? '#f87171' : '#94a3b8'
+                    }}>
+                      {comp.wrc_vs_native_agreement}
+                    </span>
+                  </div>
+                  {comp.human_review_required && (
+                    <div style={{ color: '#f87171', fontWeight: 600, fontSize: '0.75rem', marginTop: '2px' }}>
+                      ⚠️ High-confidence disagreement flagged for manual beta review
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         <div className="inspection-note-block">
           <span>Measurement Review</span>
           <p>{measurementLabel(item)}</p>

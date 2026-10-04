@@ -32,6 +32,8 @@ class JointConditionClass(str, Enum):
     OPEN_JOINT = "open_joint"
     DAMAGED_JOINT = "damaged_joint"
     INTRUDING_SEAL = "intruding_seal"
+    DEPOSITS_OBSTACLES = "deposits_obstacles"
+    DIFFICULT_CONDITION = "difficult_condition"
     CLASSIFICATION_UNAVAILABLE = "classification_unavailable"
 
 

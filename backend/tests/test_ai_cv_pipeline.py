@@ -180,13 +180,14 @@ def test_tolerance_primary_open_joint():
     assert res_open.condition == JointConditionClass.OPEN_JOINT
     assert res_open.is_tolerance_overridden is True
 
-    # Case B: Measured gap 8.0mm within allowable 12.0mm -> remains NORMAL_JOINT
+    # Case B: Measured gap 8.0mm within allowable 12.0mm -> remains unoverridden
+    # Without visual evidence or weights, zero-guessing requires CLASSIFICATION_UNAVAILABLE
     res_normal = classifier.classify_joint(
         image_bgr=None,
         measured_gap_mm=8.0,
         max_allowable_gap_mm=12.0,
     )
-    assert res_normal.condition == JointConditionClass.NORMAL_JOINT
+    assert res_normal.condition == JointConditionClass.CLASSIFICATION_UNAVAILABLE
     assert res_normal.is_tolerance_overridden is False
 
 

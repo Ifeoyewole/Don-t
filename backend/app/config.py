@@ -1,6 +1,7 @@
 """Application configuration and runtime environment settings."""
 
 import os
+from pathlib import Path
 from typing import List
 from pydantic import BaseModel, Field
 
@@ -47,5 +48,20 @@ class Settings(BaseModel):
     STANDARD_TOLERANCE_MAX_PASS_MM: float = 15.0
     STANDARD_TOLERANCE_MAX_REVIEW_MM: float = 25.0
 
+    # External Sewer Defect Baseline Classifier (WRc InceptionResNetV2 - Advisory Only)
+    WRC_BASELINE_ENABLED: bool = os.getenv("WRC_BASELINE_ENABLED", "true").lower() in ("true", "1", "yes")
+    WRC_BASELINE_MODEL_ID: str = os.getenv("WRC_BASELINE_MODEL_ID", "wrc-inceptionresnetv2-baseline-v1")
+    WRC_BASELINE_PATH: str = os.getenv(
+        "WRC_BASELINE_PATH",
+        str(Path(__file__).resolve().parent.parent / "models" / "external" / "wrc" / "wrc_inceptionresnetv2_baseline_v1.onnx"),
+    )
+    WRC_BASELINE_MIN_SCORE: float = float(os.getenv("WRC_BASELINE_MIN_SCORE", "0.20"))
+
 
 settings = Settings()
+
+
+def get_settings() -> Settings:
+    """Return application settings singleton."""
+    return settings
+

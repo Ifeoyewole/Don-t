@@ -39,6 +39,13 @@ class ModelRegistry:
         segmenter_weights = self.models_dir / "pipe_joint_segmenter_v1.onnx"
         classifier_weights = self.models_dir / "pipe_joint_classifier_v1.onnx"
 
+        wrc_weights = self.models_dir / "wrc_inceptionresnetv2_baseline_v1.onnx"
+        if not wrc_weights.exists():
+            # Check external models directory
+            alt_wrc = self.models_dir / "external" / "wrc" / "wrc_inceptionresnetv2_baseline_v1.onnx"
+            if alt_wrc.exists():
+                wrc_weights = alt_wrc
+
         self._models["joint_segmenter"] = ModelInfo(
             model_id="joint_segmenter",
             model_type="segmenter",
@@ -55,6 +62,15 @@ class ModelRegistry:
             input_size=256,
             version="1.0.0",
             is_available=classifier_weights.exists(),
+        )
+
+        self._models["wrc-inceptionresnetv2-baseline-v1"] = ModelInfo(
+            model_id="wrc-inceptionresnetv2-baseline-v1",
+            model_type="external_classifier",
+            weights_path=wrc_weights,
+            input_size=299,
+            version="1.0.0",
+            is_available=wrc_weights.exists(),
         )
 
     def get_model_info(self, model_id: str) -> Optional[ModelInfo]:

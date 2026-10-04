@@ -104,6 +104,42 @@ class ConfidenceBreakdown(BaseModel):
     )
 
 
+class ExternalClassTopK(BaseModel):
+    """Single top-k class prediction from external classifier."""
+    index: int = Field(..., description="Class index in model output")
+    raw_class_name: str = Field(..., description="Raw class name from external model")
+    raw_class_code: Optional[str] = Field(None, description="External standard defect code (e.g. JD, DE, B)")
+    score: float = Field(..., description="Model confidence score for this class (0.0 to 1.0)")
+    jointinspect_mapping: Optional[str] = Field(None, description="Mapped JointInspect condition concept or None")
+
+
+class ExternalClassifierResult(BaseModel):
+    """External sewer defect baseline classifier result contract (Advisory Baseline)."""
+    model_id: str = Field(default="wrc-inceptionresnetv2-baseline-v1", description="External model identity")
+    source: str = Field(default="WRc", description="Training dataset origin")
+    raw_class_code: Optional[str] = Field(None, description="Top-1 WRc defect code")
+    raw_class_name: str = Field(..., description="Top-1 raw WRc class name")
+    confidence: float = Field(..., description="Model probability score for top-1 class (MODEL_SCORE)")
+    top_k: List[ExternalClassTopK] = Field(default_factory=list, description="Top-K predicted classes")
+    jointinspect_mapping: Optional[str] = Field(None, description="Conservative JointInspect condition category")
+    mapping_status: str = Field(..., description="Mapping outcome: DIRECT, GROUPED, UNMAPPED, or AMBIGUOUS")
+    advisory_only: bool = Field(default=True, description="Strictly advisory; no measurement or tolerance authority")
+    status: str = Field(default="SUCCESS", description="SUCCESS, LOW_CONFIDENCE_CLASSIFICATION, or EXTERNAL_CLASSIFIER_UNAVAILABLE")
+
+
+class ModelComparisonResult(BaseModel):
+    """Comparison and disagreement tracking across visual assessment systems for beta evaluation."""
+    wrc_baseline_prediction: Optional[str] = Field(None, description="WRc external classifier prediction")
+    wrc_baseline_score: Optional[float] = Field(None, description="WRc model score")
+    native_model_b_prediction: Optional[str] = Field(None, description="JointInspect native Model B prediction")
+    native_model_b_score: Optional[float] = Field(None, description="JointInspect native Model B score")
+    vertex_observation: Optional[str] = Field(None, description="Vertex AI semantic observation")
+    wrc_vs_native_agreement: str = Field(..., description="AGREE, DISAGREE, NOT_COMPARABLE, or UNMAPPED")
+    wrc_vs_vertex_agreement: str = Field(..., description="AGREE, DISAGREE, NOT_COMPARABLE, or UNMAPPED")
+    native_vs_vertex_agreement: str = Field(..., description="AGREE, DISAGREE, NOT_COMPARABLE, or UNMAPPED")
+    human_review_required: bool = Field(default=False, description="Flagged for manual review on strong disagreement")
+
+
 class MeasurementResponse(BaseModel):
     """Top-level structured response payload returned by measurement API."""
     joint_type: JointType = Field(..., description="Classified or requested joint type.")
@@ -131,8 +167,17 @@ class MeasurementResponse(BaseModel):
     )
     overlay_hints: OverlayHints = Field(..., description="Frontend overlay graphics coordinates.")
     debug_info: Optional[CvMeasurementDebug] = Field(None, description="Optional diagnostic measurements.")
+    external_classifier: Optional[ExternalClassifierResult] = Field(
+        default=None,
+        description="External sewer baseline classifier result (WRc InceptionResNetV2).",
+    )
+    model_comparison: Optional[ModelComparisonResult] = Field(
+        default=None,
+        description="Beta-testing model comparison and disagreement telemetry.",
+    )
     timestamp: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(),
         description="ISO 8601 UTC timestamp of the measurement.",
     )
+
 

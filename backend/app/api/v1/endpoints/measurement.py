@@ -6,6 +6,10 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from backend.app.core.cv.ai.image_quality import validate_image_quality
 from backend.app.core.cv.ai.joint_classifier import JointClassifier
 from backend.app.core.cv.ai.joint_segmenter import JointSegmenter
+from backend.app.core.cv.ai.wrc_inception_classifier import (
+    compare_models,
+    get_wrc_classifier,
+)
 from backend.app.core.cv.calibration import camera_calibrator
 from backend.app.core.cv.circular_detector import measure_circular_gap
 from backend.app.core.cv.confidence import confidence_engine
@@ -217,6 +221,18 @@ async def measure_joint_gap(
             roi_bbox=seg_res.bbox if seg_res.detected else None,
             measured_gap_mm=response.mean_gap_mm,
             max_allowable_gap_mm=max_tol,
+        )
+
+        # Step 6b: External WRc InceptionResNetV2 Sewer Baseline Classifier (Advisory Baseline)
+        wrc_classifier = get_wrc_classifier()
+        wrc_res = wrc_classifier.classify(image_bgr=rectified_bgr)
+        response.external_classifier = wrc_res
+
+        # Step 6c: Beta Multi-System Disagreement Tracking
+        response.model_comparison = compare_models(
+            wrc_result=wrc_res,
+            native_result=cond_res,
+            vertex_observation=None,
         )
 
         # Step 7: Calibrated Multi-Component Confidence Fusion

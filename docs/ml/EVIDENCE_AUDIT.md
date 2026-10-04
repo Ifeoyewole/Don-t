@@ -64,3 +64,19 @@ This audit establishes the factual baseline of the JointInspect computer vision 
 3. **Eliminated Invented Confidence Scores**: Removed hardcoded `0.70` confidence defaults when weights are absent.
 4. **Stage 0 Hardening**: Updated `training/task.py` so that Stage 0 runs as an explicit pipeline dry-run without writing dummy weights or recording fake candidate artifacts.
 5. **Truth in Metrics**: Documented that all Stage 0 metric values were simulated tensor convergence tests, not real-world model accuracy. Real-world physical accuracy requires empirical data from our controlled physical test rig.
+
+---
+
+## 5. WRc InceptionResNetV2 External Baseline Status
+
+- **Model Identifier**: `wrc-inceptionresnetv2-baseline-v1`
+- **Origin**: `alexgeorge13/WRc-Dataset-Classification` (Commit `7ac0b0f9edf430d43e5f180466e2e456d98fdfe7`)
+- **Software License**: MIT License (Alex George, 2025)
+- **Dataset / Weight Provenance**: `EXTERNAL_PRETRAINED` / `PENDING_REVIEW`
+- **Genuine Binary Weights**: `trainedWRc_inceptionresnetv2_focalLoss/weights.h5` (`231,566,563 bytes`)
+- **Verified SHA256**: `42527D8C4D38E6113F079BCB007715A5476D39CD3CC327F4BA87269D3C7DE253` (PASS)
+- **Production Artifact**: `gs://joint-inspection-510310-data/models/external/wrc/inceptionresnetv2/v1/wrc_inceptionresnetv2_baseline_v1.onnx` (`219,476,235 bytes`)
+- **Parity Verification**: Max absolute error `3.576e-07`, top-1 prediction matches reference TensorFlow (`Deposit`, score 0.6203)
+- **Classification Role**: Strictly advisory external visual baseline (`ADVISORY_BASELINE`)
+- **Engineering / Measurement Authority**: **NONE (0%)**
+- **Native Model B**: Preserved independently as experimental candidate (`cls-smoke-v1`)

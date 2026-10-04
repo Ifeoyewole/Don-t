@@ -1,0 +1,49 @@
+steps:
+  # Step 1: Copy verified ONNX model from GCS into backend/models directory
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        mkdir -p backend/models
+        gcloud storage cp gs://joint-inspection-510310-data/models/external/wrc/inceptionresnetv2/v1/wrc_inceptionresnetv2_baseline_v1.onnx backend/models/wrc_inceptionresnetv2_baseline_v1.onnx
+        ls -lh backend/models/
+
+  # Step 2: Build container image using Dockerfile
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:latest'
+      - '-f'
+      - 'backend/Dockerfile'
+      - 'backend'
+
+  # Step 3: Push image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:latest'
+
+  # Step 4: Deploy to Cloud Run service pipe-joint-api
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'pipe-joint-api'
+      - '--image=europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:latest'
+      - '--region=europe-west2'
+      - '--project=joint-inspection-510310'
+      - '--service-account=joint-inspection-runtime@joint-inspection-510310.iam.gserviceaccount.com'
+      - '--no-allow-unauthenticated'
+      - '--max-instances=10'
+      - '--concurrency=80'
+      - '--timeout=60s'
+      - '--set-env-vars=ENVIRONMENT=production,ENABLE_DOCS=false,CALIBRATION_MUTATION_ENABLED=false,WRC_BASELINE_ENABLED=true,WRC_BASELINE_PATH=/app/backend/models/wrc_inceptionresnetv2_baseline_v1.onnx'
+
+images:
+  - 'europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:latest'
+
+options:
+  machineType: 'E2_HIGHCPU_8'

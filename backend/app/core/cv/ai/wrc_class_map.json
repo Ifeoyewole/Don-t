@@ -1,0 +1,123 @@
+{
+  "model_id": "wrc-inceptionresnetv2-baseline-v1",
+  "output_dimension": 13,
+  "classes": [
+    {
+      "index": 0,
+      "wrc_code": "B",
+      "wrc_description": "Broken",
+      "jointinspect_mapping": "DAMAGED_JOINT",
+      "mapping_status": "GROUPED",
+      "mapping_confidence": 0.85,
+      "mapping_reason": "Structural pipe break represents severe structural damage at or near the pipe joint."
+    },
+    {
+      "index": 1,
+      "wrc_code": "CN",
+      "wrc_description": "Connection",
+      "jointinspect_mapping": null,
+      "mapping_status": "UNMAPPED",
+      "mapping_confidence": 0.0,
+      "mapping_reason": "Lateral pipe connection is an infrastructure junction, not an inspectable pipe joint defect."
+    },
+    {
+      "index": 2,
+      "wrc_code": "CK",
+      "wrc_description": "Crack",
+      "jointinspect_mapping": "DAMAGED_JOINT",
+      "mapping_status": "GROUPED",
+      "mapping_confidence": 0.90,
+      "mapping_reason": "Circumferential or longitudinal cracking compromises joint seal integrity."
+    },
+    {
+      "index": 3,
+      "wrc_code": "CND",
+      "wrc_description": "Defective Connection",
+      "jointinspect_mapping": null,
+      "mapping_status": "AMBIGUOUS",
+      "mapping_confidence": 0.0,
+      "mapping_reason": "Defective lateral connection is ambiguous with respect to circumferential joint geometry."
+    },
+    {
+      "index": 4,
+      "wrc_code": "D",
+      "wrc_description": "Deformed",
+      "jointinspect_mapping": "DAMAGED_JOINT",
+      "mapping_status": "GROUPED",
+      "mapping_confidence": 0.80,
+      "mapping_reason": "Pipe barrel deformation distorts the joint socket and spigot profile."
+    },
+    {
+      "index": 5,
+      "wrc_code": "DE",
+      "wrc_description": "Deposit",
+      "jointinspect_mapping": "DEPOSITS_OBSTACLES",
+      "mapping_status": "DIRECT",
+      "mapping_confidence": 0.95,
+      "mapping_reason": "Direct 1:1 conceptual match with JointInspect operational deposits and debris."
+    },
+    {
+      "index": 6,
+      "wrc_code": "JD",
+      "wrc_description": "Displaced Joint",
+      "jointinspect_mapping": "DISPLACED_JOINT",
+      "mapping_status": "DIRECT",
+      "mapping_confidence": 0.98,
+      "mapping_reason": "Direct 1:1 match for JointInspect displaced joint condition class."
+    },
+    {
+      "index": 7,
+      "wrc_code": "F",
+      "wrc_description": "Fracture",
+      "jointinspect_mapping": "DAMAGED_JOINT",
+      "mapping_status": "GROUPED",
+      "mapping_confidence": 0.90,
+      "mapping_reason": "Material fracture represents severe structural joint and barrel damage."
+    },
+    {
+      "index": 8,
+      "wrc_code": "H",
+      "wrc_description": "Hole",
+      "jointinspect_mapping": "DAMAGED_JOINT",
+      "mapping_status": "GROUPED",
+      "mapping_confidence": 0.85,
+      "mapping_reason": "Penetration hole in pipe wall compromises joint watertightness."
+    },
+    {
+      "index": 9,
+      "wrc_code": "J",
+      "wrc_description": "Junction",
+      "jointinspect_mapping": null,
+      "mapping_status": "UNMAPPED",
+      "mapping_confidence": 0.0,
+      "mapping_reason": "Sewer junction node is a mainline layout feature, not a pipe joint condition."
+    },
+    {
+      "index": 10,
+      "wrc_code": "LL",
+      "wrc_description": "Line of Sewer",
+      "jointinspect_mapping": null,
+      "mapping_status": "AMBIGUOUS",
+      "mapping_confidence": 0.0,
+      "mapping_reason": "Longitudinal line of sewer is a survey reference observation, ambiguous to joint state."
+    },
+    {
+      "index": 11,
+      "wrc_code": "R",
+      "wrc_description": "Roots",
+      "jointinspect_mapping": "DEPOSITS_OBSTACLES",
+      "mapping_status": "GROUPED",
+      "mapping_confidence": 0.90,
+      "mapping_reason": "Root mass ingress represents an intrusive obstruction at the joint seam."
+    },
+    {
+      "index": 12,
+      "wrc_code": "W",
+      "wrc_description": "Water",
+      "jointinspect_mapping": null,
+      "mapping_status": "UNMAPPED",
+      "mapping_confidence": 0.0,
+      "mapping_reason": "Standing water or high water level is a hydraulic condition, not a joint structural classification."
+    }
+  ]
+}
