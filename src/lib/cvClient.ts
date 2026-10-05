@@ -1,10 +1,14 @@
 import type {
+  CalibrationProfile,
+  ClassifierEvidence,
   ConfidenceBreakdown,
   CvMeasurementDebug,
+  ExternalClassifierResult,
   InspectionStatus,
   JointConditionClass,
   MeasurementOverlayHints,
   MeasurementResultStatus,
+  ModelComparisonResult,
 } from '../types'
 import type { CvWorkerRequest, CvWorkerResponse } from './cvMeasurement'
 
@@ -105,12 +109,12 @@ interface FastApiMeasurementPayload {
   engineering_result?: string
   authoritative_reason?: string
   ai_explanation?: string
-  classifier_evidence?: any
-  calibration_profile?: any
+  classifier_evidence?: ClassifierEvidence
+  calibration_profile?: CalibrationProfile
   geometry_tier?: string
-  external_classifier?: any
-  model_comparison?: any
-  semantic_gate?: any
+  external_classifier?: ExternalClassifierResult
+  model_comparison?: ModelComparisonResult
+  semantic_gate?: Record<string, unknown> | null
   mean_displacement_mm?: number
   tolerance_exceeded?: boolean
   overall_status?: 'PASS' | 'WARNING' | 'FAIL' | 'REVIEW' | 'CALIBRATION_REQUIRED'

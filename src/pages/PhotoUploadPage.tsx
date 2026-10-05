@@ -27,6 +27,47 @@ const phaseLabel = (image: InspectionImage) => {
   return `${image.progress ?? 0}% complete`
 }
 
+type CalibrationSourceType = 'PROJECT_METADATA' | 'MANHOLE_METADATA' | 'PHYSICAL_REFERENCE' | 'TEST_RIG' | 'CAMERA_CALIBRATION'
+
+function getInitialCalibration(projId: string) {
+  if (!projId || typeof localStorage === 'undefined') {
+    return {
+      profile: null as CalibrationProfile | null,
+      pipeDiameter: '' as number | '',
+      source: 'PROJECT_METADATA' as CalibrationSourceType,
+      referenceId: '',
+      verified: false,
+      notes: '',
+    }
+  }
+  try {
+    const stored = localStorage.getItem(`jointinspect_cal_${projId}`)
+    if (stored) {
+      const parsed = JSON.parse(stored) as CalibrationProfile
+      const dia = parsed.pipe_diameter_mm ?? parsed.pipeDiameterMm
+      const ref = parsed.calibration_reference_id ?? parsed.calibrationReferenceId
+      return {
+        profile: parsed,
+        pipeDiameter: (dia ? Number(dia) : '') as number | '',
+        source: (parsed.source as CalibrationSourceType) || 'PROJECT_METADATA',
+        referenceId: ref || '',
+        verified: Boolean(parsed.verified),
+        notes: parsed.notes || '',
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return {
+    profile: null as CalibrationProfile | null,
+    pipeDiameter: '' as number | '',
+    source: 'PROJECT_METADATA' as CalibrationSourceType,
+    referenceId: '',
+    verified: false,
+    notes: '',
+  }
+}
+
 export const PhotoUploadPage = ({
   online,
   projectId,
@@ -47,44 +88,28 @@ export const PhotoUploadPage = ({
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [reportedDownlink, setReportedDownlink] = useState<number | null>(null)
 
-  // Calibration Profile Setup - Fail-Safe Defaults
-  const [calPipeDiameter, setCalPipeDiameter] = useState<number | ''>('')
-  const [calSource, setCalSource] = useState<'PROJECT_METADATA' | 'MANHOLE_METADATA' | 'PHYSICAL_REFERENCE' | 'TEST_RIG' | 'CAMERA_CALIBRATION'>('PROJECT_METADATA')
-  const [calReferenceId, setCalReferenceId] = useState<string>('')
-  const [calVerified, setCalVerified] = useState<boolean>(false)
-  const [calNotes, setCalNotes] = useState<string>('')
-  const [savedProfile, setSavedProfile] = useState<CalibrationProfile | null>(null)
+  // Calibration Profile Setup - Fail-Safe Defaults initialized from project storage
+  const [prevProjectId, setPrevProjectId] = useState(projectId)
+  const [calPipeDiameter, setCalPipeDiameter] = useState<number | ''>(() => getInitialCalibration(projectId).pipeDiameter)
+  const [calSource, setCalSource] = useState<CalibrationSourceType>(() => getInitialCalibration(projectId).source)
+  const [calReferenceId, setCalReferenceId] = useState<string>(() => getInitialCalibration(projectId).referenceId)
+  const [calVerified, setCalVerified] = useState<boolean>(() => getInitialCalibration(projectId).verified)
+  const [calNotes, setCalNotes] = useState<string>(() => getInitialCalibration(projectId).notes)
+  const [savedProfile, setSavedProfile] = useState<CalibrationProfile | null>(() => getInitialCalibration(projectId).profile)
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('')
   const [saveErrorMsg, setSaveErrorMsg] = useState<string>('')
 
-  // Load saved calibration profile for this project
-  useEffect(() => {
-    if (!projectId) return
-    const key = `jointinspect_cal_${projectId}`
-    try {
-      const stored = localStorage.getItem(key)
-      if (stored) {
-        const parsed = JSON.parse(stored) as CalibrationProfile
-        setSavedProfile(parsed)
-        const dia = parsed.pipe_diameter_mm ?? parsed.pipeDiameterMm
-        setCalPipeDiameter(dia ? Number(dia) : '')
-        if (parsed.source) setCalSource(parsed.source as any)
-        const ref = parsed.calibration_reference_id ?? parsed.calibrationReferenceId
-        setCalReferenceId(ref || '')
-        setCalVerified(Boolean(parsed.verified))
-        if (parsed.notes) setCalNotes(parsed.notes)
-      } else {
-        // Default fail-safe unverified/blank profile for new project
-        setSavedProfile(null)
-        setCalPipeDiameter('')
-        setCalReferenceId('')
-        setCalVerified(false)
-        setCalNotes('')
-      }
-    } catch {
-      // ignore JSON parse error
-    }
-  }, [projectId])
+  // Synchronize state during render if projectId changes
+  if (projectId !== prevProjectId) {
+    setPrevProjectId(projectId)
+    const init = getInitialCalibration(projectId)
+    setCalPipeDiameter(init.pipeDiameter)
+    setCalSource(init.source)
+    setCalReferenceId(init.referenceId)
+    setCalVerified(init.verified)
+    setCalNotes(init.notes)
+    setSavedProfile(init.profile)
+  }
 
   const handleSaveCalibration = () => {
     setSaveErrorMsg('')
@@ -337,7 +362,7 @@ export const PhotoUploadPage = ({
                 </label>
                 <select
                   value={calSource}
-                  onChange={(e) => setCalSource(e.target.value as any)}
+                  onChange={(e) => setCalSource(e.target.value as CalibrationSourceType)}
                   style={{
                     width: '100%',
                     padding: '0.4rem',

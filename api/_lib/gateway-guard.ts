@@ -42,7 +42,7 @@ export function isMaliciousPath(path: string): boolean {
 export function normalizeRequestId(rawId?: string | string[]): string {
   if (typeof rawId === 'string') {
     const trimmed = rawId.trim()
-    if (trimmed.length > 0 && trimmed.length <= 64 && /^[a-zA-Z0-9_\-]+$/.test(trimmed)) {
+    if (trimmed.length > 0 && trimmed.length <= 64 && /^[a-zA-Z0-9_-]+$/.test(trimmed)) {
       return trimmed
     }
   }

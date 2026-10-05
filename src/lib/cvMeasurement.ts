@@ -1,4 +1,6 @@
 import type {
+  CalibrationProfile,
+  ClassifierEvidence,
   ConfidenceBreakdown,
   CvMeasurementDebug,
   InspectionStatus,
@@ -36,8 +38,8 @@ export interface CvWorkerResponse {
   condition?: JointConditionClass
   confidenceBreakdown?: ConfidenceBreakdown
   rejectionReason?: string
-  classifierEvidence?: any
-  calibrationProfile?: any
+  classifierEvidence?: ClassifierEvidence
+  calibrationProfile?: CalibrationProfile
   geometryTier?: string
   candidateGapMm?: number | null
   authoritativeGapMm?: number | null

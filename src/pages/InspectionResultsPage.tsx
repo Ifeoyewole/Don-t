@@ -412,7 +412,17 @@ const ResultCard = ({
               </span>
             </div>
             {(() => {
-              const evidence = (item.classifierEvidence || item.cvDebug?.classifierEvidence || item.externalClassifier || item.cvDebug?.externalClassifier) as any;
+              type ClassifierEvidenceView = {
+                raw_prediction?: string
+                raw_class_name?: string
+                raw_code?: string
+                raw_class_code?: string
+                confidence?: number
+                mapped_condition?: string
+                jointinspect_mapping?: string
+                mapping_status?: string
+              }
+              const evidence = (item.classifierEvidence || item.cvDebug?.classifierEvidence || item.externalClassifier || item.cvDebug?.externalClassifier) as ClassifierEvidenceView | undefined;
               if (!evidence) {
                 return <div style={{ color: '#64748b', marginTop: '2px' }}>Classifier evidence unavailable</div>;
               }
