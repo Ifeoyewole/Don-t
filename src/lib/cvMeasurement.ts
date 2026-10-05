@@ -16,6 +16,9 @@ export interface CvWorkerRequest {
   orderIndex: number
   blob?: Blob
   pipeDiameterMm?: number
+  operatorContext?: string
+  calibrationSource?: string
+  calibrationVerified?: boolean
 }
 
 export interface CvWorkerResponse {
@@ -33,7 +36,7 @@ export interface CvWorkerResponse {
   rejectionReason?: string
 }
 
-const DEFAULT_PIPE_DIAMETER_MM = 225
+// Uncalibrated measurements cannot assume default 225mm pipe diameter
 const MAX_PROCESS_DIMENSION = 1200
 const ANGLE_STEPS = 72
 const BASE_CLOSE_UP_MM_PER_PIXEL = 0.075
@@ -1139,7 +1142,9 @@ export async function runCvMeasurement(
     fallbackNote?: string
   },
 ): Promise<CvWorkerResponse> {
-  const pipeDiameterMm = request.pipeDiameterMm ?? DEFAULT_PIPE_DIAMETER_MM
+  const isCalibrated = Boolean(request.calibrationVerified && request.pipeDiameterMm && request.pipeDiameterMm > 0)
+  const pipeDiameterMm = isCalibrated ? (request.pipeDiameterMm as number) : 100.0
+
   if (!request.blob) {
     return createRejectedMeasurement(request, pipeDiameterMm, 'No image data provided for measurement.')
   }
@@ -1152,16 +1157,20 @@ export async function runCvMeasurement(
     const openCvMeasured = await tryMeasureWithOpenCv(request.blob, pipeDiameterMm)
     if (openCvMeasured) {
       const classification = classifyGap(openCvMeasured.gapMm, pipeDiameterMm)
+      const note = isCalibrated
+        ? openCvMeasured.note
+        : 'CALIBRATION_REQUIRED: Offline browser preview lacks verified calibration; physical millimeters withheld.'
       return {
         imageId: request.imageId,
-        originalGapMm: openCvMeasured.gapMm,
-        status: classification.status,
-        confidence: openCvMeasured.confidence,
-        resultStatus: openCvMeasured.confidence >= 0.7 ? 'ACCEPTED_MEASUREMENT' : 'REVIEW_REQUIRED',
-        measurementSource: 'cv',
-        measurementNote: openCvMeasured.note,
+        originalGapMm: isCalibrated ? openCvMeasured.gapMm : 0,
+        status: isCalibrated ? classification.status : 'REVIEW',
+        confidence: isCalibrated ? openCvMeasured.confidence : 0.4,
+        resultStatus: isCalibrated && openCvMeasured.confidence >= 0.7 ? 'ACCEPTED_MEASUREMENT' : 'REVIEW_REQUIRED',
+        measurementSource: isCalibrated ? 'cv' : 'offline-preview',
+        measurementNote: note,
         cvDebug: openCvMeasured.debug,
         overlayHints: openCvMeasured.debug.overlayHints,
+        rejectionReason: isCalibrated ? undefined : 'CALIBRATION_REQUIRED',
       }
     }
   }
@@ -1177,15 +1186,19 @@ export async function runCvMeasurement(
   }
 
   const classification = classifyGap(measured.gapMm, pipeDiameterMm)
+  const note = isCalibrated
+    ? measured.note
+    : 'CALIBRATION_REQUIRED: Offline browser preview lacks verified calibration; physical millimeters withheld.'
   return {
     imageId: request.imageId,
-    originalGapMm: measured.gapMm,
-    status: classification.status,
-    confidence: measured.confidence,
-    resultStatus: measured.confidence >= 0.7 ? 'ACCEPTED_MEASUREMENT' : 'REVIEW_REQUIRED',
-    measurementSource: 'cv',
-    measurementNote: measured.note,
+    originalGapMm: isCalibrated ? measured.gapMm : 0,
+    status: isCalibrated ? classification.status : 'REVIEW',
+    confidence: isCalibrated ? measured.confidence : 0.4,
+    resultStatus: isCalibrated && measured.confidence >= 0.7 ? 'ACCEPTED_MEASUREMENT' : 'REVIEW_REQUIRED',
+    measurementSource: isCalibrated ? 'cv' : 'offline-preview',
+    measurementNote: note,
     cvDebug: measured.debug,
     overlayHints: measured.debug.overlayHints,
+    rejectionReason: isCalibrated ? undefined : 'CALIBRATION_REQUIRED',
   }
 }

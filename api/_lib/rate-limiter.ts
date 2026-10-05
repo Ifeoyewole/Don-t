@@ -51,22 +51,23 @@ class MemoryRateLimitStore implements RateLimitStore {
 const activeStore: RateLimitStore = new MemoryRateLimitStore()
 
 export function getClientIp(req: HttpRequestLike): string {
-  const xForwardedFor = req.headers['x-forwarded-for']
-  if (typeof xForwardedFor === 'string') {
-    return xForwardedFor.split(',')[0].trim()
+  const vercelIp = req.headers['x-vercel-forwarded-for']
+  if (typeof vercelIp === 'string' && vercelIp.trim()) {
+    return vercelIp.split(',')[0].trim()
   }
   const xRealIp = req.headers['x-real-ip']
-  if (typeof xRealIp === 'string') {
+  if (typeof xRealIp === 'string' && xRealIp.trim()) {
     return xRealIp.trim()
   }
   return req.socket?.remoteAddress || '127.0.0.1'
 }
 
-export type RouteCategory = 'health' | 'measure' | 'multi-frame' | 'calibration-read' | 'calibration-mutate'
+export type RouteCategory = 'health' | 'validation' | 'measure' | 'multi-frame' | 'calibration-read' | 'calibration-mutate'
 
 export function getRouteCategory(path: string, method: string): RouteCategory {
   const normalized = path.toLowerCase()
   if (normalized.includes('/health')) return 'health'
+  if (normalized.includes('/validate-photo')) return 'validation'
   if (normalized.includes('/multi-frame')) return 'multi-frame'
   if (normalized.includes('/measure')) return 'measure'
   if (normalized.includes('/calibration')) {
@@ -83,6 +84,7 @@ export async function checkRateLimit(req: HttpRequestLike, routeCategory?: Route
 
   let limit = GATEWAY_CONFIG.RATE_LIMITS.MEASURE
   if (category === 'health') limit = GATEWAY_CONFIG.RATE_LIMITS.HEALTH
+  else if (category === 'validation') limit = GATEWAY_CONFIG.RATE_LIMITS.VALIDATION
   else if (category === 'multi-frame') limit = GATEWAY_CONFIG.RATE_LIMITS.MULTI_FRAME
   else if (category === 'calibration-read') limit = GATEWAY_CONFIG.RATE_LIMITS.CALIBRATION_READ
   else if (category === 'calibration-mutate') limit = GATEWAY_CONFIG.RATE_LIMITS.CALIBRATION_MUTATE

@@ -59,9 +59,14 @@ async def correlation_id_middleware(request: Request, call_next):
     return response
 
 
-# Mount API Routers
+# Mount Canonical API Router under /api/v1
 app.include_router(api_router, prefix="/api/v1")
-app.include_router(api_router)  # Also expose directly for backward compatibility
+
+
+@app.get("/health", tags=["Health"])
+async def root_liveness():
+    """Minimal public liveness health probe for Cloud Run and platform monitoring."""
+    return {"status": "ok"}
 
 
 @app.exception_handler(ValueError)
@@ -87,13 +92,8 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 @app.get("/", tags=["Root"])
 async def root():
-    """Service landing endpoint with operational status."""
+    """Service landing endpoint with minimal operational status."""
     return {
         "service": "Pipe Joint Optical Measurement CV Engine",
         "status": "online",
-        "endpoints": {
-            "health": "/cv/health",
-            "validate_photo": "/cv/validate-photo",
-            "measure": "/cv/measure",
-        },
     }

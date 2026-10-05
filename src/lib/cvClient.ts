@@ -216,6 +216,15 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
     if (request.pipeDiameterMm) {
       formData.append('pipe_diameter_mm', String(request.pipeDiameterMm))
     }
+    if (request.operatorContext) {
+      formData.append('operator_context', request.operatorContext.slice(0, 1000))
+    }
+    if (request.calibrationSource) {
+      formData.append('calibration_source', request.calibrationSource)
+    }
+    if (typeof request.calibrationVerified === 'boolean') {
+      formData.append('calibration_verified', String(request.calibrationVerified))
+    }
     formData.append('joint_type', 'CIRCULAR_OPENING')
     formData.append('return_debug_image', 'false')
 

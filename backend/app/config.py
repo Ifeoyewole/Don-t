@@ -57,6 +57,12 @@ class Settings(BaseModel):
     )
     WRC_BASELINE_MIN_SCORE: float = float(os.getenv("WRC_BASELINE_MIN_SCORE", "0.20"))
 
+    # Vertex AI Semantic Domain Gate & Multi-Modal Context Understanding
+    VERTEX_INSPECTION_MODEL: str = os.getenv("VERTEX_INSPECTION_MODEL", "gemini-2.5-flash")
+    VERTEX_INSPECTION_LOCATION: str = os.getenv("VERTEX_INSPECTION_LOCATION", "europe-west2")
+    VERTEX_PROJECT_ID: str = os.getenv("VERTEX_PROJECT_ID", "joint-inspection-510310")
+    VERTEX_SEMANTIC_GATE_ENABLED: bool = os.getenv("VERTEX_SEMANTIC_GATE_ENABLED", "true").lower() in ("true", "1", "yes")
+
 
 settings = Settings()
 

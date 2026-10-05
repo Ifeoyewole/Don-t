@@ -1,340 +1,40 @@
 /**
  * Vercel Secure API Gateway Route Handler for Computer Vision Endpoints
  *
- * Implements perimeter security:
- * 1. Method and path validation
- * 2. Route-based sliding window rate limiting
- * 3. User authentication verification (pluggable abstraction)
- * 4. Strips client internal/auth headers
- * 5. Acquires Google ID token via Vercel OIDC -> Workload Identity Federation
- * 6. Invokes private Cloud Run backend securely via X-Serverless-Authorization
- * 7. Sanitizes all error responses returned to the client
+ * Implements perimeter security (Consolidated Architecture):
+ * 1. Strict Method and Path Allowlist Matrix (Phase 3)
+ * 2. Route-based sliding window rate limiting (Phase 8)
+ * 3. User authentication verification (pluggable abstraction, Phase 4)
+ * 4. Inbound Header Security: strips client Authorization & internal headers (Phase 6)
+ * 5. Acquires Google ID token via Vercel OIDC -> Workload Identity Federation (WIF, Phase 5)
+ * 6. True streaming bytes-read ceiling enforcement (Memory DoS defense, Phase 9)
+ * 7. Explicit production CORS with Vary: Origin (Phase 10)
+ * 8. Minimal Public Liveness vs Authenticated Diagnostics (Phase 11)
+ * 9. Calibration Access & Mutation Lock (Phase 12)
+ * 10. Sanitizes all error responses returned to the client (Phase 34)
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { getVercelOidcToken } from '@vercel/oidc'
+import { ALLOWED_ORIGINS, GATEWAY_CONFIG } from '../../_lib/config'
+import { verifyGatewayUser } from '../../_lib/auth-abstraction'
+import { checkRateLimit } from '../../_lib/rate-limiter'
+import {
+  isMaliciousPath,
+  normalizeRequestId,
+  readStreamWithLimit,
+  resolveGatewayRoute,
+  sanitizeErrorResponse,
+  sanitizeForwardHeaders,
+  PayloadTooLargeError,
+} from '../../_lib/gateway-guard'
+import { getCloudRunIdToken } from '../../_lib/gcp-oidc'
 
-// ==========================================
-// 1. GATEWAY CONFIGURATION IDENTIFIERS
-// ==========================================
-export const GATEWAY_CONFIG = {
-  GCP_PROJECT_ID: process.env.GCP_PROJECT_ID || 'joint-inspection-510310',
-  GCP_PROJECT_NUMBER: process.env.GCP_PROJECT_NUMBER || '567370443508',
-  GCP_SERVICE_ACCOUNT_EMAIL:
-    process.env.GCP_SERVICE_ACCOUNT_EMAIL ||
-    'joint-inspect-vercel-invoker@joint-inspection-510310.iam.gserviceaccount.com',
-  GCP_WORKLOAD_IDENTITY_POOL_ID: process.env.GCP_WORKLOAD_IDENTITY_POOL_ID || 'vercel',
-  GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID:
-    process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID || 'vercel-production',
-  CLOUD_RUN_URL: (process.env.CLOUD_RUN_URL || 'https://pipe-joint-api-7d5y5wcyta-nw.a.run.app').replace(/\/$/, ''),
-
-  // Authentication abstraction mode ('disabled' until provider selection is approved)
-  USER_AUTH_MODE: (process.env.USER_AUTH_MODE || 'disabled') as 'disabled' | 'provider',
-
-  // Rate Limiting (Requests / minute / IP)
-  RATE_LIMITS: {
-    HEALTH: parseInt(process.env.RATE_LIMIT_HEALTH || '60', 10),
-    MEASURE: parseInt(process.env.RATE_LIMIT_MEASURE || '20', 10),
-    MULTI_FRAME: parseInt(process.env.RATE_LIMIT_MULTI_FRAME || '5', 10),
-    CALIBRATION_READ: parseInt(process.env.RATE_LIMIT_CALIBRATION_READ || '30', 10),
-    CALIBRATION_MUTATE: parseInt(process.env.RATE_LIMIT_CALIBRATION_MUTATE || '5', 10),
-  },
-
-  // Payload constraints
-  MAX_UPLOAD_SIZE_BYTES: 15 * 1024 * 1024, // 15 MB
-  MAX_MULTI_FRAME_BYTES: 30 * 1024 * 1024, // 30 MB
-  MAX_MULTI_FRAME_COUNT: 30,
-
-  // Allowed image MIME types
-  ALLOWED_IMAGE_MIMES: ['image/jpeg', 'image/png', 'image/webp'],
-} as const
-
-// ==========================================
-// 2. USER AUTHENTICATION ABSTRACTION
-// ==========================================
-export type Role = 'ADMIN' | 'ENGINEER' | 'INSPECTOR' | 'CLIENT_VIEWER'
-
-export interface AuthenticatedUser {
-  id: string
-  email?: string
-  roles: Role[]
-  metadata?: Record<string, unknown>
-}
-
-export interface UserAuthProvider {
-  verifyRequest(req: IncomingMessage): Promise<AuthenticatedUser | null>
-}
-
-export class DisabledUserAuthProvider implements UserAuthProvider {
-  async verifyRequest(_req?: IncomingMessage | Record<string, unknown>): Promise<AuthenticatedUser | null> {
-    return {
-      id: 'guest_operator',
-      roles: ['INSPECTOR'],
-      metadata: { authMode: 'disabled' },
-    }
-  }
-}
-
-export class PluggableUserAuthProvider implements UserAuthProvider {
-  async verifyRequest(req: IncomingMessage): Promise<AuthenticatedUser | null> {
-    const authHeader = req.headers.authorization
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return null
-    }
-    return null
-  }
-}
-
-function getUserAuthProvider(): UserAuthProvider {
-  if (GATEWAY_CONFIG.USER_AUTH_MODE === 'disabled') {
-    return new DisabledUserAuthProvider()
-  }
-  return new PluggableUserAuthProvider()
-}
-
-export async function verifyGatewayUser(req: IncomingMessage): Promise<AuthenticatedUser | null> {
-  const provider = getUserAuthProvider()
-  return provider.verifyRequest(req)
-}
-
-// ==========================================
-// 3. RATE LIMITER
-// ==========================================
-interface RateLimitWindow {
-  timestamps: number[]
-}
-
-const memoryRateLimitStore = new Map<string, RateLimitWindow>()
-
-export function getClientIp(req: IncomingMessage): string {
-  const vercelForwardedFor = req.headers['x-vercel-forwarded-for']
-  if (typeof vercelForwardedFor === 'string' && vercelForwardedFor.trim()) {
-    return vercelForwardedFor.split(',')[0].trim()
-  }
-  const realIp = req.headers['x-real-ip']
-  if (typeof realIp === 'string' && realIp.trim()) {
-    return realIp.trim()
-  }
-  return '127.0.0.1'
-}
-
-export function getRouteCategory(url: string, method: string): keyof typeof GATEWAY_CONFIG.RATE_LIMITS {
-  const cleanUrl = url.toLowerCase()
-  if (cleanUrl.includes('/health')) return 'HEALTH'
-  if (cleanUrl.includes('/multi-frame')) return 'MULTI_FRAME'
-  if (cleanUrl.includes('/measure')) return 'MEASURE'
-  if (cleanUrl.includes('/calibration')) {
-    return ['POST', 'PUT', 'DELETE'].includes(method.toUpperCase())
-      ? 'CALIBRATION_MUTATE'
-      : 'CALIBRATION_READ'
-  }
-  return 'HEALTH'
-}
-
-export async function checkRateLimit(
-  req: IncomingMessage
-): Promise<{ allowed: boolean; limit: number; remaining: number; resetSeconds: number }> {
-  const ip = getClientIp(req)
-  const category = getRouteCategory(req.url || '/', req.method || 'GET')
-  const limit = GATEWAY_CONFIG.RATE_LIMITS[category]
-  const key = `${category}:${ip}`
-  const now = Date.now()
-  const windowMs = 60_000
-
-  let record = memoryRateLimitStore.get(key)
-  if (!record) {
-    record = { timestamps: [] }
-    memoryRateLimitStore.set(key, record)
-  }
-
-  // Purge expired timestamps
-  record.timestamps = record.timestamps.filter((ts) => ts > now - windowMs)
-
-  if (record.timestamps.length >= limit) {
-    const oldest = record.timestamps[0] || now
-    const resetSeconds = Math.max(1, Math.ceil((oldest + windowMs - now) / 1000))
-    return { allowed: false, limit, remaining: 0, resetSeconds }
-  }
-
-  record.timestamps.push(now)
-  return {
-    allowed: true,
-    limit,
-    remaining: limit - record.timestamps.length,
-    resetSeconds: 60,
-  }
-}
-
-// ==========================================
-// 4. GATEWAY GUARD & SANITIZER
-// ==========================================
-const FORBIDDEN_HEADER_PREFIXES = [
-  'x-serverless-authorization',
-  'x-vercel-oidc-token',
-  'x-internal-',
-  'x-gcp-',
-  'x-service-account-',
-]
-
-const MALICIOUS_PATH_PATTERNS = [
-  /wp-admin/i,
-  /\.env/i,
-  /\/\.git/i,
-  /phpmyadmin/i,
-  /server-status/i,
-  /\.aws/i,
-  /\.ssh/i,
-  /etc\/passwd/i,
-]
-
-export function isMaliciousPath(path: string): boolean {
-  return MALICIOUS_PATH_PATTERNS.some((pattern) => pattern.test(path))
-}
-
-export function sanitizeForwardHeaders(headers: Record<string, string | string[] | undefined>): Record<string, string> {
-  const clean: Record<string, string> = {}
-
-  for (const [key, value] of Object.entries(headers)) {
-    if (!value || typeof value !== 'string') continue
-    const lowerKey = key.toLowerCase()
-
-    // 1. Strip forbidden client-supplied internal headers
-    if (FORBIDDEN_HEADER_PREFIXES.some((prefix) => lowerKey.startsWith(prefix))) {
-      continue
-    }
-
-    // 2. Discard client-supplied X-Forwarded-For to prevent IP spoofing
-    if (lowerKey === 'x-forwarded-for' || lowerKey === 'x-forwarded-host') {
-      continue
-    }
-
-    clean[key] = value
-  }
-
-  return clean
-}
-
-export function sanitizeErrorResponse(_error: unknown, requestId: string): { detail: string; request_id: string } {
-  return {
-    detail: 'An error occurred while processing the inspection request.',
-    request_id: requestId,
-  }
-}
-
-// ==========================================
-// 5. GCP WORKLOAD IDENTITY FEDERATION OIDC
-// ==========================================
-interface CachedIdToken {
-  token: string
-  expiresAtMs: number
-}
-
-let cachedIdToken: CachedIdToken | null = null
-
-export async function getCloudRunIdToken(): Promise<string | null> {
-  const now = Date.now()
-
-  if (cachedIdToken && cachedIdToken.expiresAtMs > now + 300_000) {
-    return cachedIdToken.token
-  }
-
-  let vercelOidcToken: string | null
-  try {
-    vercelOidcToken = await getVercelOidcToken()
-  } catch {
-    // In local dev/testing without active Vercel request context, fallback to env var
-    vercelOidcToken =
-      process.env.VERCEL_OIDC_TOKEN ||
-      process.env.TEST_VERCEL_OIDC_TOKEN ||
-      null
-  }
-
-  if (!vercelOidcToken) {
-    if (process.env.DEV_CLOUD_RUN_ID_TOKEN) {
-      return process.env.DEV_CLOUD_RUN_ID_TOKEN
-    }
-    console.warn('[GATEWAY-AUTH] No Vercel OIDC token available from runtime context or environment')
-    return null
-  }
-
-  const stsAudience = `//iam.googleapis.com/projects/${GATEWAY_CONFIG.GCP_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${GATEWAY_CONFIG.GCP_WORKLOAD_IDENTITY_POOL_ID}/providers/${GATEWAY_CONFIG.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID}`
-
-  try {
-    // Step 1: Exchange Vercel OIDC token for Google STS Federated Access Token
-    const stsResponse = await fetch('https://sts.googleapis.com/v1/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
-        audience: stsAudience,
-        scope: 'https://www.googleapis.com/auth/cloud-platform',
-        requested_token_type: 'urn:ietf:params:oauth:token-type:access_token',
-        subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
-        subject_token: vercelOidcToken,
-      }),
-    })
-
-    if (!stsResponse.ok) {
-      const errText = await stsResponse.text()
-      console.error('[GATEWAY-AUTH] Step 1 Google STS token exchange failed:', {
-        status: stsResponse.status,
-        audience: stsAudience,
-        error: errText,
-      })
-      return null
-    }
-
-    const stsData = (await stsResponse.json()) as { access_token: string }
-
-    // Step 2: Impersonate Service Account and Generate Cloud Run ID Token
-    const iamCredentialsUrl = `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${encodeURIComponent(
-      GATEWAY_CONFIG.GCP_SERVICE_ACCOUNT_EMAIL
-    )}:generateIdToken`
-
-    const idTokenResponse = await fetch(iamCredentialsUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${stsData.access_token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        audience: GATEWAY_CONFIG.CLOUD_RUN_URL,
-        includeEmail: true,
-      }),
-    })
-
-    if (!idTokenResponse.ok) {
-      const errText = await idTokenResponse.text()
-      console.error('[GATEWAY-AUTH] Step 2 IAM generateIdToken failed:', {
-        status: idTokenResponse.status,
-        serviceAccount: GATEWAY_CONFIG.GCP_SERVICE_ACCOUNT_EMAIL,
-        targetAudience: GATEWAY_CONFIG.CLOUD_RUN_URL,
-        error: errText,
-      })
-      return null
-    }
-
-    const idTokenData = (await idTokenResponse.json()) as { token: string; expireTime?: string }
-    cachedIdToken = {
-      token: idTokenData.token,
-      expiresAtMs: now + 3000_000, // 50 minutes cache
-    }
-
-    return idTokenData.token
-  } catch (err) {
-    console.error('[GATEWAY-AUTH] Workload Identity exchange exception:', err instanceof Error ? err.message : String(err))
-    return null
-  }
-}
-
-// ==========================================
-// 6. RESPONSE HELPER & REQUEST DISPATCHER
-// ==========================================
-function sendJson(res: ServerResponse, statusCode: number, data: unknown, extraHeaders: Record<string, string> = {}) {
+function sendJson(
+  res: ServerResponse,
+  statusCode: number,
+  data: unknown,
+  extraHeaders: Record<string, string> = {}
+) {
   const payload = JSON.stringify(data)
   res.writeHead(statusCode, {
     'Content-Type': 'application/json',
@@ -344,20 +44,37 @@ function sendJson(res: ServerResponse, statusCode: number, data: unknown, extraH
   res.end(payload)
 }
 
+function getMatchedOrigin(req: IncomingMessage): string | null {
+  const rawOrigin = req.headers.origin
+  if (!rawOrigin || typeof rawOrigin !== 'string') return null
+  const cleanOrigin = rawOrigin.trim()
+  if (ALLOWED_ORIGINS.includes(cleanOrigin as typeof ALLOWED_ORIGINS[number])) {
+    return cleanOrigin
+  }
+  return null
+}
+
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
-  const requestId = (req.headers['x-request-id'] as string) || `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  const requestId = normalizeRequestId(req.headers['x-request-id'])
   const method = req.method?.toUpperCase() || 'GET'
   const url = req.url || '/'
+  const matchedOrigin = getMatchedOrigin(req)
 
-  // 1. Validate HTTP Method
-  if (!['GET', 'POST', 'OPTIONS'].includes(method)) {
-    return sendJson(res, 405, { detail: 'Method not allowed', request_id: requestId })
+  // 1. CORS Preflight & Origin Handling
+  const corsHeaders: Record<string, string> = {
+    'Vary': 'Origin',
+  }
+  if (matchedOrigin) {
+    corsHeaders['Access-Control-Allow-Origin'] = matchedOrigin
+    corsHeaders['Access-Control-Allow-Credentials'] = 'true'
   }
 
-  // Handle CORS preflight for same-origin or configured origins
   if (method === 'OPTIONS') {
+    if (!matchedOrigin) {
+      return sendJson(res, 403, { detail: 'Forbidden origin', request_id: requestId }, corsHeaders)
+    }
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': req.headers.origin || 'https://joint-inspection.vercel.app',
+      ...corsHeaders,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-ID',
       'Access-Control-Max-Age': '86400',
@@ -367,11 +84,25 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   // 2. Reject Malicious Scanner Paths
   if (isMaliciousPath(url)) {
-    return sendJson(res, 404, { detail: 'Not found', request_id: requestId })
+    return sendJson(res, 404, { detail: 'Not found', request_id: requestId }, corsHeaders)
   }
 
-  // 3. Enforce IP-based Rate Limiting
-  const rateLimitResult = await checkRateLimit(req)
+  // 3. Strict Gateway Route Matrix Resolution (Phase 3)
+  const route = resolveGatewayRoute(url, method)
+  if (!route.allowed) {
+    return sendJson(
+      res,
+      route.status,
+      {
+        detail: route.status === 405 ? 'Method not allowed' : 'Not found',
+        request_id: requestId,
+      },
+      corsHeaders
+    )
+  }
+
+  // 4. IP-Based Sliding Window Rate Limiting (Phase 8)
+  const rateLimitResult = await checkRateLimit(req, route.routeCategory)
   if (!rateLimitResult.allowed) {
     return sendJson(
       res,
@@ -381,84 +112,101 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         request_id: requestId,
         retry_after_seconds: rateLimitResult.resetSeconds,
       },
-      { 'Retry-After': String(rateLimitResult.resetSeconds) }
+      {
+        ...corsHeaders,
+        'Retry-After': String(rateLimitResult.resetSeconds),
+      }
     )
   }
 
-  // 4. Verify User Authentication (Neutral Abstraction)
+  // 5. User Authentication & Authorization (Phase 4 & 12)
   const authUser = await verifyGatewayUser(req)
   if (GATEWAY_CONFIG.USER_AUTH_MODE === 'provider' && !authUser) {
-    return sendJson(res, 401, {
-      detail: 'Authentication required. Invalid or missing credentials.',
-      request_id: requestId,
-    })
+    return sendJson(
+      res,
+      401,
+      {
+        detail: 'Authentication required. Invalid or missing credentials.',
+        request_id: requestId,
+      },
+      corsHeaders
+    )
   }
 
-  // 5. Calibration Security: Restrict Mutations in Production
-  if (url.includes('/calibration') && ['POST', 'PUT', 'DELETE'].includes(method)) {
+  if (route.requiresAuth && !authUser) {
+    return sendJson(
+      res,
+      401,
+      {
+        detail: 'Authentication required to access calibration profiles.',
+        request_id: requestId,
+      },
+      corsHeaders
+    )
+  }
+
+  if (route.requiresAdmin) {
     const hasAdminRole = authUser?.roles?.includes('ADMIN')
     if (!hasAdminRole) {
-      return sendJson(res, 403, {
-        detail: 'Calibration profile modification is locked in production pending administrative role delegation.',
-        request_id: requestId,
-      })
+      return sendJson(
+        res,
+        403,
+        {
+          detail: 'Administrative authority required for calibration mutation.',
+          request_id: requestId,
+        },
+        corsHeaders
+      )
     }
   }
 
-  // 6. Enforce Payload Size Bounds via Content-Length
-  const contentLengthHeader = req.headers['content-length']
-  if (contentLengthHeader) {
-    const contentLength = parseInt(contentLengthHeader, 10)
-    const maxAllowed = url.includes('/multi-frame')
+  // 6. Minimal Public Health vs Authenticated Diagnostics (Phase 11)
+  const [, rawQuery] = url.split('?')
+  const qParams = new URLSearchParams(rawQuery || '')
+  qParams.delete('...route')
+  qParams.delete('route')
+
+  if (route.targetPath === 'api/v1/cv/health') {
+    const wantsDiagnostics = qParams.get('diagnostics') === 'true'
+    const isEngineerOrAdmin =
+      authUser?.roles?.includes('ENGINEER') || authUser?.roles?.includes('ADMIN')
+
+    // If public liveness probe without diagnostic authorization, return minimal response directly
+    if (!wantsDiagnostics || !isEngineerOrAdmin) {
+      return sendJson(res, 200, { status: 'ok' }, corsHeaders)
+    }
+  }
+
+  // 7. Memory DoS Defense: Enforce Streaming Bytes-Read Ceiling (Phase 9)
+  const maxAllowedBytes =
+    route.routeCategory === 'multi-frame'
       ? GATEWAY_CONFIG.MAX_MULTI_FRAME_BYTES
       : GATEWAY_CONFIG.MAX_UPLOAD_SIZE_BYTES
 
-    if (contentLength > maxAllowed) {
-      return sendJson(res, 413, {
-        detail: `Payload size (${contentLength} bytes) exceeds gateway maximum limit (${maxAllowed} bytes).`,
-        request_id: requestId,
-      })
+  let bodyBuffer: Buffer | undefined
+  if (['POST', 'PUT', 'PATCH'].includes(method)) {
+    try {
+      bodyBuffer = await readStreamWithLimit(req, maxAllowedBytes)
+    } catch (err) {
+      if (err instanceof PayloadTooLargeError) {
+        return sendJson(
+          res,
+          413,
+          {
+            detail: err.message,
+            request_id: requestId,
+          },
+          corsHeaders
+        )
+      }
+      return sendJson(res, 400, { detail: 'Failed reading request payload', request_id: requestId }, corsHeaders)
     }
   }
 
-  // 7. Resolve Upstream Path on Private Cloud Run Service
-  // Strip query parameters injected by Vercel catch-all (e.g. ?...route=health)
-  const [pathOnly, rawQuery] = url.split('?')
-  let targetSubPath = pathOnly.replace(/^\/api\/v1\/?/, '').replace(/^\/api\/?/, '')
-  const matchedPath = (req.headers['x-matched-path'] as string) || ''
-
-  if (targetSubPath.includes('[...route]')) {
-    if (matchedPath.includes('health') || url.includes('health')) {
-      targetSubPath = 'cv/health'
-    } else {
-      targetSubPath = matchedPath.replace(/^\/api\/v1\/?/, '').replace(/^\/api\/?/, '') || 'cv/health'
-    }
-  }
-
-  if (targetSubPath === 'health' || targetSubPath === '/health') {
-    targetSubPath = 'cv/health'
-  } else if (!targetSubPath.startsWith('cv/')) {
-    targetSubPath = `cv/${targetSubPath}`
-  }
-
-  // Filter out Vercel internal query parameters (...route) from upstream URL
-  let forwardQuery = ''
-  if (rawQuery) {
-    const qParams = new URLSearchParams(rawQuery)
-    qParams.delete('...route')
-    qParams.delete('route')
-    const qs = qParams.toString()
-    if (qs) {
-      forwardQuery = `?${qs}`
-    }
-  }
-
-  const targetUrl = `${GATEWAY_CONFIG.CLOUD_RUN_URL}/${targetSubPath}${forwardQuery}`
-
-  // 8. Obtain Short-Lived ID Token for Cloud Run (Vercel OIDC -> GCP WIF)
+  // 8. Workload Identity Federation (WIF): Acquire Cloud Run ID Token
   const idToken = await getCloudRunIdToken()
 
-  // 9. Prepare Forward Headers (Strip client internal/security headers)
+  // 9. Inbound Header Security: Strip Client Authorization & Internal Headers (Phase 6)
   const forwardHeaders = sanitizeForwardHeaders(req.headers)
   forwardHeaders['x-request-id'] = requestId
 
@@ -467,32 +215,30 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     forwardHeaders['authorization'] = `Bearer ${idToken}`
   }
 
-  try {
-    // 10. Forward Request Server-to-Server
-    const chunks: Buffer[] = []
-    for await (const chunk of req) {
-      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
-    }
-    const bodyBuffer = chunks.length > 0 ? Buffer.concat(chunks) : undefined
+  // 10. Forward Request to Private Cloud Run Backend
+  const forwardQuery = qParams.toString() ? `?${qParams.toString()}` : ''
+  const targetUrl = `${GATEWAY_CONFIG.CLOUD_RUN_URL}/${route.targetPath}${forwardQuery}`
 
+  try {
     const upstreamResponse = await fetch(targetUrl, {
       method,
       headers: forwardHeaders,
-      body: ['POST', 'PUT', 'PATCH'].includes(method) ? bodyBuffer : undefined,
+      body: bodyBuffer,
     })
 
     const responseBody = await upstreamResponse.arrayBuffer()
     const contentType = upstreamResponse.headers.get('content-type') || 'application/json'
 
     res.writeHead(upstreamResponse.status, {
+      ...corsHeaders,
       'Content-Type': contentType,
       'X-Request-ID': requestId,
       'Cache-Control': 'no-store, max-age=0',
     })
     res.end(Buffer.from(responseBody))
   } catch (error) {
-    console.error(`[GATEWAY-ERR-${requestId}] Forwarding to Cloud Run failed:`, error)
+    console.error(`[GATEWAY-ERR-${requestId}] Upstream invocation failed:`, error)
     const sanitized = sanitizeErrorResponse(error, requestId)
-    return sendJson(res, 502, sanitized)
+    return sendJson(res, 502, sanitized, corsHeaders)
   }
 }

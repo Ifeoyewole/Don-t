@@ -216,7 +216,7 @@ def test_api_calibration_endpoints():
     from backend.app.main import app
 
     client = TestClient(app)
-    res = client.get("/cv/calibration/profiles")
+    res = client.get("/api/v1/cv/calibration/profiles")
     assert res.status_code == 200
     profiles = res.json()
     assert len(profiles) >= 2
@@ -224,9 +224,12 @@ def test_api_calibration_endpoints():
     assert "CCTV-STANDARD-01" in camera_ids
     assert "GOPRO-MAX-REFRAMED" in camera_ids
 
+    # Prove removed alias returns 404
+    assert client.get("/cv/calibration/profiles").status_code == 404
+
 
 def test_api_multiframe_endpoint(synthetic_pipe_joint_image):
-    """Verify POST /cv/measure/multi-frame burst endpoint."""
+    """Verify POST /api/v1/cv/measure/multi-frame burst endpoint."""
     import io
     from fastapi.testclient import TestClient
     from backend.app.main import app
@@ -241,14 +244,23 @@ def test_api_multiframe_endpoint(synthetic_pipe_joint_image):
     ]
     data = {
         "pipe_diameter_mm": "100.0",
+        "calibration_source": "TEST_RIG",
+        "calibration_verified": "true",
         "max_gap_mm": "15.0",
     }
 
-    res = client.post("/cv/measure/multi-frame", files=files, data=data)
+    res = client.post("/api/v1/cv/measure/multi-frame", files=files, data=data)
     assert res.status_code == 200
     body = res.json()
     assert body["num_frames_received"] == 2
     assert body["num_frames_accepted"] == 2
     assert body["median_gap_mm"] > 0
     assert body["result_status"] == MeasurementResultStatus.ACCEPTED_MEASUREMENT
+
+    # Prove removed alias returns 404
+    files_legacy = [
+        ("files", ("f1.jpg", io.BytesIO(frame_bytes), "image/jpeg")),
+        ("files", ("f2.jpg", io.BytesIO(frame_bytes), "image/jpeg")),
+    ]
+    assert client.post("/cv/measure/multi-frame", files=files_legacy, data=data).status_code == 404
 

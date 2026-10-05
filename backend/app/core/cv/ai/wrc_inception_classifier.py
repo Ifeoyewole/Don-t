@@ -15,6 +15,7 @@ Contract & Safety Rules:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -97,10 +98,36 @@ class WRCInceptionClassifier:
         return None
 
     def _init_session(self) -> None:
-        """Initialize ONNX runtime inference session."""
+        """Initialize ONNX runtime inference session with immutable SHA-256 verification."""
         resolved_path = self._resolve_model_path()
         if not resolved_path:
             logger.info("WRc baseline model weights not found in search paths. Status: unavailable.")
+            self._session = None
+            return
+
+        expected_hash = "42527d8c4d38e6113f079bcb007715a5476d39cd3cc327f4ba87269d3c7de253"
+        try:
+            h = hashlib.sha256()
+            with open(resolved_path, "rb") as f:
+                while True:
+                    chunk = f.read(65536)
+                    if not chunk:
+                        break
+                    h.update(chunk)
+            actual_hash = h.hexdigest()
+            if actual_hash != expected_hash:
+                logger.error(
+                    "EXTERNAL_CLASSIFIER_INTEGRITY_FAILURE: WRc ONNX hash mismatch! Expected %s, got %s",
+                    expected_hash,
+                    actual_hash,
+                )
+                self._integrity_failure = True
+                self._session = None
+                return
+            logger.info("WRc ONNX integrity verified with SHA-256: %s", actual_hash)
+        except Exception as e:
+            logger.error("Failed computing SHA-256 for WRc ONNX model: %s", e)
+            self._integrity_failure = True
             self._session = None
             return
 
@@ -175,7 +202,21 @@ class WRCInceptionClassifier:
         Returns:
             ExternalClassifierResult: Structured advisory result.
         """
-        # 1. Check availability and input validity
+        # 1. Check availability, integrity, and input validity
+        if getattr(self, "_integrity_failure", False):
+            return ExternalClassifierResult(
+                model_id=self.model_id,
+                source=self.source,
+                raw_class_code=None,
+                raw_class_name="UNKNOWN",
+                confidence=0.0,
+                top_k=[],
+                jointinspect_mapping=None,
+                mapping_status="UNMAPPED",
+                advisory_only=True,
+                status="EXTERNAL_CLASSIFIER_INTEGRITY_FAILURE",
+            )
+
         if not self.is_available or image_bgr is None or image_bgr.size == 0:
             return ExternalClassifierResult(
                 model_id=self.model_id,

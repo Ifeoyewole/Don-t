@@ -22,6 +22,7 @@ export const GATEWAY_CONFIG = {
   // Rate Limiting (Requests / minute / IP)
   RATE_LIMITS: {
     HEALTH: parseInt(process.env.RATE_LIMIT_HEALTH || '60', 10),
+    VALIDATION: parseInt(process.env.RATE_LIMIT_VALIDATION || '30', 10),
     MEASURE: parseInt(process.env.RATE_LIMIT_MEASURE || '20', 10),
     MULTI_FRAME: parseInt(process.env.RATE_LIMIT_MULTI_FRAME || '5', 10),
     CALIBRATION_READ: parseInt(process.env.RATE_LIMIT_CALIBRATION_READ || '30', 10),
@@ -36,3 +37,16 @@ export const GATEWAY_CONFIG = {
   // Allowed image MIME types
   ALLOWED_IMAGE_MIMES: ['image/jpeg', 'image/png', 'image/webp'],
 } as const
+
+// Production environment validation: forbid development / test token fallbacks
+const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
+if (isProduction) {
+  if (process.env.DEV_CLOUD_RUN_ID_TOKEN || process.env.TEST_VERCEL_OIDC_TOKEN) {
+    throw new Error('FATAL SECURITY: DEV_CLOUD_RUN_ID_TOKEN and TEST_VERCEL_OIDC_TOKEN are strictly forbidden in production.')
+  }
+}
+
+export const ALLOWED_ORIGINS = [
+  'https://joint-inspection.vercel.app',
+  ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:5173', 'http://127.0.0.1:5173'] : []),
+] as const

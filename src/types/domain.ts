@@ -12,7 +12,14 @@ export type InspectionCaptureSource = 'upload' | 'camera'
 export type QueueStatus = 'queued' | 'processing' | 'completed' | 'failed'
 export type InspectionStatus = 'PASS' | 'REVIEW' | 'FAIL'
 export type GuidedPhotoStatus = 'ready' | 'retake'
-export type MeasurementSource = 'fastapi' | 'cv' | 'ai-assisted' | 'ai-estimated' | 'ai-review' | 'manual' | 'fallback' | 'ai'
+export type InspectionDomainStatus =
+  | 'PIPE_JOINT_INSPECTION'
+  | 'PIPE_INTERIOR_NO_JOINT'
+  | 'UNRELATED_IMAGE'
+  | 'AMBIGUOUS_IMAGE'
+  | 'LOW_QUALITY_IMAGE'
+  | 'UNSUPPORTED_IMAGE'
+export type MeasurementSource = 'fastapi' | 'cv' | 'offline-preview' | 'ai-assisted' | 'ai-review' | 'manual' | 'fallback'
 
 export type MeasurementResultStatus =
   | 'ACCEPTED_MEASUREMENT'
@@ -71,13 +78,13 @@ export interface CvMeasurementDebug {
 }
 
 export interface AiMeasurementReview {
-  provider: 'mock-gemini' | 'gemini'
+  provider: 'mock-gemini' | 'gemini' | 'mock-dev' | 'unavailable' | 'vertex'
   model: string
   usable: boolean
   jointVisible: boolean
   pipeOpeningVisible: boolean
   cvPlausible: boolean
-  estimatedGapMm: number | null
+  estimatedGapMm?: number | null
   confidence: number
   reason: string
   retakeMessage?: string
@@ -294,6 +301,9 @@ export interface ProcessingEvent {
 export interface ProcessOptions {
   concurrency?: number
   failAtImageId?: string
+  operatorContext?: string
+  calibrationSource?: string
+  calibrationVerified?: boolean
 }
 
 export interface ProcessBatchResult {

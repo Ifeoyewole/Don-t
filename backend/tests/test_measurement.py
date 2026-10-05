@@ -177,7 +177,7 @@ def test_measure_circular_gap(synthetic_circular_image):
     assert response.pipe_diameter_mm == 100.0
     assert response.pixels_per_mm > 0.0
     assert response.mean_gap_mm > 0.0
-    assert len(response.overlay_hints.ray_samples) == 36
+    assert len(response.overlay_hints.ray_samples) >= 20  # Zero-guessing excludes invalid/outlier rays
     assert response.debug_info is not None
     assert response.debug_info.debug_image_base64 is not None
     assert response.debug_info.debug_image_base64.startswith("data:image/jpeg;base64,")
@@ -220,58 +220,82 @@ def test_measure_horizontal_seam_gap(synthetic_horizontal_seam_image):
 # ==============================================================================
 
 def test_api_health(client):
-    """Test /health and /cv/health endpoints."""
-    res = client.get("/cv/health")
+    """Test platform /health, canonical /api/v1/cv/health, and removed /cv/health."""
+    # Platform probe
+    res_platform = client.get("/health")
+    assert res_platform.status_code == 200
+    assert res_platform.json() == {"status": "ok"}
+
+    # Canonical endpoint
+    res = client.get("/api/v1/cv/health")
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "ok"
     assert "opencv_version" in data
 
+    # Proving removed legacy alias returns 404
+    res_legacy = client.get("/cv/health")
+    assert res_legacy.status_code == 404
+
 
 def test_api_validate_photo(client, synthetic_circular_image):
-    """Test POST /cv/validate-photo with multipart file upload."""
+    """Test POST /api/v1/cv/validate-photo and regression 404 on legacy /cv/validate-photo."""
     _, buffer = cv2.imencode(".jpg", synthetic_circular_image)
     files = {"file": ("test.jpg", io.BytesIO(buffer.tobytes()), "image/jpeg")}
 
-    res = client.post("/cv/validate-photo", files=files)
+    res = client.post("/api/v1/cv/validate-photo", files=files)
     assert res.status_code == 200
     data = res.json()
     assert "blur_score" in data
     assert "exposure_status" in data
     assert "is_acceptable" in data
 
+    # Prove removed alias returns 404
+    files_legacy = {"file": ("test.jpg", io.BytesIO(buffer.tobytes()), "image/jpeg")}
+    res_legacy = client.post("/cv/validate-photo", files=files_legacy)
+    assert res_legacy.status_code == 404
+
 
 def test_api_measure_circular(client, synthetic_circular_image):
-    """Test POST /cv/measure for circular pipe opening."""
+    """Test POST /api/v1/cv/measure with verified calibration."""
     _, buffer = cv2.imencode(".jpg", synthetic_circular_image)
     files = {"file": ("pipe.jpg", io.BytesIO(buffer.tobytes()), "image/jpeg")}
     data = {
         "joint_type": "CIRCULAR_OPENING",
         "pipe_diameter_mm": "100.0",
+        "calibration_source": "TEST_RIG",
+        "calibration_verified": "true",
         "return_debug_image": "true",
         "num_samples": "36",
     }
 
-    res = client.post("/cv/measure", files=files, data=data)
+    res = client.post("/api/v1/cv/measure", files=files, data=data)
     assert res.status_code == 200
     result = res.json()
     assert result["joint_type"] == "CIRCULAR_OPENING"
     assert result["mean_gap_mm"] > 0
-    assert len(result["overlay_hints"]["ray_samples"]) == 36
+    assert len(result["overlay_hints"]["ray_samples"]) >= 20
+
+    # Prove removed alias returns 404
+    files_legacy = {"file": ("pipe.jpg", io.BytesIO(buffer.tobytes()), "image/jpeg")}
+    res_legacy = client.post("/cv/measure", files=files_legacy, data=data)
+    assert res_legacy.status_code == 404
 
 
 def test_api_measure_vertical_seam(client, synthetic_vertical_seam_image):
-    """Test POST /cv/measure for vertical seam."""
+    """Test POST /api/v1/cv/measure for vertical seam with verified calibration."""
     _, buffer = cv2.imencode(".jpg", synthetic_vertical_seam_image)
     files = {"file": ("seam.jpg", io.BytesIO(buffer.tobytes()), "image/jpeg")}
     data = {
         "joint_type": "VERTICAL_SEAM",
         "pipe_diameter_mm": "100.0",
+        "calibration_source": "TEST_RIG",
+        "calibration_verified": "true",
         "return_debug_image": "true",
         "num_samples": "20",
     }
 
-    res = client.post("/cv/measure", files=files, data=data)
+    res = client.post("/api/v1/cv/measure", files=files, data=data)
     assert res.status_code == 200
     result = res.json()
     assert result["joint_type"] == "VERTICAL_SEAM"
@@ -279,7 +303,7 @@ def test_api_measure_vertical_seam(client, synthetic_vertical_seam_image):
 
 
 def test_api_measure_invalid_image(client):
-    """Test POST /cv/measure with corrupt non-image bytes."""
+    """Test POST /api/v1/cv/measure with corrupt non-image bytes."""
     files = {"file": ("corrupt.jpg", io.BytesIO(b"not an image"), "image/jpeg")}
-    res = client.post("/cv/measure", files=files)
+    res = client.post("/api/v1/cv/measure", files=files)
     assert res.status_code == 400

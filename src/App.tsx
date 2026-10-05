@@ -635,8 +635,8 @@ function App() {
             await inspectionQueue.clearManholeQueue(uploadManholeId)
             await refreshRouteData()
           }}
-          onStartInspection={async () => {
-            const result = await processor.processQueuedImages(uploadManholeId)
+          onStartInspection={async (operatorContext?: string) => {
+            const result = await processor.processQueuedImages(uploadManholeId, { operatorContext })
             console.log('PROCESS RESULT:', result)
             if (!result.success || !result.inspectionId) {
               throw new Error(result.message || 'Inspection processing failed')

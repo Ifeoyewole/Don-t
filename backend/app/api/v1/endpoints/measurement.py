@@ -1,11 +1,15 @@
 """Automated computer vision measurement API endpoints with integrated AI/CV fusion."""
 
+import logging
 from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+
+logger = logging.getLogger(__name__)
 
 from backend.app.core.cv.ai.image_quality import validate_image_quality
 from backend.app.core.cv.ai.joint_classifier import JointClassifier
 from backend.app.core.cv.ai.joint_segmenter import JointSegmenter
+from backend.app.core.cv.ai.vertex_semantic_gate import get_vertex_semantic_gate
 from backend.app.core.cv.ai.wrc_inception_classifier import (
     compare_models,
     get_wrc_classifier,
@@ -15,6 +19,8 @@ from backend.app.core.cv.circular_detector import measure_circular_gap
 from backend.app.core.cv.confidence import confidence_engine
 from backend.app.core.cv.seam_detector import measure_seam_gap
 from backend.app.schemas.domain import (
+    CalibrationSource,
+    DomainStatus,
     JointConditionClass,
     JointType,
     MeasurementResultStatus,
@@ -50,6 +56,18 @@ async def measure_joint_gap(
     camera_id: Optional[str] = Form(
         None,
         description="Optional camera profile ID (e.g. 'CCTV-STANDARD-01', 'GOPRO-MAX-REFRAMED') for lens un-distortion.",
+    ),
+    operator_context: Optional[str] = Form(
+        None,
+        description="Optional operator context, notes, or prompt for semantic focus.",
+    ),
+    calibration_source: Optional[CalibrationSource] = Form(
+        None,
+        description="Provenance of calibration diameter (PROJECT_METADATA, MANHOLE_METADATA, PHYSICAL_REFERENCE, CAMERA_CALIBRATION, TEST_RIG).",
+    ),
+    calibration_verified: bool = Form(
+        False,
+        description="Whether the calibration source has been verified by engineering protocol.",
     ),
     nominal_gap_mm: Optional[float] = Form(
         None,
@@ -92,14 +110,18 @@ async def measure_joint_gap(
         le=0.95,
     ),
 ) -> MeasurementResponse:
-    """Execute end-to-end AI/CV pipe joint measurement pipeline:
+    """Execute end-to-end AI/CV pipe joint measurement pipeline with strict authority boundaries:
 
-    1. Image Quality Gate -> Reject if blurred, underexposed, or blinded by glare.
-    2. Camera Calibration -> Rectify lens barrel distortion.
-    3. AI Joint Segmenter (Model A) -> Locate joint ROI and binary mask (No LLM fallback).
-    4. OpenCV Geometry Engine -> Measure circular opening or seam gap (Zero artificial guessing).
-    5. AI Condition Classifier (Model B) -> Tolerance-primary structural defect diagnosis.
-    6. Calibrated Confidence Fusion -> Production gating (ACCEPTED_MEASUREMENT, REVIEW_REQUIRED, REJECTED_UNRELIABLE).
+    0. Vertex AI Semantic Domain Gate & Operator Context Isolation.
+    1. Pre-measurement Image Quality Gate (OpenCV sharpness/exposure/glare).
+    2. Camera Calibration & Lens Distortion Rectification.
+    3. AI Joint Segmenter (Model A) -> Locate joint ROI and binary mask.
+    4. OpenCV Geometry Engine (Zero Guessing) -> Radial ray / seam trace.
+    5. Calibration Authority Check -> Disallow unverified mm claims.
+    6. AI Condition Classifier (Model B) -> Tolerance-primary structural diagnosis.
+    7. External WRc InceptionResNetV2 Baseline Classifier (Advisory Only).
+    8. Multi-System Disagreement Tracking.
+    9. Authoritative Engineering Rules aggregation.
     """
     try:
         content = await file.read()
@@ -117,10 +139,101 @@ async def measure_joint_gap(
 
         image_bgr = decode_image_bytes(content)
 
-        # Step 1: Pre-measurement Image Quality Gate
+        # Step 0: Vertex AI Semantic Domain Gate & Multi-Modal Context Understanding
+        vertex_gate = get_vertex_semantic_gate()
+        semantic_res = vertex_gate.evaluate(image_bgr, operator_context=operator_context)
+
+        # Domain gating: block unrelated scenes, non-joint pipe interiors, or degraded images
+        if semantic_res.domain_status == DomainStatus.UNRELATED_IMAGE:
+            confidence_bd = confidence_engine.fuse_confidence(
+                quality_score=0.0,
+                segmentation_score=0.0,
+                condition_score=0.0,
+                geometry_score=0.0,
+            )
+            return MeasurementResponse(
+                joint_type=joint_type,
+                pipe_diameter_mm=pipe_diameter_mm,
+                pixels_per_mm=1.0,
+                mean_gap_mm=0.0,
+                min_gap_mm=0.0,
+                max_gap_mm=0.0,
+                overall_status=ToleranceStatus.FAIL,
+                result_status=MeasurementResultStatus.REJECTED_UNRELIABLE,
+                condition=None,
+                confidence_breakdown=confidence_bd,
+                rejection_reason="UNRELATED_IMAGE: Image is not a pipe interior or sewer scene. Physical measurement stopped.",
+                overlay_hints=OverlayHints(),
+                debug_info=None,
+                semantic_gate=semantic_res,
+                calibration_source=calibration_source,
+                physical_measurement_available=False,
+                authoritative_gap_mm=None,
+                engineering_result=ToleranceStatus.FAIL,
+                authoritative_reason="Unrelated image rejected by semantic gatekeeper.",
+            )
+
+        if semantic_res.domain_status == DomainStatus.PIPE_INTERIOR_NO_JOINT:
+            confidence_bd = confidence_engine.fuse_confidence(
+                quality_score=0.70,
+                segmentation_score=0.0,
+                condition_score=0.0,
+                geometry_score=0.0,
+            )
+            return MeasurementResponse(
+                joint_type=joint_type,
+                pipe_diameter_mm=pipe_diameter_mm,
+                pixels_per_mm=1.0,
+                mean_gap_mm=0.0,
+                min_gap_mm=0.0,
+                max_gap_mm=0.0,
+                overall_status=ToleranceStatus.REVIEW,
+                result_status=MeasurementResultStatus.REJECTED_UNRELIABLE,
+                condition=None,
+                confidence_breakdown=confidence_bd,
+                rejection_reason="PIPE_INTERIOR_NO_JOINT: Pipe interior detected but no pipe joint is visible for measurement.",
+                overlay_hints=OverlayHints(),
+                debug_info=None,
+                semantic_gate=semantic_res,
+                calibration_source=calibration_source,
+                physical_measurement_available=False,
+                authoritative_gap_mm=None,
+                engineering_result=ToleranceStatus.REVIEW,
+                authoritative_reason="Pipe interior section without joint; joint measurement skipped.",
+            )
+
+        if semantic_res.domain_status == DomainStatus.LOW_QUALITY_IMAGE:
+            confidence_bd = confidence_engine.fuse_confidence(
+                quality_score=0.20,
+                segmentation_score=0.0,
+                condition_score=0.0,
+                geometry_score=0.0,
+            )
+            return MeasurementResponse(
+                joint_type=joint_type,
+                pipe_diameter_mm=pipe_diameter_mm,
+                pixels_per_mm=1.0,
+                mean_gap_mm=0.0,
+                min_gap_mm=0.0,
+                max_gap_mm=0.0,
+                overall_status=ToleranceStatus.REVIEW,
+                result_status=MeasurementResultStatus.REJECTED_UNRELIABLE,
+                condition=None,
+                confidence_breakdown=confidence_bd,
+                rejection_reason="LOW_QUALITY_IMAGE: Image quality degraded by blur, lighting, or water obstruction; retake required.",
+                overlay_hints=OverlayHints(),
+                debug_info=None,
+                semantic_gate=semantic_res,
+                calibration_source=calibration_source,
+                physical_measurement_available=False,
+                authoritative_gap_mm=None,
+                engineering_result=ToleranceStatus.REVIEW,
+                authoritative_reason="Low quality image requires manual inspector review or re-capture.",
+            )
+
+        # Step 1: Pre-measurement Image Quality Gate (OpenCV local)
         quality_res = validate_image_quality(image_bgr)
         if not quality_res.usable:
-            # Explicit safety rejection without artificial guessing
             confidence_bd = confidence_engine.fuse_confidence(
                 quality_score=quality_res.quality_score,
                 segmentation_score=0.0,
@@ -141,6 +254,12 @@ async def measure_joint_gap(
                 rejection_reason=quality_res.rejection_reason or "Image quality unsuitable for measurement.",
                 overlay_hints=OverlayHints(),
                 debug_info=None,
+                semantic_gate=semantic_res,
+                calibration_source=calibration_source,
+                physical_measurement_available=False,
+                authoritative_gap_mm=None,
+                engineering_result=ToleranceStatus.FAIL,
+                authoritative_reason="Image failed local OpenCV optical quality validation.",
             )
 
         # Step 2: Camera Calibration & Lens Distortion Rectification
@@ -188,7 +307,6 @@ async def measure_joint_gap(
             geometry_success = True
             geometry_confidence = 0.92 if response.overall_status != ToleranceStatus.FAIL else 0.70
         except ValueError as val_err:
-            # Zero guessing: when geometry is unresolved, fail safely
             geometry_success = False
             geometry_confidence = 0.20
             confidence_bd = confidence_engine.fuse_confidence(
@@ -211,9 +329,43 @@ async def measure_joint_gap(
                 rejection_reason=f"joint_geometry_not_reliable: {str(val_err)}",
                 overlay_hints=OverlayHints(),
                 debug_info=None,
+                semantic_gate=semantic_res,
+                calibration_source=calibration_source,
+                physical_measurement_available=False,
+                authoritative_gap_mm=None,
+                engineering_result=ToleranceStatus.FAIL,
+                authoritative_reason=f"Zero-guessing geometry rejection: {str(val_err)}",
             )
 
-        # Step 6: AI Joint Condition Classifier (Model B) with Tolerance-Primary Rule
+        # Step 6: Calibration Authority Validation
+        # Client parameter pipe_diameter_mm does NOT automatically become verified calibration.
+        # Calibration must retain provenance from an approved verified source:
+        # PROJECT_METADATA, MANHOLE_METADATA, PHYSICAL_REFERENCE, CAMERA_CALIBRATION, TEST_RIG.
+        verified_sources = {
+            CalibrationSource.PROJECT_METADATA,
+            CalibrationSource.MANHOLE_METADATA,
+            CalibrationSource.PHYSICAL_REFERENCE,
+            CalibrationSource.CAMERA_CALIBRATION,
+            CalibrationSource.TEST_RIG,
+        }
+        is_calibrated = (
+            calibration_source in verified_sources
+            and calibration_verified is True
+        )
+
+        if is_calibrated:
+            physical_measurement_available = True
+            authoritative_gap_mm = response.mean_gap_mm
+            eng_result = response.overall_status
+            eng_reason = f"Verified physical calibration ({calibration_source.value}): measured gap {response.mean_gap_mm:.2f}mm matches tolerance criteria."
+        else:
+            physical_measurement_available = False
+            authoritative_gap_mm = None
+            eng_result = ToleranceStatus.REVIEW
+            eng_reason = "CALIBRATION_REQUIRED: Calibration is unverified or absent; authoritative millimeters withheld."
+            response.rejection_reason = "CALIBRATION_REQUIRED: Unverified diameter cannot produce authoritative millimeters."
+
+        # Step 7: AI Joint Condition Classifier (Model B) with Tolerance-Primary Rule
         classifier = JointClassifier()
         max_tol = tolerance_spec.max_gap_mm if tolerance_spec else 15.0
         cond_res = classifier.classify_joint(
@@ -223,19 +375,19 @@ async def measure_joint_gap(
             max_allowable_gap_mm=max_tol,
         )
 
-        # Step 6b: External WRc InceptionResNetV2 Sewer Baseline Classifier (Advisory Baseline)
+        # Step 8: External WRc InceptionResNetV2 Sewer Baseline Classifier (Advisory Baseline)
         wrc_classifier = get_wrc_classifier()
         wrc_res = wrc_classifier.classify(image_bgr=rectified_bgr)
         response.external_classifier = wrc_res
 
-        # Step 6c: Beta Multi-System Disagreement Tracking
+        # Step 9: Beta Multi-System Disagreement Tracking
         response.model_comparison = compare_models(
             wrc_result=wrc_res,
             native_result=cond_res,
-            vertex_observation=None,
+            vertex_observation=semantic_res.observation,
         )
 
-        # Step 7: Calibrated Multi-Component Confidence Fusion
+        # Step 10: Calibrated Multi-Component Confidence Fusion
         seg_score = seg_res.confidence if seg_res.detected else 0.50
         breakdown = confidence_engine.fuse_confidence(
             quality_score=quality_res.quality_score,
@@ -246,9 +398,19 @@ async def measure_joint_gap(
 
         response.condition = cond_res.condition
         response.confidence_breakdown = breakdown
-        response.result_status = breakdown.decision
-        if breakdown.decision != MeasurementResultStatus.ACCEPTED_MEASUREMENT:
+        response.result_status = breakdown.decision if is_calibrated else MeasurementResultStatus.REVIEW_REQUIRED
+        if not is_calibrated and not response.rejection_reason:
+            response.rejection_reason = "CALIBRATION_REQUIRED: Verification needed for authoritative millimeters."
+        elif breakdown.decision != MeasurementResultStatus.ACCEPTED_MEASUREMENT and not response.rejection_reason:
             response.rejection_reason = f"Measurement gated for inspector review (confidence {breakdown.overall_confidence:.2f})."
+
+        # Attach semantic and calibration authority metadata
+        response.semantic_gate = semantic_res
+        response.calibration_source = calibration_source
+        response.physical_measurement_available = physical_measurement_available
+        response.authoritative_gap_mm = authoritative_gap_mm
+        response.engineering_result = eng_result
+        response.authoritative_reason = eng_reason
 
         return response
 
@@ -260,7 +422,8 @@ async def measure_joint_gap(
             detail=str(val_err),
         )
     except Exception as exc:
+        logger.error("Internal measurement pipeline failure: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Computer vision measurement failed: {str(exc)}",
+            detail="Computer vision measurement processing encountered an internal error. Please check image and retry.",
         )

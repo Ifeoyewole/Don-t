@@ -5,6 +5,7 @@
  * for private Cloud Run invocation without any static service account keys.
  */
 
+import { getVercelOidcToken } from '@vercel/oidc'
 import { GATEWAY_CONFIG } from './config'
 
 interface CachedIdToken {
@@ -25,14 +26,20 @@ export async function getCloudRunIdToken(): Promise<string | null> {
     return cachedIdToken.token
   }
 
-  // Retrieve Vercel OIDC token injected into environment
-  const vercelOidcToken =
-    process.env.VERCEL_OIDC_TOKEN ||
-    process.env.TEST_VERCEL_OIDC_TOKEN
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
+
+  let vercelOidcToken: string | null = null
+  try {
+    vercelOidcToken = await getVercelOidcToken()
+  } catch {
+    // If not in Vercel request context, check env vars (non-production only)
+    if (!isProduction) {
+      vercelOidcToken = process.env.VERCEL_OIDC_TOKEN || process.env.TEST_VERCEL_OIDC_TOKEN || null
+    }
+  }
 
   if (!vercelOidcToken) {
-    // If running in development / test with a pre-configured service token
-    if (process.env.DEV_CLOUD_RUN_ID_TOKEN) {
+    if (!isProduction && process.env.DEV_CLOUD_RUN_ID_TOKEN) {
       return process.env.DEV_CLOUD_RUN_ID_TOKEN
     }
     return null
