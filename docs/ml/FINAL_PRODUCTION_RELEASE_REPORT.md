@@ -65,14 +65,34 @@ JointInspect has completed its final technical correction pass before controlled
 
 ## 4. Verified Live Deployment Traceability
 
-- **Git Commit SHA:** `cfac2b34e74439f9d8848f7ce09aa2b796afb5c7`
-- **Cloud Run Service:** `pipe-joint-api` (`europe-west2`)
-- **Cloud Run Active Revision:** `pipe-joint-api-00009-tdn`
-- **Cloud Run Container Image:** `europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:925793d`
-- **Cloud Run Image Digest:** `sha256:faf49ca89a9ed56658a58303385dc97581768270a6b2d5c09b7e0abc106625e0`
+- **Backend Code SHA:** `fad372fdf4890ff9da9a630de1564094678e8f56`
+- **Frontend Vercel SHA:** `fad372fdf4890ff9da9a630de1564094678e8f56`
+- **GitHub Actions CI Run:** `37382481307` (Status: `completed`, Conclusion: `success`)
+- **Cloud Run Service:** `pipe-joint-api` (`europe-west2`, Project: `joint-inspection-510310`)
+- **Cloud Run Active Revision:** `pipe-joint-api-00010-ptx`
+- **Cloud Run Container Image:** `europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:fad372f`
+- **Cloud Run Image Digest:** `sha256:21058e11b233ad92ea310d6b92f01f6762e00414dae848648f8a1831e556b18a`
 - **Runtime Service Account:** `joint-inspection-runtime@joint-inspection-510310.iam.gserviceaccount.com`
-- **Frontend Gateway:** `https://joint-inspection.vercel.app` (Deployed commit `cfac2b34e74439f9d8848f7ce09aa2b796afb5c7`)
-- **Direct Anonymous Access:** HTTP 403 Forbidden (`allUsers = 0`)
+- **Frontend Gateway:** `https://joint-inspection.vercel.app` (Live Asset Bundle: `index-C5wQfKm3.js`)
+- **Direct Anonymous Access:** HTTP 403 Forbidden (`allUsers = 0`, `allAuthenticatedUsers = 0`)
 - **Vercel Health Liveness:** HTTP 200 OK
 - **Vercel CV Gateway Health:** HTTP 200 OK
+
+---
+
+## 5. Calibration Safety & Fail-Safe Verification
+
+- **Calibration default-safe UX:** **PASS**
+- **Default physical diameter:** **NONE** (starts blank / "Select diameter...")
+- **Default verified state:** **FALSE** (unverified by default)
+- **Backend CalibrationProfile default:** `verified = False`
+- **Implicit physical runtime defaults:** **NONE** (0 implicit mm injected)
+- **Free-text calibration authority:** **NONE** (free-text context strictly prohibited from forging calibration)
+- **Uncalibrated authoritative mm:** **0** (authoritative millimeters withheld when unverified)
+- **Reusable verified profile:** **PASS** (explicitly saved verified profile auto-persists and reuses per project)
+- **Live Defect Classifier:** **WRc InceptionResNetV2** (single live condition classifier)
+- **Native Model B Live Execution:** **NONE** (offline/experimental only; `model_comparison = null`)
+- **Zero-Guessing Tiers:** **PASS** (0 synthetic rays, 0 median infilling)
+- **Vertex Semantic Gate:** **PASS** (live Gemini 2.5 Flash, fail-closed, bounded retry / circuit breaker)
+
 
