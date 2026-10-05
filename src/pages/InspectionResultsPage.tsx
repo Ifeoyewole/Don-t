@@ -63,7 +63,7 @@ const measurementValueLabel = (item: InspectionResult) => {
     return item.cvDebug?.gapPixels ? `${item.cvDebug.gapPixels.toFixed(1)} px gap - calibrate for mm` : 'Calibration needed'
   }
 
-  if (item.measurementSource === 'ai-estimated' && !item.cvDebug?.pipeDetected) {
+  if (item.measurementSource === 'ai-assisted' && !item.cvDebug?.pipeDetected) {
     return `~${item.finalGapMm.toFixed(1)} mm from ${item.cvDebug?.gapPixels?.toFixed(1) ?? '--'} px`
   }
 
@@ -224,7 +224,7 @@ const ResultCard = ({
         )}
 
         <div className="inspection-gap-row">
-          <span>{item.measurementSource === 'ai-review' ? 'Detected gap:' : item.measurementSource === 'ai-estimated' && !item.cvDebug?.pipeDetected ? 'Estimated gap:' : 'Measured gap:'}</span>
+          <span>{item.measurementSource === 'ai-review' ? 'Detected gap:' : item.measurementSource === 'ai-assisted' && !item.cvDebug?.pipeDetected ? 'Estimated gap:' : 'Measured gap:'}</span>
           <strong>{measurementValueLabel(item)}</strong>
         </div>
 

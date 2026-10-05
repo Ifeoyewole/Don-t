@@ -143,55 +143,51 @@ async def measure_joint_gap(
         vertex_gate = get_vertex_semantic_gate()
         semantic_res = vertex_gate.evaluate(image_bgr, operator_context=operator_context)
 
-        # Domain gating: block unrelated scenes, non-joint pipe interiors, or degraded images
-        if semantic_res.domain_status == DomainStatus.UNRELATED_IMAGE:
-            confidence_bd = confidence_engine.fuse_confidence(
-                quality_score=0.0,
-                segmentation_score=0.0,
-                condition_score=0.0,
-                geometry_score=0.0,
-            )
-            return MeasurementResponse(
-                joint_type=joint_type,
-                pipe_diameter_mm=pipe_diameter_mm,
-                pixels_per_mm=1.0,
-                mean_gap_mm=0.0,
-                min_gap_mm=0.0,
-                max_gap_mm=0.0,
-                overall_status=ToleranceStatus.FAIL,
-                result_status=MeasurementResultStatus.REJECTED_UNRELIABLE,
-                condition=None,
-                confidence_breakdown=confidence_bd,
-                rejection_reason="UNRELATED_IMAGE: Image is not a pipe interior or sewer scene. Physical measurement stopped.",
-                overlay_hints=OverlayHints(),
-                debug_info=None,
-                semantic_gate=semantic_res,
-                calibration_source=calibration_source,
-                physical_measurement_available=False,
-                authoritative_gap_mm=None,
-                engineering_result=ToleranceStatus.FAIL,
-                authoritative_reason="Unrelated image rejected by semantic gatekeeper.",
-            )
+        # Domain gating: block unrelated scenes, non-joint pipe interiors, degraded images, or when Vertex is unavailable
+        if not semantic_res.processing_allowed:
+            if semantic_res.domain_status == DomainStatus.UNRELATED_IMAGE:
+                q_score = 0.0
+                reason = "UNRELATED_IMAGE: Image is not a pipe interior or sewer scene. Physical measurement stopped."
+                auth_reason = "Unrelated image rejected by semantic gatekeeper."
+            elif semantic_res.domain_status == DomainStatus.PIPE_INTERIOR_NO_JOINT:
+                q_score = 0.70
+                reason = "PIPE_INTERIOR_NO_JOINT: Pipe interior detected but no pipe joint is visible for measurement."
+                auth_reason = "Pipe interior section without joint; joint measurement skipped."
+            elif semantic_res.domain_status == DomainStatus.LOW_QUALITY_IMAGE:
+                q_score = 0.20
+                reason = "LOW_QUALITY_IMAGE: Image quality degraded by blur, lighting, or water obstruction; retake required."
+                auth_reason = "Low quality image requires manual inspector review or re-capture."
+            elif semantic_res.domain_status == DomainStatus.DOMAIN_VALIDATION_UNAVAILABLE:
+                q_score = 0.0
+                reason = semantic_res.user_message or "AI image validation is temporarily unavailable. Inspection measurement is paused until semantic validation is restored."
+                auth_reason = "AI image validation unavailable; fail-closed enforcement active."
+            else:
+                q_score = 0.0
+                reason = semantic_res.user_message or f"Semantic gate blocked processing: {semantic_res.domain_status.value}"
+                auth_reason = "Semantic domain gatekeeper prevented measurement execution."
 
-        if semantic_res.domain_status == DomainStatus.PIPE_INTERIOR_NO_JOINT:
             confidence_bd = confidence_engine.fuse_confidence(
-                quality_score=0.70,
+                quality_score=q_score,
                 segmentation_score=0.0,
                 condition_score=0.0,
                 geometry_score=0.0,
             )
             return MeasurementResponse(
                 joint_type=joint_type,
-                pipe_diameter_mm=pipe_diameter_mm,
-                pixels_per_mm=1.0,
-                mean_gap_mm=0.0,
-                min_gap_mm=0.0,
-                max_gap_mm=0.0,
+                pipe_diameter_mm=None,
+                pixels_per_mm=None,
+                mean_gap_mm=None,
+                min_gap_mm=None,
+                max_gap_mm=None,
+                mean_gap_px=None,
+                min_gap_px=None,
+                max_gap_px=None,
+                candidate_gap_mm=None,
                 overall_status=ToleranceStatus.REVIEW,
                 result_status=MeasurementResultStatus.REJECTED_UNRELIABLE,
                 condition=None,
                 confidence_breakdown=confidence_bd,
-                rejection_reason="PIPE_INTERIOR_NO_JOINT: Pipe interior detected but no pipe joint is visible for measurement.",
+                rejection_reason=reason,
                 overlay_hints=OverlayHints(),
                 debug_info=None,
                 semantic_gate=semantic_res,
@@ -199,36 +195,7 @@ async def measure_joint_gap(
                 physical_measurement_available=False,
                 authoritative_gap_mm=None,
                 engineering_result=ToleranceStatus.REVIEW,
-                authoritative_reason="Pipe interior section without joint; joint measurement skipped.",
-            )
-
-        if semantic_res.domain_status == DomainStatus.LOW_QUALITY_IMAGE:
-            confidence_bd = confidence_engine.fuse_confidence(
-                quality_score=0.20,
-                segmentation_score=0.0,
-                condition_score=0.0,
-                geometry_score=0.0,
-            )
-            return MeasurementResponse(
-                joint_type=joint_type,
-                pipe_diameter_mm=pipe_diameter_mm,
-                pixels_per_mm=1.0,
-                mean_gap_mm=0.0,
-                min_gap_mm=0.0,
-                max_gap_mm=0.0,
-                overall_status=ToleranceStatus.REVIEW,
-                result_status=MeasurementResultStatus.REJECTED_UNRELIABLE,
-                condition=None,
-                confidence_breakdown=confidence_bd,
-                rejection_reason="LOW_QUALITY_IMAGE: Image quality degraded by blur, lighting, or water obstruction; retake required.",
-                overlay_hints=OverlayHints(),
-                debug_info=None,
-                semantic_gate=semantic_res,
-                calibration_source=calibration_source,
-                physical_measurement_available=False,
-                authoritative_gap_mm=None,
-                engineering_result=ToleranceStatus.REVIEW,
-                authoritative_reason="Low quality image requires manual inspector review or re-capture.",
+                authoritative_reason=auth_reason,
             )
 
         # Step 1: Pre-measurement Image Quality Gate (OpenCV local)
@@ -242,12 +209,16 @@ async def measure_joint_gap(
             )
             return MeasurementResponse(
                 joint_type=joint_type,
-                pipe_diameter_mm=pipe_diameter_mm,
-                pixels_per_mm=1.0,
-                mean_gap_mm=0.0,
-                min_gap_mm=0.0,
-                max_gap_mm=0.0,
-                overall_status=ToleranceStatus.FAIL,
+                pipe_diameter_mm=None,
+                pixels_per_mm=None,
+                mean_gap_mm=None,
+                min_gap_mm=None,
+                max_gap_mm=None,
+                mean_gap_px=None,
+                min_gap_px=None,
+                max_gap_px=None,
+                candidate_gap_mm=None,
+                overall_status=ToleranceStatus.REVIEW,
                 result_status=MeasurementResultStatus.REJECTED_UNRELIABLE,
                 condition=None,
                 confidence_breakdown=confidence_bd,
@@ -258,7 +229,7 @@ async def measure_joint_gap(
                 calibration_source=calibration_source,
                 physical_measurement_available=False,
                 authoritative_gap_mm=None,
-                engineering_result=ToleranceStatus.FAIL,
+                engineering_result=ToleranceStatus.REVIEW,
                 authoritative_reason="Image failed local OpenCV optical quality validation.",
             )
 
@@ -317,12 +288,16 @@ async def measure_joint_gap(
             )
             return MeasurementResponse(
                 joint_type=joint_type,
-                pipe_diameter_mm=pipe_diameter_mm,
-                pixels_per_mm=1.0,
-                mean_gap_mm=0.0,
-                min_gap_mm=0.0,
-                max_gap_mm=0.0,
-                overall_status=ToleranceStatus.FAIL,
+                pipe_diameter_mm=None,
+                pixels_per_mm=None,
+                mean_gap_mm=None,
+                min_gap_mm=None,
+                max_gap_mm=None,
+                mean_gap_px=None,
+                min_gap_px=None,
+                max_gap_px=None,
+                candidate_gap_mm=None,
+                overall_status=ToleranceStatus.REVIEW,
                 result_status=MeasurementResultStatus.REJECTED_UNRELIABLE,
                 condition=None,
                 confidence_breakdown=confidence_bd,
@@ -333,7 +308,7 @@ async def measure_joint_gap(
                 calibration_source=calibration_source,
                 physical_measurement_available=False,
                 authoritative_gap_mm=None,
-                engineering_result=ToleranceStatus.FAIL,
+                engineering_result=ToleranceStatus.REVIEW,
                 authoritative_reason=f"Zero-guessing geometry rejection: {str(val_err)}",
             )
 
@@ -353,17 +328,49 @@ async def measure_joint_gap(
             and calibration_verified is True
         )
 
-        if is_calibrated:
-            physical_measurement_available = True
-            authoritative_gap_mm = response.mean_gap_mm
-            eng_result = response.overall_status
-            eng_reason = f"Verified physical calibration ({calibration_source.value}): measured gap {response.mean_gap_mm:.2f}mm matches tolerance criteria."
+        if not is_calibrated:
+            # When uncalibrated: physical_measurement_available = False, authoritative_gap_mm = None.
+            # Physical mm values MUST NOT be emitted (Section 7).
+            # If an unverified client diameter produced raw mm, store in candidate_gap_mm for diagnostics.
+            if response.mean_gap_mm is not None:
+                response.candidate_gap_mm = response.mean_gap_mm
+            response.mean_gap_mm = None
+            response.min_gap_mm = None
+            response.max_gap_mm = None
+            response.pixels_per_mm = None
+            response.pipe_diameter_mm = None
+            response.physical_measurement_available = False
+            response.authoritative_gap_mm = None
+            response.overall_status = ToleranceStatus.CALIBRATION_REQUIRED
+            response.engineering_result = ToleranceStatus.REVIEW
+            response.authoritative_reason = (
+                "CALIBRATION_REQUIRED: Calibration is unverified or absent; authoritative millimeters withheld."
+            )
+            response.rejection_reason = (
+                "CALIBRATION_REQUIRED: Unverified diameter cannot produce authoritative millimeters."
+            )
         else:
-            physical_measurement_available = False
-            authoritative_gap_mm = None
-            eng_result = ToleranceStatus.REVIEW
-            eng_reason = "CALIBRATION_REQUIRED: Calibration is unverified or absent; authoritative millimeters withheld."
-            response.rejection_reason = "CALIBRATION_REQUIRED: Unverified diameter cannot produce authoritative millimeters."
+            # Calibrated. Enforce Section 8: REJECTED GEOMETRY CANNOT BE AUTHORITATIVE
+            if response.result_status == MeasurementResultStatus.REJECTED_UNRELIABLE:
+                if response.mean_gap_mm is not None:
+                    response.candidate_gap_mm = response.mean_gap_mm
+                response.mean_gap_mm = None
+                response.min_gap_mm = None
+                response.max_gap_mm = None
+                response.physical_measurement_available = False
+                response.authoritative_gap_mm = None
+                response.engineering_result = ToleranceStatus.REVIEW
+                response.authoritative_reason = (
+                    "GEOMETRY_REJECTED: Measurement geometry rejected as unreliable; authoritative millimeters withheld."
+                )
+            else:
+                response.physical_measurement_available = True
+                response.authoritative_gap_mm = response.mean_gap_mm
+                response.engineering_result = response.overall_status
+                response.authoritative_reason = (
+                    f"Verified physical calibration ({calibration_source.value}): "
+                    f"measured gap {response.mean_gap_mm:.2f}mm matches tolerance criteria."
+                )
 
         # Step 7: AI Joint Condition Classifier (Model B) with Tolerance-Primary Rule
         classifier = JointClassifier()
@@ -385,32 +392,56 @@ async def measure_joint_gap(
             wrc_result=wrc_res,
             native_result=cond_res,
             vertex_observation=semantic_res.observation,
+            segmenter_result=seg_res,
+            vertex_live=(semantic_res.model == "gemini-2.5-flash"),
         )
 
         # Step 10: Calibrated Multi-Component Confidence Fusion
         seg_score = seg_res.confidence if seg_res.detected else 0.50
+        cond_score = cond_res.confidence
+        if joint_type != JointType.CIRCULAR_OPENING:
+            # Seams are linear structures where circular joint condition classifier does not apply directly.
+            # Base condition score on seam line consistency and tolerance status.
+            cond_score = 0.85 if response.overall_status != ToleranceStatus.FAIL else 0.50
+
         breakdown = confidence_engine.fuse_confidence(
             quality_score=quality_res.quality_score,
             segmentation_score=seg_score,
-            condition_score=cond_res.confidence,
+            condition_score=cond_score,
             geometry_score=geometry_confidence,
         )
 
         response.condition = cond_res.condition
         response.confidence_breakdown = breakdown
         response.result_status = breakdown.decision if is_calibrated else MeasurementResultStatus.REVIEW_REQUIRED
+
+        # Enforce Section 8: If fused decision is REJECTED_UNRELIABLE, withhold authoritative mm
+        if response.result_status == MeasurementResultStatus.REJECTED_UNRELIABLE:
+            if response.mean_gap_mm is not None:
+                response.candidate_gap_mm = response.mean_gap_mm
+            response.mean_gap_mm = None
+            response.min_gap_mm = None
+            response.max_gap_mm = None
+            response.physical_measurement_available = False
+            response.authoritative_gap_mm = None
+            response.engineering_result = ToleranceStatus.REVIEW
+            if not response.authoritative_reason or "Verified physical calibration" in response.authoritative_reason:
+                response.authoritative_reason = (
+                    "REJECTED_UNRELIABLE: Measurement confidence insufficient for authoritative determination."
+                )
+
         if not is_calibrated and not response.rejection_reason:
             response.rejection_reason = "CALIBRATION_REQUIRED: Verification needed for authoritative millimeters."
         elif breakdown.decision != MeasurementResultStatus.ACCEPTED_MEASUREMENT and not response.rejection_reason:
             response.rejection_reason = f"Measurement gated for inspector review (confidence {breakdown.overall_confidence:.2f})."
 
-        # Attach semantic and calibration authority metadata
+        # Final attach of semantic and calibration authority metadata
         response.semantic_gate = semantic_res
         response.calibration_source = calibration_source
-        response.physical_measurement_available = physical_measurement_available
-        response.authoritative_gap_mm = authoritative_gap_mm
-        response.engineering_result = eng_result
-        response.authoritative_reason = eng_reason
+        if not is_calibrated or response.result_status == MeasurementResultStatus.REJECTED_UNRELIABLE:
+            response.physical_measurement_available = False
+            response.authoritative_gap_mm = None
+            response.engineering_result = ToleranceStatus.REVIEW
 
         return response
 

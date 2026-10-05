@@ -147,6 +147,8 @@ class ModelComparisonResult(BaseModel):
     wrc_vs_vertex_agreement: str = Field(..., description="AGREE, DISAGREE, NOT_COMPARABLE, or UNMAPPED")
     native_vs_vertex_agreement: str = Field(..., description="AGREE, DISAGREE, NOT_COMPARABLE, or UNMAPPED")
     human_review_required: bool = Field(default=False, description="Flagged for manual review on strong disagreement")
+    availability: Optional[dict[str, str]] = Field(None, description="Explicit system execution status (e.g. {'vertex': 'LIVE', 'model_a': 'AVAILABLE', ...})")
+    run_mode: Optional[str] = Field(None, description="FULL_MULTI_MODEL if all systems executed, else PARTIAL_MULTI_MODEL")
 
 
 class VertexSemanticGateResult(BaseModel):
@@ -156,6 +158,7 @@ class VertexSemanticGateResult(BaseModel):
     joint_visible: bool = Field(..., description="Whether a pipe joint is visible")
     quality: str = Field(..., description="Visual quality assessment (OK, BLURRY, UNDEREXPOSED, OVEREXPOSED, DEGRADED)")
     prompt_image_conflict: bool = Field(default=False, description="Whether operator context conflicts with visual evidence")
+    conflict_reason: Optional[str] = Field(None, description="Structured prompt conflict category e.g. ENGINEERING_STATUS_OVERRIDE_ATTEMPT, PHYSICAL_MEASUREMENT_OVERRIDE_ATTEMPT, CALIBRATION_OVERRIDE_ATTEMPT, DOMAIN_CONTRADICTION")
     processing_allowed: bool = Field(..., description="Whether joint geometry processing is permitted")
     user_message: str = Field(..., description="Operator guidance message")
     observation: str = Field(..., description="Detailed semantic visual observation")
@@ -174,6 +177,7 @@ class MeasurementResponse(BaseModel):
     mean_gap_mm: Optional[float] = Field(None, description="Average measured gap clearance across all sample locations in mm.")
     min_gap_mm: Optional[float] = Field(None, description="Minimum recorded gap clearance in mm.")
     max_gap_mm: Optional[float] = Field(None, description="Maximum recorded gap clearance in mm.")
+    candidate_gap_mm: Optional[float] = Field(None, description="Non-authoritative raw calibrated gap mm for diagnostics when geometry is rejected.")
     overall_status: ToleranceStatus = Field(..., description="Comprehensive QA classification.")
     result_status: MeasurementResultStatus = Field(
         default=MeasurementResultStatus.ACCEPTED_MEASUREMENT,

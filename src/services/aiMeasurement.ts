@@ -1,5 +1,4 @@
 import type { AiMeasurementReview, CvMeasurementDebug } from '../types'
-import { createEnhancedImagePayload } from '../lib/imageEnhancement'
 import { createTimestamp } from '../utils/identity'
 
 export interface AiMeasurementRequest {

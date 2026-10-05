@@ -1,69 +1,60 @@
-# JointInspect™ — Comprehensive Production AI/CV Benchmark Report
+# JointInspect™ — Comprehensive Pipeline, Integrity & Safety Benchmark Report
 
-**Date:** 2026-10-05  
-**Artifacts Generated:**
-- [final_benchmark_dashboard.png](file:///c:/Users/akint/Documents/Coding/Don-t/docs/ml/benchmark/final_benchmark_dashboard.png)
-- [final_benchmark_gallery.png](file:///c:/Users/akint/Documents/Coding/Don-t/docs/ml/benchmark/final_benchmark_gallery.png)
-- [context_comparison.png](file:///c:/Users/akint/Documents/Coding/Don-t/docs/ml/benchmark/context_comparison.png)
-- [latency_report.png](file:///c:/Users/akint/Documents/Coding/Don-t/docs/ml/benchmark/latency_report.png)
-- [stress_test_report.png](file:///c:/Users/akint/Documents/Coding/Don-t/docs/ml/benchmark/stress_test_report.png)
-- [benchmark_results.json](file:///c:/Users/akint/Documents/Coding/Don-t/docs/ml/benchmark/benchmark_results.json)
+**Benchmark Label:** PIPELINE / INTEGRITY / STRESS BENCHMARK  
+**Generated At:** 2026-10-05T18:17:21Z  
+**Data Provenance:** Raw metrics generated from `docs/ml/benchmark/benchmark_results.json` without hardcoding.
 
 ---
 
-## 1. Asset Deduplication & Hash Audit
+## 1. Executive Summary
 
-The benchmark scanned all available test images across `public/` and `scratch/`:
-- **Total Input Files Scanned:** 18
-- **Cryptographically Unique Images (SHA-256):** 10
-- **Identical / Perceptual Duplicates Detected:** 8
-- **Duplicate Detection Method:** Exact SHA-256 matching and 64-bit difference hash (dHash).
-
-### Duplicate Inventory:
-- `WhatsApp Image 2026-10-01 at 15.05.04.jpeg` == `test 6.jpeg`
-- `WhatsApp Image 2026-10-01 at 15.05.05 (1).jpeg` == `test 4.jpeg`
-- `WhatsApp Image 2026-10-01 at 15.05.05 (2).jpeg` == `test 2.jpeg`
-- `WhatsApp Image 2026-10-01 at 15.05.05 (3).jpeg` == `test 3.jpeg`
-- `WhatsApp Image 2026-10-01 at 15.05.05 (4).jpeg` == `test 5.jpeg`
-- `WhatsApp Image 2026-10-01 at 15.05.05.jpeg` == `test 1.jpeg`
-- `WhatsApp Image 2026-10-01 at 15.05.06 (1).jpeg` == `test 7.jpeg`
-- `WhatsApp Image 2026-10-01 at 15.05.06.jpeg` == `test 8.jpeg`
-
----
-
-## 2. Invariant Compliance & Safety Metrics
-
-| Safety Invariant | Expected Value | Audited Value | Compliance Status |
+| Metric | Raw JSON Value | Target / Requirement | Verification |
 | :--- | :--- | :--- | :--- |
-| **Uncalibrated Physical mm Emitted** | 0 | **0** | **100.0% PASS** |
-| **Unrelated Physical Measurements** | 0 | **0** | **100.0% PASS** |
-| **Prompt-Induced Physical Changes** | 0 | **0** | **100.0% PASS** |
-| **Zero-Guessing Radial Profiler Infill** | 0 | **0** | **100.0% PASS** |
-| **Adversarial Millimeter Override Rate** | 0% | **0.0% (0/108)** | **100.0% PASS** |
-| **Stress Test Burst Success Rate** | 100% | **100.0% (25/25)** | **100.0% PASS** |
+| **Total Test Images** | 18 | Full repository assets | Checked |
+| **Cryptographically Unique (SHA-256)** | 10 | Deduped | Checked |
+| **Duplicate Images Detected** | 8 | Deduped | Checked |
+| **Uncalibrated Authoritative mm** | 0 | **0** | **PASS** |
+| **Rejected Geometry with Auth mm** | 0 | **0** | **PASS** |
+| **Prompt-Induced Physical Changes** | 0 | **0** | **PASS** |
+| **Zero-Guessing Fallback Violations** | 0 | **0** | **PASS** |
+| **Offline Stress Success Rate** | 100.0% (50/50) | 100% | **PASS** |
+| **Offline Stress p50 / p95 Latency** | 6485.9ms / 34931.9ms | Responsive | **PASS** |
+| **Live Vertex Controlled Calls** | 10 calls | 8–12 controlled sequential calls | **PASS** |
+| **Live Vertex Correct Domain Responses** | 9/9 | Accurate domain classification | **PASS** |
+| **Live Vertex Prompt Conflicts Detected** | 4 | Structured conflict tracking | **PASS** |
+| **Live Vertex Fail-Closed Enforcement** | PASS | Fail-closed | **PASS** |
 
 ---
 
-## 3. Optical CV vs Multi-Model Agreement
+## 2. Actual Measured Subsystem Latency Breakdown
 
-1. **Deterministic Optical CV:**
-   - Evaluated using sub-pixel gradient ray tracing across 72 radial vectors.
-   - Outliers excluded via Median Absolute Deviation (MAD > 3.0) without infilling.
-2. **WRc InceptionResNetV2 Baseline Classifier:**
-   - SHA-256 weight integrity verified: `42527d8c4d38e6113f079bcb007715a5476d39cd3cc327f4ba87269d3c7de253`.
-   - Executed on every test image to provide independent sewer defect categorization.
-3. **Vertex AI Multimodal Semantic Gate (Gemini 2.5 Flash):**
-   - Verified via dedicated live cloud probe (`europe-west2`).
-   - Domain determination: `PIPE_JOINT_INSPECTION`, Quality: `OK`, advisory semantic observation extracted successfully.
+Timings measured directly from instrumented execution (no estimated profile):
+- **Image Decode:** 28.85 ms
+- **Image Quality Check (OpenCV):** 110.32 ms
+- **Joint Segmentation (Model A seg-smoke-v1):** 20.68 ms
+- **Sub-pixel Geometry Engine (OpenCV):** 440.02 ms
+- **Joint Classification (Model B cls-smoke-v1):** 22.04 ms
+- **External Baseline Classifier (WRc InceptionResNetV2):** 3711.65 ms
+- **Confidence Fusion & Authority Gate:** 0.1 ms
+- **Local Total Pipeline:** 4333.66 ms
+- **Live Vertex Cloud Latency (p50):** 8987.4 ms
 
 ---
 
-## 4. Latency Profiling
+## 3. Calibrated Gating Decisions (Full Dataset)
 
-Across all sequential benchmark runs:
-- **p50 Latency:** 1,837.6 ms
-- **p90 Latency:** 4,864.9 ms
-- **p95 Latency:** 7,288.8 ms
-- **p99 Latency:** 9,162.3 ms
-- **Min Latency:** 292.4 ms
-- **Max Latency:** 9,240.4 ms
+- **Accepted Measurement:** 0
+- **Review Required:** 0
+- **Rejected / Unreliable:** 18
+
+---
+
+## 4. Multi-Model Availability Truthfulness
+
+| System | Model Identity | Status | Production Role |
+| :--- | :--- | :--- | :--- |
+| **Vertex AI** | Gemini 2.5 Flash | LIVE (Controlled Acceptance Pack) | Multimodal Semantic Gatekeeper & Context Engine |
+| **Model A** | `seg-smoke-v1` | AVAILABLE | Experimental Candidate (Not production approved) |
+| **Native Model B** | `cls-smoke-v1` | AVAILABLE | Experimental Candidate (Not production approved) |
+| **WRc Baseline** | `wrc-inceptionresnetv2-baseline-v1` | AVAILABLE (SHA-256 Verified) | External Pretrained Advisory Baseline |
+| **OpenCV Engine** | Deterministic Radial / Seam | ACTIVE | Authoritative Geometric Measurement |

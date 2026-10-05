@@ -1,43 +1,34 @@
-# JointInspect™ — High-Concurrency Stress Test Report
+# JointInspect™ — Final Concurrency & Latency Stress Test Report
 
-**Date:** 2026-10-05  
-**Execution Target:** Canonical Ingress `/api/v1/cv/measure`  
-**Load Profile:** 25 Concurrent Requests across 4 Worker Threads  
-**Payload:** Real Sewer CCTV Joint Photograph (Full Annular Resolution)  
+**Benchmark Label:** PIPELINE / INTEGRITY / STRESS BENCHMARK  
+**Generated At:** 2026-10-05T18:17:21Z
 
 ---
 
-## 1. Concurrency & Throughput Metrics
+## 1. Concurrency Stress Test Architecture
 
-The stress testing suite fired burst traffic against the unified pipeline endpoint to verify thread safety, resource contention, memory stability, and error handling.
-
-| Metric | Result | Target Benchmark | Status |
-| :--- | :--- | :--- | :--- |
-| **Total Requests** | 25 | 25 | **COMPLETE** |
-| **Successful Responses (HTTP 200)** | 25 | 25 | **100% Success** |
-| **Failed Requests (5xx / 4xx)** | 0 | 0 | **0 Failures** |
-| **Median Latency (p50)** | **1,906.4 ms** | < 3,000 ms | **OPTIMAL** |
-| **95th Percentile Latency (p95)** | **3,278.2 ms** | < 6,000 ms | **OPTIMAL** |
-| **Minimum Latency** | 979.9 ms | — | **FASTEST** |
-| **Maximum Latency** | 3,313.2 ms | < 8,000 ms | **SAFE** |
+To prevent HTTP 429 quota exhaustion on Vertex AI, the stress test is architected with strict separation:
+- **Offline / Local Stress Test:** Runs OpenCV DSP, Model A, Model B, WRc, and deterministic mock semantic gate.
+- **Workers:** 8 concurrent worker threads.
+- **Total Requests:** 50.
 
 ---
 
-## 2. Resource & Thread Safety Audit
+## 2. Quantitative Results
 
-1. **FastAPI & OpenCV Stability:**
-   - Zero deadlock or race conditions detected across concurrent NumPy array operations and OpenCV C++ DSP bindings.
-   - Clean thread-local memory reclamation with no residual image buffer leaks.
-2. **Rate Limiting & Memory Guardrails:**
-   - 20 MB streaming byte-read limit successfully guarded heap allocation.
-   - Zero memory spikes or unhandled exceptions logged.
+- **Successful Requests (HTTP 200):** 50 / 50 (100.0%)
+- **Failed Requests:** 0
+- **Latency p50:** 6485.9 ms
+- **Latency p95:** 34931.9 ms
+- **Latency p99:** 35016.3 ms
+- **Latency Min / Max:** 1811.0 ms / 35054.2 ms
 
 ---
 
-## 3. Visual Artifacts
+## 3. Live Vertex Latency Profile (Measured Separately)
 
-Graphical profiling charts are saved in:
-[stress_test_report.png](file:///c:/Users/akint/Documents/Coding/Don-t/docs/ml/benchmark/stress_test_report.png)
-
-- **Panel A (Concurrent Response Latency Sequence):** Displays stable response timing under multi-worker burst conditions with p50 and p95 thresholds indicated.
-- **Panel B (Throughput & Success Rate):** Confirms 100% completion rate without service disruption.
+- **Probes Run:** 10 sequential controlled calls
+- **Live Vertex p50:** 8987.4 ms
+- **Live Vertex p95:** 16806.0 ms
+- **Live Vertex Min / Max:** 6997.4 ms / 21588.6 ms
+- **Fail-Closed Behavior:** PASS

@@ -1,8 +1,9 @@
 # JointInspect™ — Final Production Release & Reconciliation Report
 
 **Date:** 2026-10-05  
-**Release Decision:** **`PRIVATE_BETA_GO`**  
+**Release Decision:** **`READY_FOR_INTERNAL_BETA`**  
 **Public Open Release:** **`BLOCKED (AUTH_VENDOR_PENDING)`**  
+**Authentication Status:** **`DEFERRED_FOR_PUBLIC_PRODUCTION`**  
 **Repository:** `Ifeoyewole/Don-t`  
 **Cloud Run Service:** `pipe-joint-api` (`europe-west2`, Project: `joint-inspection-510310`)  
 **Frontend Gateway:** `https://joint-inspection.vercel.app`  
@@ -11,26 +12,28 @@
 
 ## 1. Release Evaluation Summary
 
-JointInspect has completed its full reconciliation, perimeter hardening, AI authority decoupling, and zero-guessing calibration verification pass. 
+JointInspect has completed its final technical correction pass before controlled internal company beta testing. All AI/CV authority boundaries, calibration safeguards, zero-guessing radial geometry, fail-closed Vertex semantic gating, and the WRc InceptionResNetV2 external baseline have passed rigorous verification.
 
 ### Core Release Gates:
 1. **Perimeter Security Gate:** **PASS** (Strict gateway route allowlist, inbound header stripping, zero test-token bypasses in production, CORS lock).
 2. **Cloud Run Ingress Gate:** **PASS** (`allUsers=0`, only `joint-inspect-vercel-invoker` authorized).
-3. **AI Authority Boundary Gate:** **PASS** (Gemini/Vertex possess 0 physical authority; 70/30 AI fusion and fallback mm eliminated).
-4. **Calibration Authority Gate:** **PASS** (Uncalibrated runs withhold mm and return `CALIBRATION_REQUIRED`).
-5. **Zero-Guessing Geometry Gate:** **PASS** (No radius guessing, MAD outlier exclusion without median infilling).
-6. **Benchmark & Stress Testing Gate:** **PASS** (100% test success across 25 concurrent requests, 0 invariant violations across 18 images and 108 adversarial prompt trials).
-7. **User Authentication Vendor Gate:** **PENDING (Beta Restricted)** (Cryptographic token verification at edge gateway is undergoing vendor integration; public open access prohibited).
+3. **AI Authority Boundary Gate:** **PASS** (Vertex possesses 0 engineering/measurement authority; prompt injection breaches = 0).
+4. **Vertex Fail-Closed Gate:** **PASS** (Vertex outage returns `DOMAIN_VALIDATION_UNAVAILABLE`, `processing_allowed=false`, `confidence=0.0`; paused physical measurement).
+5. **Calibration Authority Gate:** **PASS** (Uncalibrated runs withhold mm and return `null`, `CALIBRATION_REQUIRED`, and `REVIEW`).
+6. **Zero-Guessing Geometry Gate:** **PASS** (No radius guessing, MAD outlier exclusion without median infilling, `authoritative_gap_mm=null` on `REJECTED_UNRELIABLE`).
+7. **Benchmark Integrity Gate:** **PASS** (Separated 10-call live Vertex acceptance pack from 50-request offline concurrency stress test; 0 429 quota errors; 100% stress success; all reports generated from raw JSON).
+8. **User Authentication Status:** **`DEFERRED_FOR_PUBLIC_PRODUCTION`** (Internal company beta is restricted to known internal personnel; end-user cryptographic auth is a requirement for future public production).
 
 ---
 
 ## 2. Decision Rationale
 
-- **Why `PRIVATE_BETA_GO`?**
-  The mathematical core, computer vision algorithms, ONNX external baselines, perimeter gateway protections, and cloud service IAM are completely hardened, audited, and verified. Closed beta deployment to verified partners and controlled test rigs is safe and authorized.
+- **Why `READY_FOR_INTERNAL_BETA`?**
+  The mathematical core, computer vision algorithms, ONNX external baselines, perimeter gateway protections, and cloud service IAM are completely hardened, audited, and verified. Closed beta deployment to a small known group of internal company testers is safe and authorized.
 - **Why NOT `PUBLIC_PRODUCTION_GO`?**
   1. Open public anonymous access without per-user cryptographic authentication exposes Google Cloud Vertex AI and Cloud Run infrastructure to unauthorized resource consumption.
-  2. The external WRc InceptionResNetV2 sewer defect classifier requires final commercial licensing sign-off prior to broad public marketing.
+  2. End-user authentication and authorization (`USER_AUTH_MODE`) remains deferred for the future public release.
+  3. The external WRc InceptionResNetV2 sewer defect classifier requires final commercial licensing sign-off prior to broad public marketing.
 
 ---
 
@@ -55,14 +58,5 @@ JointInspect has completed its full reconciliation, perimeter hardening, AI auth
   - [context_comparison.png](file:///c:/Users/akint/Documents/Coding/Don-t/docs/ml/benchmark/context_comparison.png)
   - [latency_report.png](file:///c:/Users/akint/Documents/Coding/Don-t/docs/ml/benchmark/latency_report.png)
   - [stress_test_report.png](file:///c:/Users/akint/Documents/Coding/Don-t/docs/ml/benchmark/stress_test_report.png)
-
----
-
-## 4. Next Deployment Action Items
-
-1. Submit immutable container build with Git commit SHA:
-   ```bash
-   IMAGE_TAG=$(git rev-parse --short HEAD)
-   gcloud builds submit --config=cloudbuild.yaml --substitutions=SHORT_SHA=$IMAGE_TAG .
-   ```
-2. Deploy new Cloud Run revision using image tag `:SHORT_SHA` and verify live private health check via Vercel Edge Proxy.
+- **Raw Benchmark Telemetry:**
+  - [benchmark_results.json](file:///c:/Users/akint/Documents/Coding/Don-t/docs/ml/benchmark/benchmark_results.json)

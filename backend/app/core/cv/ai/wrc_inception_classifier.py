@@ -87,8 +87,9 @@ class WRCInceptionClassifier:
             candidates.append(Path(env_models_dir) / "wrc_inceptionresnetv2_baseline_v1.onnx")
 
         # Standard backend locations
-        repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
+        repo_root = Path(__file__).resolve().parents[5]
         candidates.append(repo_root / "models" / "external" / "wrc" / "wrc_inceptionresnetv2_baseline_v1.onnx")
+        candidates.append(repo_root / "models" / "wrc_inceptionresnetv2_baseline_v1.onnx")
         candidates.append(repo_root / "backend" / "models" / "wrc_inceptionresnetv2_baseline_v1.onnx")
 
         for path in candidates:
@@ -105,7 +106,10 @@ class WRCInceptionClassifier:
             self._session = None
             return
 
-        expected_hash = "42527d8c4d38e6113f079bcb007715a5476d39cd3cc327f4ba87269d3c7de253"
+        valid_hashes = {
+            "8a6115e9f6f6f3a5a4f5cc749cc35420a623a4547e904174ae9a18ceab63f9f4",  # Converted ONNX model
+            "42527d8c4d38e6113f079bcb007715a5476d39cd3cc327f4ba87269d3c7de253",  # Source Keras weights.h5
+        }
         try:
             h = hashlib.sha256()
             with open(resolved_path, "rb") as f:
@@ -115,10 +119,9 @@ class WRCInceptionClassifier:
                         break
                     h.update(chunk)
             actual_hash = h.hexdigest()
-            if actual_hash != expected_hash:
+            if actual_hash not in valid_hashes:
                 logger.error(
-                    "EXTERNAL_CLASSIFIER_INTEGRITY_FAILURE: WRc ONNX hash mismatch! Expected %s, got %s",
-                    expected_hash,
+                    "EXTERNAL_CLASSIFIER_INTEGRITY_FAILURE: WRc ONNX hash mismatch! Got %s",
                     actual_hash,
                 )
                 self._integrity_failure = True
@@ -306,6 +309,8 @@ def compare_models(
     wrc_result: Optional[ExternalClassifierResult],
     native_result: Optional[Any],
     vertex_observation: Optional[str] = None,
+    segmenter_result: Optional[Any] = None,
+    vertex_live: bool = False,
 ) -> ModelComparisonResult:
     """Compare predictions across advisory systems and track disagreements for beta evaluation.
     
@@ -313,12 +318,14 @@ def compare_models(
         wrc_result: WRc external classifier result.
         native_result: JointInspect native Model B JointConditionResult.
         vertex_observation: Optional textual observation from Vertex AI domain gate.
+        segmenter_result: Optional JointSegmenter Model A result.
+        vertex_live: Whether Vertex executed as a live cloud call.
         
     Returns:
-        ModelComparisonResult: Agreement metrics and human review flag.
+        ModelComparisonResult: Agreement metrics, human review flag, and system availability.
     """
     wrc_pred = wrc_result.jointinspect_mapping if (wrc_result and wrc_result.status == "SUCCESS") else None
-    wrc_score = wrc_result.confidence if wrc_result else None
+    wrc_score = wrc_result.confidence if (wrc_result and wrc_result.status == "SUCCESS") else None
 
     native_pred = None
     native_score = None
@@ -327,6 +334,21 @@ def compare_models(
         if cond and cond != JointConditionClass.CLASSIFICATION_UNAVAILABLE:
             native_pred = cond.value if hasattr(cond, "value") else str(cond)
         native_score = getattr(native_result, "confidence", None)
+
+    # Multi-system availability tracking
+    wrc_avail = "AVAILABLE" if (wrc_result and wrc_result.status == "SUCCESS") else "UNAVAILABLE"
+    native_avail = "AVAILABLE" if (native_pred is not None) else "UNAVAILABLE"
+    model_a_avail = "AVAILABLE" if (segmenter_result and getattr(segmenter_result, "detected", False)) else "UNAVAILABLE"
+    vertex_avail = "LIVE" if vertex_live else ("AVAILABLE" if vertex_observation else "UNAVAILABLE")
+
+    availability = {
+        "vertex": vertex_avail,
+        "model_a": model_a_avail,
+        "model_b": native_avail,
+        "wrc": wrc_avail,
+    }
+    all_executed = all(v in ("LIVE", "AVAILABLE") for v in availability.values())
+    run_mode = "FULL_MULTI_MODEL" if all_executed else "PARTIAL_MULTI_MODEL"
 
     # 1. WRc vs Native
     if not wrc_pred or not native_pred:
@@ -365,7 +387,7 @@ def compare_models(
             human_review = True
 
     return ModelComparisonResult(
-        wrc_baseline_prediction=wrc_result.raw_class_name if wrc_result else None,
+        wrc_baseline_prediction=wrc_result.raw_class_name if (wrc_result and wrc_result.status == "SUCCESS") else None,
         wrc_baseline_score=wrc_score,
         native_model_b_prediction=native_pred,
         native_model_b_score=native_score,
@@ -374,6 +396,8 @@ def compare_models(
         wrc_vs_vertex_agreement=wrc_vs_vertex,
         native_vs_vertex_agreement=native_vs_vertex,
         human_review_required=human_review,
+        availability=availability,
+        run_mode=run_mode,
     )
 
 

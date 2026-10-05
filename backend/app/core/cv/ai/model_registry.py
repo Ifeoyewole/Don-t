@@ -22,12 +22,13 @@ class ModelRegistry:
 
     def __init__(self, models_dir: Optional[Path] = None):
         if models_dir is None:
-            # Default to backend/models or environment variable
             env_path = os.getenv("PIPE_CV_MODELS_DIR")
             if env_path:
                 self.models_dir = Path(env_path)
             else:
-                self.models_dir = Path(__file__).resolve().parent.parent.parent.parent / "models"
+                # Repo root models directory
+                repo_root = Path(__file__).resolve().parents[5]
+                self.models_dir = repo_root / "models"
         else:
             self.models_dir = models_dir
 
@@ -36,22 +37,35 @@ class ModelRegistry:
 
     def _initialize_registry(self) -> None:
         """Register default model definitions and check weight file presence."""
-        segmenter_weights = self.models_dir / "pipe_joint_segmenter_v1.onnx"
-        classifier_weights = self.models_dir / "pipe_joint_classifier_v1.onnx"
+        # 1. Model A (Joint Segmenter)
+        seg_candidates = [
+            self.models_dir / "pipe_joint_segmenter_v1.onnx",
+            self.models_dir / "segmenter" / "candidates" / "seg-smoke-v1" / "model.onnx",
+            self.models_dir / "segmenter" / "candidates" / "seg-v1.0.0-smoke" / "model.onnx",
+        ]
+        segmenter_weights = next((p for p in seg_candidates if p.exists()), seg_candidates[0])
 
-        wrc_weights = self.models_dir / "wrc_inceptionresnetv2_baseline_v1.onnx"
-        if not wrc_weights.exists():
-            # Check external models directory
-            alt_wrc = self.models_dir / "external" / "wrc" / "wrc_inceptionresnetv2_baseline_v1.onnx"
-            if alt_wrc.exists():
-                wrc_weights = alt_wrc
+        # 2. Model B (Joint Classifier)
+        cls_candidates = [
+            self.models_dir / "pipe_joint_classifier_v1.onnx",
+            self.models_dir / "classifier" / "candidates" / "cls-smoke-v1" / "model.onnx",
+            self.models_dir / "classifier" / "candidates" / "cls-v1.0.0-smoke" / "model.onnx",
+        ]
+        classifier_weights = next((p for p in cls_candidates if p.exists()), cls_candidates[0])
+
+        # 3. External WRc InceptionResNetV2 Baseline
+        wrc_candidates = [
+            self.models_dir / "external" / "wrc" / "wrc_inceptionresnetv2_baseline_v1.onnx",
+            self.models_dir / "wrc_inceptionresnetv2_baseline_v1.onnx",
+        ]
+        wrc_weights = next((p for p in wrc_candidates if p.exists()), wrc_candidates[0])
 
         self._models["joint_segmenter"] = ModelInfo(
             model_id="joint_segmenter",
             model_type="segmenter",
             weights_path=segmenter_weights,
             input_size=640,
-            version="1.0.0",
+            version="seg-smoke-v1",
             is_available=segmenter_weights.exists(),
         )
 
@@ -60,7 +74,7 @@ class ModelRegistry:
             model_type="classifier",
             weights_path=classifier_weights,
             input_size=256,
-            version="1.0.0",
+            version="cls-smoke-v1",
             is_available=classifier_weights.exists(),
         )
 
@@ -69,7 +83,7 @@ class ModelRegistry:
             model_type="external_classifier",
             weights_path=wrc_weights,
             input_size=299,
-            version="1.0.0",
+            version="wrc-inceptionresnetv2-baseline-v1",
             is_available=wrc_weights.exists(),
         )
 
