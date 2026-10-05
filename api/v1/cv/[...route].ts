@@ -55,15 +55,17 @@ function getMatchedOrigin(req: IncomingMessage): string | null {
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
-  const requestId = normalizeRequestId(req.headers['x-request-id'])
-  const method = req.method?.toUpperCase() || 'GET'
-  const url = req.url || '/'
-  const matchedOrigin = getMatchedOrigin(req)
-
-  // 1. CORS Preflight & Origin Handling
+  let requestId = 'unknown'
   const corsHeaders: Record<string, string> = {
     'Vary': 'Origin',
   }
+  try {
+    requestId = normalizeRequestId(req.headers['x-request-id'])
+    const method = req.method?.toUpperCase() || 'GET'
+    const url = req.url || '/'
+    const matchedOrigin = getMatchedOrigin(req)
+
+    // 1. CORS Preflight & Origin Handling
   if (matchedOrigin) {
     corsHeaders['Access-Control-Allow-Origin'] = matchedOrigin
     corsHeaders['Access-Control-Allow-Credentials'] = 'true'
@@ -236,9 +238,13 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       'Cache-Control': 'no-store, max-age=0',
     })
     res.end(Buffer.from(responseBody))
-  } catch (error) {
-    console.error(`[GATEWAY-ERR-${requestId}] Upstream invocation failed:`, error)
-    const sanitized = sanitizeErrorResponse(error, requestId)
-    return sendJson(res, 502, sanitized, corsHeaders)
+    } catch (error) {
+      console.error(`[GATEWAY-ERR-${requestId}] Upstream invocation failed:`, error)
+      const sanitized = sanitizeErrorResponse(error, requestId)
+      return sendJson(res, 502, sanitized, corsHeaders)
+    }
+  } catch (fatalError) {
+    console.error(`[GATEWAY-FATAL-${requestId}]`, fatalError)
+    return sendJson(res, 500, { detail: 'Gateway Internal Server Error', request_id: requestId }, corsHeaders)
   }
 }

@@ -41,8 +41,11 @@ export const GATEWAY_CONFIG = {
 // Production environment validation: forbid development / test token fallbacks
 const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
 if (isProduction) {
-  if (process.env.DEV_CLOUD_RUN_ID_TOKEN || process.env.TEST_VERCEL_OIDC_TOKEN) {
-    throw new Error('FATAL SECURITY: DEV_CLOUD_RUN_ID_TOKEN and TEST_VERCEL_OIDC_TOKEN are strictly forbidden in production.')
+  if (process.env.DEV_CLOUD_RUN_ID_TOKEN) {
+    delete process.env.DEV_CLOUD_RUN_ID_TOKEN
+  }
+  if (process.env.TEST_VERCEL_OIDC_TOKEN) {
+    delete process.env.TEST_VERCEL_OIDC_TOKEN
   }
 }
 
