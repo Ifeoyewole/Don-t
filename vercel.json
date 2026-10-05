@@ -33,16 +33,12 @@
   ],
   "rewrites": [
     {
-      "source": "/api/v1/cv/(.*)",
-      "destination": "/api/v1/cv/[...route]"
-    },
-    {
       "source": "/cv/(.*)",
-      "destination": "/api/v1/cv/[...route]"
+      "destination": "/api/v1/cv/$1"
     },
     {
       "source": "/health",
-      "destination": "/api/v1/cv/[...route]"
+      "destination": "/api/health"
     },
     {
       "source": "/((?!api/|cv/|health).*)",
