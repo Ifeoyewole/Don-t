@@ -46,6 +46,12 @@ async def validate_photo(
                 detail="Uploaded file payload is empty.",
             )
 
+        if len(content) > 15 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Uploaded image payload exceeds 15 MB limit.",
+            )
+
         image_bgr = decode_image_bytes(content)
         result = validate_photo_quality(
             image_bgr,
@@ -60,8 +66,10 @@ async def validate_photo(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(val_err),
         )
-    except Exception as exc:
+    except HTTPException:
+        raise
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error evaluating photo quality: {str(exc)}",
+            detail="Error evaluating photo quality due to internal processing error.",
         )

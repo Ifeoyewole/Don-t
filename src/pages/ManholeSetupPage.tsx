@@ -77,17 +77,29 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
 
   return (
     <div className="page-grid manhole-page">
-      <section className="page-hero left-aligned">
+      <button className="page-back-link" type="button" onClick={onBack}>
+        ← Back to Project Details
+      </button>
+
+      <header className="page-hero left-aligned">
         <div>
           <p className="eyebrow">{projectName}</p>
           <h1>Manhole Setup</h1>
           <p className="lead">Enter the manhole details before uploading joint photos for measurement.</p>
         </div>
-      </section>
+      </header>
 
       <section className="split-page-shell">
         <div className="split-main-column">
           <article className="stitch-form-card">
+            <div className="stitch-section-head">
+              <div>
+                <h2>Manhole Specifications</h2>
+                <p className="form-section-subtitle">Define pipe run distance and material classification for tolerance calculation.</p>
+              </div>
+              <span className="form-step-badge">Step 2 of 4</span>
+            </div>
+
             <div className="stitch-two-up">
               <label className="field">
                 <span>Manhole ID</span>
@@ -148,8 +160,10 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
 
             {error ? <p className="form-error">{error}</p> : null}
 
+            <div className="form-action-divider" />
+
             <div className="page-footer-actions align-right">
-              <button className="button button-secondary" type="button" onClick={onBack}>
+              <button className="button button-ghost" type="button" onClick={onBack}>
                 Back
               </button>
               <button className="button button-primary button-wide-on-desktop" type="button" onClick={handleSave} disabled={saving}>
@@ -163,10 +177,10 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
           <article className="estimate-sidebar">
             <div className="estimate-sidebar-head">
               <h2>Run Estimate</h2>
-              <span>{loadingEstimate ? 'Updating' : 'Ready'}</span>
+              <span className="estimate-status-pill">{loadingEstimate ? 'Updating...' : 'Ready'}</span>
             </div>
             <div className="estimate-highlight">
-              <span>Estimated Pipe Joints</span>
+              <span className="estimate-highlight-label">Estimated Pipe Joints</span>
               <strong>{estimate?.jointsNeeded ?? '--'}</strong>
               <p>Based on {estimate?.unitLengthM ?? '--'}m pipe lengths</p>
             </div>
@@ -181,7 +195,7 @@ export const ManholeSetupPage = ({ projectName, manhole, projectId, onBack, onEs
               </div>
             </div>
             <div className="estimate-message">
-              This helps you anticipate how many pipe-to-pipe joints may need photos in the run.
+              Anticipated pipe-to-pipe joint locations requiring optical inspection along this run.
             </div>
           </article>
         </aside>

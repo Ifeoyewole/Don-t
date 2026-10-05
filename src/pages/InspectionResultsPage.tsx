@@ -26,14 +26,29 @@ type DraftOverride = {
 }
 
 const sourceLabels: Record<MeasurementSource, string> = {
-  fastapi: 'FastAPI CV',
-  cv: 'CV measured',
+  fastapi: 'Optical CV Engine',
+  cv: 'CV Measured',
+  'offline-preview': 'Offline preview (unverified)',
   'ai-assisted': 'AI assisted',
-  'ai-estimated': 'AI estimated',
   'ai-review': 'AI review',
   manual: 'Manual override',
   fallback: 'Estimated fallback',
-  ai: 'AI measured',
+}
+
+const trustStatusLabels: Record<string, { label: string; className: string }> = {
+  ACCEPTED_MEASUREMENT: { label: '✓ Accepted Measurement', className: 'trust-accepted' },
+  REVIEW_REQUIRED: { label: '⚠ Review Required', className: 'trust-review' },
+  REJECTED_UNRELIABLE: { label: '✕ Rejected (Unreliable)', className: 'trust-rejected' },
+}
+
+const conditionLabels: Record<string, string> = {
+  NORMAL: 'Normal Joint',
+  OPEN_JOINT: 'Open Joint',
+  ANGULAR_DEFLECTION: 'Angular Deflection',
+  SURFACE_DAMAGE: 'Surface Damage',
+  DEPOSITS_OBSTACLES: 'Deposits / Obstacles',
+  INTRUDING_SEAL: 'Intruding Sealing Material',
+  UNKNOWN: 'Unclassified Condition',
 }
 
 const measurementLabel = (item: InspectionResult) => {
@@ -180,14 +195,34 @@ const ResultCard = ({
         <Overlay debug={item.cvDebug} hints={resolveOverlayHints(item)} />
         <div className="result-media-top">
           <StatusBadge status={item.status} />
+          {item.resultStatus && (
+            <span className={`trust-badge ${trustStatusLabels[item.resultStatus]?.className ?? ''}`}>
+              {trustStatusLabels[item.resultStatus]?.label ?? item.resultStatus}
+            </span>
+          )}
           <span className={`source-chip source-${(item.measurementSource ?? 'cv').replaceAll('-', '-')}`}>{sourceLabel(item)}</span>
         </div>
         <div className="result-media-bottom">
           <strong>Joint {item.jointLabel}</strong>
+          {item.condition && (
+            <span className={`condition-tag condition-${item.condition.toLowerCase().replaceAll('_', '-')}`}>
+              {conditionLabels[item.condition] ?? item.condition}
+            </span>
+          )}
         </div>
       </div>
 
       <div className="inspection-result-body">
+        {item.resultStatus === 'REJECTED_UNRELIABLE' && (
+          <div className="rejection-callout">
+            <div className="rejection-callout-header">
+              <span className="rejection-callout-icon">✕</span>
+              <strong>Measurement Rejected (Zero Guessing Policy)</strong>
+            </div>
+            <p>{item.rejectionReason || 'Detection confidence is below acceptable threshold. Zero artificial guessing enforced.'}</p>
+          </div>
+        )}
+
         <div className="inspection-gap-row">
           <span>{item.measurementSource === 'ai-review' ? 'Detected gap:' : item.measurementSource === 'ai-estimated' && !item.cvDebug?.pipeDetected ? 'Estimated gap:' : 'Measured gap:'}</span>
           <strong>{measurementValueLabel(item)}</strong>
@@ -197,6 +232,152 @@ const ResultCard = ({
           <span>Status:</span>
           <strong>{item.status}</strong>
         </div>
+
+        {item.condition && (
+          <div className="inspection-condition-row">
+            <span>Classified Condition:</span>
+            <span className={`condition-pill condition-${item.condition.toLowerCase().replaceAll('_', '-')}`}>
+              {conditionLabels[item.condition] ?? item.condition}
+            </span>
+          </div>
+        )}
+
+        {item.confidenceBreakdown && (
+          <div className="confidence-breakdown-panel">
+            <div className="confidence-breakdown-head">
+              <span>Confidence Factors</span>
+              <strong>{Math.round(item.confidenceBreakdown.totalConfidence * 100)}%</strong>
+            </div>
+            <div className="confidence-factor-grid">
+              <div className="factor-item">
+                <span className="factor-label">Quality (Q)</span>
+                <span className="factor-value">{Math.round(item.confidenceBreakdown.qualityFactor * 100)}%</span>
+              </div>
+              <div className="factor-item">
+                <span className="factor-label">Geometry (G)</span>
+                <span className="factor-value">{Math.round(item.confidenceBreakdown.geometricConsistency * 100)}%</span>
+              </div>
+              <div className="factor-item">
+                <span className="factor-label">Model (M)</span>
+                <span className="factor-value">{Math.round(item.confidenceBreakdown.modelConfidence * 100)}%</span>
+              </div>
+              <div className="factor-item">
+                <span className="factor-label">Stability (S)</span>
+                <span className="factor-value">{Math.round(item.confidenceBreakdown.stabilityFactor * 100)}%</span>
+              </div>
+            </div>
+            <div className="risk-rate-indicator">
+              <span>Estimated Failure Risk:</span>
+              <strong className={item.confidenceBreakdown.failureRiskRate > 0.05 ? 'risk-high' : 'risk-low'}>
+                {(item.confidenceBreakdown.failureRiskRate * 100).toFixed(1)}%
+              </strong>
+            </div>
+          </div>
+        )}
+
+        {/* AI Visual Assessment: WRc External Baseline (Advisory Only) */}
+        {(item.externalClassifier || item.cvDebug?.externalClassifier) && (
+          <div className="wrc-baseline-card" style={{
+            margin: '12px 0',
+            padding: '12px 14px',
+            background: 'var(--color-surface-subtle, rgba(255, 255, 255, 0.04))',
+            borderRadius: '8px',
+            border: '1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.08))',
+            fontSize: '0.85rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontWeight: 600, color: 'var(--color-text-secondary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.72rem' }}>
+                AI Visual Assessment (Advisory Baseline)
+              </span>
+              <span style={{
+                fontSize: '0.7rem',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                background: 'rgba(56, 189, 248, 0.15)',
+                color: '#38bdf8',
+                fontWeight: 600
+              }}>
+                WRc InceptionResNetV2
+              </span>
+            </div>
+
+            {(() => {
+              const ext = item.externalClassifier || item.cvDebug?.externalClassifier;
+              if (!ext) return null;
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Raw WRc Prediction:</span>
+                      <div style={{ fontWeight: 600, color: '#f8fafc' }}>
+                        {ext.raw_class_name} {ext.raw_class_code ? `(${ext.raw_class_code})` : ''}
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Model Score:</span>
+                      <div style={{ fontWeight: 600, color: '#f8fafc' }}>
+                        {Math.round(ext.confidence * 100)}%
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', paddingTop: '6px' }}>
+                    <div>
+                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>JointInspect Mapping:</span>
+                      <div style={{ fontWeight: 500, color: ext.jointinspect_mapping ? '#e2e8f0' : '#64748b' }}>
+                        {ext.jointinspect_mapping || 'Unmapped'} ({ext.mapping_status})
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Authority Status:</span>
+                      <div style={{ color: '#fbbf24', fontSize: '0.75rem', fontWeight: 500 }}>
+                        Advisory Baseline (No Tolerance Authority)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Beta Multi-System Comparison Telemetry */}
+        {(item.modelComparison || item.cvDebug?.modelComparison) && (
+          <div className="model-comparison-card" style={{
+            margin: '8px 0 12px 0',
+            padding: '10px 12px',
+            background: 'rgba(0, 0, 0, 0.25)',
+            borderRadius: '6px',
+            border: '1px dashed rgba(255, 255, 255, 0.12)',
+            fontSize: '0.8rem'
+          }}>
+            <div style={{ fontWeight: 600, color: '#94a3b8', marginBottom: '6px', fontSize: '0.72rem', textTransform: 'uppercase' }}>
+              Beta Multi-System Comparison
+            </div>
+            {(() => {
+              const comp = item.modelComparison || item.cvDebug?.modelComparison;
+              if (!comp) return null;
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8' }}>WRc vs Native Agreement:</span>
+                    <span style={{
+                      fontWeight: 600,
+                      color: comp.wrc_vs_native_agreement === 'AGREE' ? '#4ade80' : comp.wrc_vs_native_agreement === 'DISAGREE' ? '#f87171' : '#94a3b8'
+                    }}>
+                      {comp.wrc_vs_native_agreement}
+                    </span>
+                  </div>
+                  {comp.human_review_required && (
+                    <div style={{ color: '#f87171', fontWeight: 600, fontSize: '0.75rem', marginTop: '2px' }}>
+                      ⚠️ High-confidence disagreement flagged for manual beta review
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
         <div className="inspection-note-block">
           <span>Measurement Review</span>

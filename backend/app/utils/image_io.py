@@ -6,26 +6,64 @@ import cv2
 import numpy as np
 
 
+ALLOWED_MAGIC_SIGNATURES = [
+    b"\xff\xd8\xff",  # JPEG
+    b"\x89PNG\r\n\x1a\n",  # PNG
+    b"RIFF",  # WebP container prefix
+]
+
+
 def decode_image_bytes(image_bytes: bytes) -> np.ndarray:
-    """Decode raw image bytes (JPEG, PNG, WebP, TIFF) to an OpenCV BGR numpy array.
+    """Decode raw image bytes (JPEG, PNG, WebP) to an OpenCV BGR numpy array with strict security checks.
 
     Args:
         image_bytes: Raw binary bytes of the uploaded image file.
 
     Returns:
-        np.ndarray: Decoded image in BGR format (H, W, 3) or (H, W).
+        np.ndarray: Decoded image in BGR format (H, W, 3).
 
     Raises:
-        ValueError: If image decoding fails or byte payload is empty/corrupt.
+        ValueError: If image decoding fails, format is unsupported, dimensions exceed bounds, or byte payload is corrupt.
     """
     if not image_bytes:
         raise ValueError("Image bytes payload is empty.")
 
+    # 1. Enforce payload size limit (15 MB default)
+    max_bytes = 15 * 1024 * 1024
+    if len(image_bytes) > max_bytes:
+        raise ValueError(f"Image payload size ({len(image_bytes)} bytes) exceeds maximum limit ({max_bytes} bytes).")
+
+    # 2. Magic byte header verification (reject executables, scripts, or foreign formats)
+    header = image_bytes[:16]
+    is_valid_magic = any(header.startswith(sig) for sig in ALLOWED_MAGIC_SIGNATURES)
+    if not is_valid_magic:
+        raise ValueError("Invalid image file format. Only JPEG, PNG, and WebP images are permitted.")
+
+    # Additional check for WebP format ('RIFF'....'WEBP')
+    if header.startswith(b"RIFF") and b"WEBP" not in image_bytes[:16]:
+        raise ValueError("Invalid RIFF container: WEBP signature missing.")
+
+    # 3. Safe OpenCV decoding
     np_arr = np.frombuffer(image_bytes, np.uint8)
     image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
     if image is None or image.size == 0:
-        raise ValueError("Failed to decode image from provided bytes. Unsupported or corrupted format.")
+        raise ValueError("Corrupted or malformed image payload. OpenCV failed to decode pixels.")
+
+    # 4. Dimension & Decompression Bomb Safeguards
+    height, width = image.shape[:2]
+    max_dimension = 8192
+    max_total_pixels = 50_000_000  # 50 Megapixels
+
+    if height > max_dimension or width > max_dimension:
+        raise ValueError(
+            f"Image dimensions ({width}x{height}) exceed maximum allowed dimension ({max_dimension}x{max_dimension})."
+        )
+
+    if (height * width) > max_total_pixels:
+        raise ValueError(
+            f"Image resolution ({width * height} pixels) exceeds decompression bomb limit ({max_total_pixels} pixels)."
+        )
 
     return image
 

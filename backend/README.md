@@ -23,7 +23,7 @@ A high-precision, sub-pixel Computer Vision backend built with **FastAPI** and *
   - Custom `ToleranceSpec` support with nominal, min, max, and warning margin buffers.
 - **Sub-Pixel Precision**: Parabolic peak interpolation and outlier rejection using Median Absolute Deviation (MAD).
 - **Interactive Visualization HUD**: Base64 JPEG overlay generation with color-coded measurement vectors and live HUD metrics.
-- **Cloud-Ready**: Zero-config Vercel Serverless (`api/index.py` + `vercel.json`) and multi-stage production `Dockerfile`.
+- **Cloud-Ready**: Native Google Cloud Run deployment (`pipe-joint-api`) and multi-stage production `Dockerfile`.
 
 ---
 
@@ -125,10 +125,14 @@ docker run -p 8000:8000 pipe-cv-backend
 
 ---
 
-## ☁️ Vercel Serverless Deployment
+## ☁️ Cloud Run & Vercel Deployment
 
-Deploy directly using Vercel CLI:
+Deploy the containerized FastAPI backend to Google Cloud Run:
 ```bash
-vercel --prod
+gcloud run deploy pipe-joint-api \
+  --image europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:latest \
+  --region europe-west2 \
+  --project joint-inspection-510310 \
+  --allow-unauthenticated
 ```
-The serverless bridge in `api/index.py` routes incoming `/api/*` and `/cv/*` requests directly to FastAPI.
+The Vercel frontend automatically proxies all `/api/v1/*` and `/cv/*` requests directly to Cloud Run via `vercel.json` rewrites.

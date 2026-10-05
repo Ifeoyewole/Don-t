@@ -1,0 +1,18 @@
+{
+  "model_id": "wrc-inceptionresnetv2-baseline-v1",
+  "source_repository": "alexgeorge13/WRc-Dataset-Classification",
+  "source_commit": "7ac0b0f9edf430d43e5f180466e2e456d98fdfe7",
+  "architecture": "InceptionResNetV2",
+  "weights_sha256": "42527d8c4d38e6113f079bcb007715a5476d39cd3cc327f4ba87269d3c7de253",
+  "weights_size_bytes": 231566563,
+  "source_code_license": "MIT",
+  "training_dataset": "WRc",
+  "external_pretrained": true,
+  "jointinspect_owned": false,
+  "commercial_weight_provenance_status": "PENDING_REVIEW",
+  "engineering_authority": false,
+  "production_measurement_authority": false,
+  "classification_role": "ADVISORY_BASELINE",
+  "beta_testing_enabled": true,
+  "production_approved": false
+}

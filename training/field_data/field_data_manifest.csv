@@ -1,0 +1,5 @@
+inspection_id,video_id,frame_id,source_owner,capture_date,pipe_material,pipe_diameter,camera_type,commercial_training_permission,commercial_model_permission,privacy_review,annotation_status,measurement_ground_truth_available,production_eligible
+INSP-RIG-001,VID-RIG-001,FRM-0001,JointInspect Metrology Lab,2026-09-15,CONCRETE,300,CCTV-STANDARD-01,true,true,APPROVED,VERIFIED,true,true
+INSP-RIG-001,VID-RIG-001,FRM-0002,JointInspect Metrology Lab,2026-09-15,CONCRETE,300,CCTV-STANDARD-01,true,true,APPROVED,VERIFIED,true,true
+INSP-RIG-002,VID-RIG-002,FRM-0001,JointInspect Metrology Lab,2026-09-16,PVC,225,CCTV-STANDARD-01,true,true,APPROVED,VERIFIED,true,true
+INSP-FLD-001,VID-FLD-001,FRM-0010,Utility Partner Alpha,2026-08-20,CLAY,150,IBAK-PAN-TILT,true,true,APPROVED,PENDING,false,false

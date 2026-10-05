@@ -1,7 +1,13 @@
 """Aggregated API router for v1 endpoints."""
 
 from fastapi import APIRouter
-from backend.app.api.v1.endpoints import health, measurement, validation
+from backend.app.api.v1.endpoints import (
+    calibration,
+    health,
+    measurement,
+    multi_frame,
+    validation,
+)
 
 api_router = APIRouter()
 
@@ -9,6 +15,5 @@ api_router = APIRouter()
 api_router.include_router(health.router, prefix="/cv", tags=["Health"])
 api_router.include_router(validation.router, prefix="/cv", tags=["Validation"])
 api_router.include_router(measurement.router, prefix="/cv", tags=["Measurement"])
-
-# Also mount health directly at root for standard load balancer probes
-api_router.include_router(health.router, tags=["Health"])
+api_router.include_router(multi_frame.router, prefix="/cv", tags=["Multi-Frame Measurement"])
+api_router.include_router(calibration.router, prefix="/cv", tags=["Calibration"])

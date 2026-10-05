@@ -9,7 +9,7 @@ from scipy.signal import find_peaks
 
 from backend.app.core.cv.preprocessor import enhance_edges_clahe, filter_bilateral_smooth
 from backend.app.core.cv.tolerance import classify_gap, evaluate_overall_status
-from backend.app.schemas.domain import JointType, ToleranceStatus
+from backend.app.schemas.domain import JointType, MeasurementResultStatus, ToleranceStatus
 from backend.app.schemas.measurement import (
     CvMeasurementDebug,
     GapLine,
@@ -44,21 +44,28 @@ def _subpixel_peak(profile: np.ndarray, peak_idx: int) -> float:
 def _reject_seam_outliers(
     gap_pixels: List[float],
     threshold_mad: float = 3.0,
-) -> List[float]:
-    """Filter localized scanline measurement outliers using Median Absolute Deviation."""
-    arr = np.array(gap_pixels, dtype=np.float64)
-    med = np.median(arr)
-    mad = np.median(np.abs(arr - med))
-    if mad < 1e-4:
-        return gap_pixels
+) -> Tuple[List[int], List[int]]:
+    """Identify inlier and outlier scanline measurement indices using MAD.
 
-    filtered = []
-    for val in arr:
+    Outlier scanlines are excluded from measurement evidence and preserved for audit,
+    never replaced with synthetic median measurements.
+    """
+    arr = np.array(gap_pixels, dtype=np.float64)
+    if len(arr) == 0:
+        return [], []
+    med = float(np.median(arr))
+    mad = float(np.median(np.abs(arr - med)))
+    if mad < 1e-4:
+        return list(range(len(gap_pixels))), []
+
+    inliers: List[int] = []
+    outliers: List[int] = []
+    for idx, val in enumerate(arr):
         if abs(val - med) > threshold_mad * (1.4826 * mad):
-            filtered.append(float(med))
+            outliers.append(idx)
         else:
-            filtered.append(float(val))
-    return filtered
+            inliers.append(idx)
+    return inliers, outliers
 
 
 def _draw_seam_debug_overlay(
@@ -134,10 +141,12 @@ def _draw_seam_debug_overlay(
 def measure_seam_gap(
     image_bgr: np.ndarray,
     joint_type: JointType = JointType.VERTICAL_SEAM,
-    pipe_diameter_mm: float = 100.0,
+    pipe_diameter_mm: Optional[float] = None,
     tolerance_spec: Optional[ToleranceSpec] = None,
     num_scanlines: int = 40,
     return_debug_image: bool = False,
+    joint_mask: Optional[np.ndarray] = None,
+    roi_bbox: Optional[Tuple[int, int, int, int]] = None,
 ) -> MeasurementResponse:
     """Execute seam gap measurement across weld/butt joint interfaces.
 
@@ -161,6 +170,10 @@ def measure_seam_gap(
         gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
     else:
         gray = image_bgr.copy()
+
+    # Apply AI segmentation mask if provided
+    if joint_mask is not None and joint_mask.shape == gray.shape:
+        gray = cv2.bitwise_and(gray, gray, mask=joint_mask)
 
     h, w = gray.shape
 
@@ -215,106 +228,150 @@ def measure_seam_gap(
 
             p1_sub = _subpixel_peak(profile, p1_int)
             p2_sub = _subpixel_peak(profile, p2_int)
-        elif len(peaks) == 1:
-            p1_int = peaks[0]
-            p1_sub = _subpixel_peak(profile, p1_int)
-            # Estimate nominal offset
-            p2_sub = p1_sub + max(8.0, axis_len * 0.05)
-        else:
-            # Fallback based on image center
-            mid = axis_len / 2.0
-            p1_sub = mid - axis_len * 0.03
-            p2_sub = mid + axis_len * 0.03
 
-        gap_px = max(1.0, abs(p2_sub - p1_sub))
-        raw_gaps_px.append(gap_px)
+            gap_px = max(1.0, abs(p2_sub - p1_sub))
+            raw_gaps_px.append(gap_px)
 
-        if is_vertical:
-            left_points.append(Point2D(x=round(p1_sub, 2), y=round(float(coord), 2)))
-            right_points.append(Point2D(x=round(p2_sub, 2), y=round(float(coord), 2)))
-        else:
-            left_points.append(Point2D(x=round(float(coord), 2), y=round(p1_sub, 2)))
-            right_points.append(Point2D(x=round(float(coord), 2), y=round(p2_sub, 2)))
+            if is_vertical:
+                left_points.append(Point2D(x=round(p1_sub, 2), y=round(float(coord), 2)))
+                right_points.append(Point2D(x=round(p2_sub, 2), y=round(float(coord), 2)))
+            else:
+                left_points.append(Point2D(x=round(float(coord), 2), y=round(p1_sub, 2)))
+                right_points.append(Point2D(x=round(float(coord), 2), y=round(p2_sub, 2)))
 
-    # Step 4: Scale Factor Calibration
-    # Reference: pipe_diameter_mm corresponds to the visible pipe width/height span
-    reference_px = float(w if is_vertical else h) * 0.65
-    pixels_per_mm = float(reference_px / max(1.0, pipe_diameter_mm))
+    # ZERO ARTIFICIAL GUESSING: If insufficient valid scanlines detected, fail explicitly
+    min_required_samples = max(3, int(num_scanlines * 0.15))
+    if len(raw_gaps_px) < min_required_samples:
+        raise ValueError("joint_geometry_not_reliable: Insufficient seam edge boundaries detected.")
 
-    # Step 5: Outlier Rejection & Measurement Objects
-    filtered_gaps_px = _reject_seam_outliers(raw_gaps_px)
+    # Step 4: Outlier Exclusion (MAD) - Excluded from evidence, not rewritten as median
+    inlier_indices, outlier_indices = _reject_seam_outliers(raw_gaps_px)
+    valid_left = [left_points[i] for i in inlier_indices]
+    valid_right = [right_points[i] for i in inlier_indices]
+    filtered_gaps_px = [raw_gaps_px[i] for i in inlier_indices]
+
+    mean_gap_px = float(np.mean(filtered_gaps_px))
+    min_gap_px = float(np.min(filtered_gaps_px))
+    max_gap_px = float(np.max(filtered_gaps_px))
+
+    # Step 5: Calibration Authority Assessment
+    has_calibration = pipe_diameter_mm is not None and pipe_diameter_mm > 0
+    pixels_per_mm: Optional[float] = None
+    mean_gap_mm: Optional[float] = None
+    min_gap_mm: Optional[float] = None
+    max_gap_mm: Optional[float] = None
+    std_gap_mm: Optional[float] = None
+    authoritative_gap_mm: Optional[float] = None
+    overall_status: ToleranceStatus
+    engineering_result: ToleranceStatus
+    authoritative_reason: str
+
+    if has_calibration:
+        # Verified physical scale only; unverified heuristic defaults eliminated
+        reference_px = float(w if is_vertical else h) * 0.65
+        pixels_per_mm = float(reference_px / float(pipe_diameter_mm))
+        gaps_mm = [gap_px / pixels_per_mm for gap_px in filtered_gaps_px]
+        gaps_arr = np.array(gaps_mm)
+        mean_gap_mm = float(np.mean(gaps_arr))
+        min_gap_mm = float(np.min(gaps_arr))
+        max_gap_mm = float(np.max(gaps_arr))
+        std_gap_mm = float(np.std(gaps_arr))
+        authoritative_gap_mm = round(mean_gap_mm, 2)
+
     gap_lines: List[GapLine] = []
-    gaps_mm: List[float] = []
+    line_statuses: List[ToleranceStatus] = []
 
-    for lp, rp, gap_px in zip(left_points, right_points, filtered_gaps_px):
-        gap_mm = gap_px / pixels_per_mm
-        gaps_mm.append(gap_mm)
-        status = classify_gap(gap_mm, pipe_diameter_mm, tolerance_spec)
+    for lp, rp, gap_px in zip(valid_left, valid_right, filtered_gaps_px):
+        if has_calibration and pixels_per_mm is not None:
+            gap_mm = round(gap_px / pixels_per_mm, 2)
+            status = classify_gap(gap_mm, float(pipe_diameter_mm), tolerance_spec)
+            line_statuses.append(status)
+        else:
+            gap_mm = None
+            status = ToleranceStatus.CALIBRATION_REQUIRED
 
         gap_lines.append(
             GapLine(
                 start=lp,
                 end=rp,
                 gap_px=round(gap_px, 2),
-                gap_mm=round(gap_mm, 2),
+                gap_mm=gap_mm,
                 status=status,
             )
         )
 
-    # Step 6: Summary Metrics
-    gaps_arr = np.array(gaps_mm)
-    mean_gap_mm = float(np.mean(gaps_arr))
-    min_gap_mm = float(np.min(gaps_arr))
-    max_gap_mm = float(np.max(gaps_arr))
-    std_gap_mm = float(np.std(gaps_arr))
+    if has_calibration and line_statuses:
+        overall_status = evaluate_overall_status(line_statuses)
+        engineering_result = overall_status
+        authoritative_reason = (
+            f"Seam scale calibrated ({pipe_diameter_mm:.1f} mm). "
+            f"Measured mean seam gap: {authoritative_gap_mm} mm evaluated as {overall_status.value}."
+        )
+    else:
+        overall_status = ToleranceStatus.CALIBRATION_REQUIRED
+        engineering_result = ToleranceStatus.CALIBRATION_REQUIRED
+        authoritative_reason = (
+            "Seam edge boundaries verified in pixel space. "
+            "Physical millimeter calculation withheld pending verified scale calibration."
+        )
 
-    overall_status = evaluate_overall_status([gl.status for gl in gap_lines])
-
-    # Step 7: Overlay Hints
+    # Step 6: Overlay Hints
     overlay_hints = OverlayHints(
         gap_lines=gap_lines,
-        seam_left_edge=left_points,
-        seam_right_edge=right_points,
+        seam_left_edge=valid_left,
+        seam_right_edge=valid_right,
     )
 
-    # Step 8: Optional Debug Image Overlay
+    # Step 7: Optional Debug Image Overlay
     debug_image_b64: Optional[str] = None
     if return_debug_image:
         debug_canvas = _draw_seam_debug_overlay(
             image_bgr,
             joint_type,
-            left_points,
-            right_points,
+            valid_left,
+            valid_right,
             gap_lines,
-            mean_gap_mm,
-            min_gap_mm,
-            max_gap_mm,
+            mean_gap_mm if mean_gap_mm is not None else 0.0,
+            min_gap_mm if min_gap_mm is not None else 0.0,
+            max_gap_mm if max_gap_mm is not None else 0.0,
             overall_status,
         )
         debug_image_b64 = encode_image_to_base64(debug_canvas, format=".jpg", jpeg_quality=85)
 
     proc_time_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
 
-    raw_gaps_mm = [g / pixels_per_mm for g in raw_gaps_px]
     debug_info = CvMeasurementDebug(
-        pixels_per_mm=round(pixels_per_mm, 4),
+        pixels_per_mm=round(pixels_per_mm, 4) if pixels_per_mm else None,
         num_samples=len(gap_lines),
-        raw_min_gap_mm=round(float(np.min(raw_gaps_mm)), 2),
-        raw_max_gap_mm=round(float(np.max(raw_gaps_mm)), 2),
-        raw_mean_gap_mm=round(float(np.mean(raw_gaps_mm)), 2),
-        std_gap_mm=round(std_gap_mm, 3),
+        raw_min_gap_mm=round(min_gap_mm, 2) if min_gap_mm is not None else None,
+        raw_max_gap_mm=round(max_gap_mm, 2) if max_gap_mm is not None else None,
+        raw_mean_gap_mm=round(mean_gap_mm, 2) if mean_gap_mm is not None else None,
+        std_gap_mm=round(std_gap_mm, 3) if std_gap_mm is not None else None,
         processing_time_ms=proc_time_ms,
         debug_image_base64=debug_image_b64,
+        total_ray_count=num_scanlines,
+        valid_ray_count=len(gap_lines),
+        valid_ray_fraction=round(len(gap_lines) / max(1, num_scanlines), 4),
+        coverage_status="FULL" if len(gap_lines) >= min_required_samples else "PARTIAL",
+        invalid_reason_counts={"OUTLIER": len(outlier_indices), "REJECTED_SCANLINES": num_scanlines - len(raw_gaps_px)},
     )
 
     return MeasurementResponse(
         joint_type=joint_type,
+        mean_gap_px=round(mean_gap_px, 2),
+        min_gap_px=round(min_gap_px, 2),
+        max_gap_px=round(max_gap_px, 2),
         pipe_diameter_mm=pipe_diameter_mm,
-        pixels_per_mm=round(pixels_per_mm, 4),
-        mean_gap_mm=round(mean_gap_mm, 2),
-        min_gap_mm=round(min_gap_mm, 2),
-        max_gap_mm=round(max_gap_mm, 2),
+        pixels_per_mm=round(pixels_per_mm, 4) if pixels_per_mm else None,
+        mean_gap_mm=round(mean_gap_mm, 2) if mean_gap_mm is not None else None,
+        min_gap_mm=round(min_gap_mm, 2) if min_gap_mm is not None else None,
+        max_gap_mm=round(max_gap_mm, 2) if max_gap_mm is not None else None,
         overall_status=overall_status,
+        result_status=MeasurementResultStatus.ACCEPTED_MEASUREMENT,
         overlay_hints=overlay_hints,
         debug_info=debug_info,
+        physical_measurement_available=has_calibration,
+        authoritative_gap_mm=authoritative_gap_mm,
+        engineering_result=engineering_result,
+        authoritative_reason=authoritative_reason,
     )

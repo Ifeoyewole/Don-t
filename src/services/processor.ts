@@ -82,6 +82,7 @@ async function runAiAssistedMeasurement(
   image: InspectionImage,
   blob: Blob | undefined,
   pipeDiameterMm: number | undefined,
+  options?: ProcessOptions,
 ): Promise<ReturnType<typeof fuseMeasurementWithAi>> {
   try {
     const cvMeasurement = await measureWithCv({
@@ -90,6 +91,9 @@ async function runAiAssistedMeasurement(
       orderIndex: image.orderIndex,
       blob,
       pipeDiameterMm,
+      operatorContext: options?.operatorContext,
+      calibrationSource: options?.calibrationSource,
+      calibrationVerified: options?.calibrationVerified,
     })
     const aiReview = shouldReviewWithAi(cvMeasurement)
       ? await reviewMeasurementWithAi({
@@ -143,7 +147,7 @@ async function runAiAssistedMeasurement(
   }
 }
 
-async function processImage(imageId: string): Promise<string | null> {
+async function processImage(imageId: string, options?: ProcessOptions): Promise<string | null> {
   const image = await db.inspectionImages.get(imageId)
   if (!image) {
     emit({
@@ -169,7 +173,7 @@ async function processImage(imageId: string): Promise<string | null> {
   emit({ type: 'progress', imageId, progress: 60, message: image.validationStatus === 'retake' ? 'Running enhanced CV and AI review' : 'Running CV pipeline' })
   await wait(20)
 
-  const measurement = await runAiAssistedMeasurement(image, blobRecord?.blob, manhole?.pipeDiameterMm)
+  const measurement = await runAiAssistedMeasurement(image, blobRecord?.blob, manhole?.pipeDiameterMm, options)
 
   const resultId = createId()
   const result: InspectionResult = {
@@ -190,6 +194,10 @@ async function processImage(imageId: string): Promise<string | null> {
     measurementAudit: measurement.measurementAudit,
     processedAt: createTimestamp(),
     overrideApplied: false,
+    resultStatus: measurement.resultStatus,
+    condition: measurement.condition,
+    confidenceBreakdown: measurement.confidenceBreakdown,
+    rejectionReason: measurement.rejectionReason,
   }
 
   await db.transaction('rw', db.inspectionImages, db.inspectionResults, async () => {
@@ -249,7 +257,7 @@ export const processor = {
       const batchResults = await Promise.all(
         batch.map(async (image) => {
           try {
-            return await processImage(image.id)
+            return await processImage(image.id, options)
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Processing failed'
             await failImageProcessing(image.id, message)
@@ -315,6 +323,10 @@ export const processor = {
       aiReview: measurement.aiReview,
       overlayHints: measurement.overlayHints,
       measurementAudit: measurement.measurementAudit,
+      resultStatus: measurement.resultStatus,
+      condition: measurement.condition,
+      confidenceBreakdown: measurement.confidenceBreakdown,
+      rejectionReason: measurement.rejectionReason,
     }
 
     await db.inspectionResults.put(updated)

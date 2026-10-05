@@ -13,7 +13,7 @@ type Props = {
   onLoadSample: () => Promise<void>
   onRemoveFile: (imageId: string) => Promise<void>
   onClearQueue: () => Promise<void>
-  onStartInspection: () => Promise<ProcessBatchResult>
+  onStartInspection: (operatorContext?: string) => Promise<ProcessBatchResult>
 }
 
 const validationTone = (image: InspectionImage) =>
@@ -41,6 +41,7 @@ export const PhotoUploadPage = ({
 }: Props) => {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [operatorContext, setOperatorContext] = useState('')
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [reportedDownlink, setReportedDownlink] = useState<number | null>(null)
 
@@ -90,7 +91,7 @@ export const PhotoUploadPage = ({
     setBusy(true)
     setError('')
     try {
-      await onStartInspection()
+      await onStartInspection(operatorContext.trim() || undefined)
     } catch (processingError) {
       setError(processingError instanceof Error ? processingError.message : 'Processing failed.')
     } finally {
@@ -135,7 +136,7 @@ export const PhotoUploadPage = ({
               className="sr-only"
               id="upload-input"
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/*"
+              accept="image/jpeg,image/png,image/webp"
               multiple
               onChange={(event) => void handleFileSelection(event.target.files)}
             />
@@ -144,7 +145,7 @@ export const PhotoUploadPage = ({
                 ⌁
               </div>
               <strong>Drag photos here</strong>
-              <span>Or tap to browse photos. Support JPG, PNG, WEBP and phone image files.</span>
+              <span>Or tap to browse photos. Supported formats: JPG, PNG, WEBP (max 15 MB).</span>
               <button className="button button-secondary" type="button" onClick={() => inputRef.current?.click()} disabled={busy}>
                 Browse Photos
               </button>
@@ -168,7 +169,7 @@ export const PhotoUploadPage = ({
               <div className="progress-fill" style={{ width: `${Math.max(queueCompletion, online ? 12 : 4)}%` }} />
             </div>
             <p>
-              Project data stays on this device, and queued photos keep their upload order while you work.
+              Project records persist in local storage. Inspection photos undergo ephemeral server-side computer vision &amp; Vertex AI domain gating; images are not retained on servers and training consent is disabled by default.
             </p>
             <p>{aiReviewCount ? `${aiReviewCount} photo(s) will use enhanced CV and AI review before a retake decision.` : 'All queued photos are eligible for measurement.'}</p>
             <div className="action-row">
@@ -179,6 +180,37 @@ export const PhotoUploadPage = ({
                 Clear All
               </button>
             </div>
+          </section>
+
+          <section className="network-card operator-context-card">
+            <div className="network-head">
+              <strong>Inspection context</strong>
+              <span>Optional</span>
+            </div>
+            <textarea
+              id="operator-context-input"
+              className="operator-context-textarea"
+              rows={3}
+              maxLength={1000}
+              value={operatorContext}
+              onChange={(e) => setOperatorContext(e.target.value)}
+              placeholder='Add useful context for this inspection, for example: "Possible gasket extrusion near the upper-right edge. Focus on joint alignment."'
+              style={{
+                width: '100%',
+                padding: '0.6rem',
+                borderRadius: '6px',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                background: 'rgba(0, 0, 0, 0.25)',
+                color: 'inherit',
+                fontSize: '0.85rem',
+                resize: 'vertical',
+                marginTop: '0.5rem',
+                boxSizing: 'border-box',
+              }}
+            />
+            <p style={{ fontSize: '0.75rem', opacity: 0.75, marginTop: '0.35rem' }}>
+              Optional. This helps AI interpret the inspection and tailor its explanation. It does not override measurements, calibration, tolerance rules, or safety checks.
+            </p>
           </section>
         </aside>
 

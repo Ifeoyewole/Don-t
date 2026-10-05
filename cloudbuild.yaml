@@ -1,0 +1,50 @@
+steps:
+  # Step 1: Copy verified ONNX model from GCS and verify SHA-256 integrity
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        mkdir -p backend/models
+        gcloud storage cp gs://joint-inspection-510310-data/models/external/wrc/inceptionresnetv2/v1/wrc_inceptionresnetv2_baseline_v1.onnx backend/models/wrc_inceptionresnetv2_baseline_v1.onnx
+        EXPECTED_SHA="42527d8c4d38e6113f079bcb007715a5476d39cd3cc327f4ba87269d3c7de253"
+        ACTUAL_SHA=$(sha256sum backend/models/wrc_inceptionresnetv2_baseline_v1.onnx | awk '{print $1}')
+        echo "Verifying WRc ONNX artifact integrity..."
+        echo "Expected SHA-256: $EXPECTED_SHA"
+        echo "Actual SHA-256:   $ACTUAL_SHA"
+        if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+          echo "ERROR: EXTERNAL_CLASSIFIER_INTEGRITY_FAILURE! WRc ONNX hash mismatch."
+          exit 1
+        fi
+        echo "WRc ONNX integrity verified successfully."
+        ls -lh backend/models/
+
+  # Step 2: Build container image tagged with immutable SHORT_SHA and latest
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:latest'
+      - '-t'
+      - 'europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:$SHORT_SHA'
+      - '-f'
+      - 'backend/Dockerfile'
+      - 'backend'
+
+  # Step 3: Push images to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:$SHORT_SHA'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:latest'
+
+images:
+  - 'europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:latest'
+  - 'europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:$SHORT_SHA'
+
+options:
+  machineType: 'E2_HIGHCPU_8'

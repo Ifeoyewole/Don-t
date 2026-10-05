@@ -1,0 +1,57 @@
+# Sewer-ML Class Filtering & Sampling Configuration
+# Based on official Sewer-ML Benchmark (CVPR 2021)
+
+dataset_name: "PipeJointDataset-v1"
+target_total_images: 5000
+
+# Primary Joint Defect Classes
+target_classes:
+  displaced_joint:
+    sewer_ml_codes: ["FS"]
+    target_count: 1750
+    description: "Faulty joint / angular and axial joint displacement"
+
+  normal_joint:
+    sewer_ml_codes: ["VA"]  # Clean inspection videos
+    target_count: 1250
+    multi_stage_filter_required: true
+    description: "Verified healthy concentric joints (filtered from plain pipe walls)"
+
+  cracks_and_deformation:
+    sewer_ml_codes: ["RB", "DE"]
+    target_count: 700
+    description: "Cracks, breaks, collapse (RB) and pipe deformation (DE) near joints"
+
+  intruding_seal:
+    sewer_ml_codes: ["IS"]
+    target_count: 350
+    description: "Intruding rubber gasket sealing rings"
+
+  hard_negatives_distractors:
+    sewer_ml_codes: ["RO", "AF", "BE", "FO"]
+    target_count: 350
+    description: "Roots (RO), settled deposits (AF), attached deposits (BE), obstacles (FO)"
+
+  difficult_conditions:
+    target_count: 600
+    sub_conditions:
+      - "dark_footage"
+      - "camera_glare_reflections"
+      - "water_reflections"
+      - "motion_blur"
+      - "dirty_lenses"
+      - "off_axis_tilt"
+
+# Deduplication and Video Splitting Parameters
+deduplication:
+  method: "dhash"
+  hash_size: 8
+  max_hamming_distance: 6
+  max_frames_per_joint: 3
+
+splits:
+  split_by: "Inspection_ID"  # Strictly grouped by inspection/video to prevent leakage
+  ratios:
+    train: 0.75
+    val: 0.15
+    test: 0.10

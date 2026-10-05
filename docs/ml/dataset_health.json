@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-10-02T11:48:58.477003+00:00",
+  "total_images": 100,
+  "real_count": 0,
+  "synthetic_count": 100,
+  "real_vs_synthetic_ratio": "0:100",
+  "human_verified_count": 100,
+  "human_verification_rate_pct": 100.0,
+  "duplicate_rate_pct": 0.0,
+  "missing_files": 0,
+  "broken_files": 0,
+  "production_eligible_failures": 0,
+  "source_distribution": {
+    "SYNTHETIC": 100
+  },
+  "license_distribution": {
+    "Proprietary (In-House)": 100
+  },
+  "class_distribution": {
+    "NORMAL_JOINT": 17,
+    "OPEN_JOINT": 17,
+    "DISPLACED_JOINT": 17,
+    "DAMAGED_JOINT": 17,
+    "INTRUDING_SEAL": 16,
+    "DEPOSITS_OBSTACLES": 16
+  },
+  "annotation_status_counts": {
+    "VERIFIED_SYNTHETIC": 100
+  },
+  "sewerml_status": "BENCHMARK_PERMISSION_PENDING (Strictly Isolated)"
+}

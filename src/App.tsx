@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { db } from './db'
-import { AppShell } from './components/AppShell'
+import { AppShell, type NavKey } from './components/AppShell'
+import { useRealtimeHealth } from './hooks/useRealtimeHealth'
 import { DashboardPage } from './pages/DashboardPage'
 import { CreateProjectPage } from './pages/CreateProjectPage'
 import { InspectionResultsPage } from './pages/InspectionResultsPage'
@@ -33,6 +34,7 @@ import type {
 
 type Route =
   | { key: 'dashboard' }
+  | { key: 'projects' }
   | { key: 'create-project' }
   | { key: 'edit-project'; projectId: string }
   | { key: 'new-manhole'; projectId: string }
@@ -52,6 +54,8 @@ type UiProjectSummary = ProjectSummary & {
 const parseRoute = (pathname: string): Route => {
   const segments = pathname.split('/').filter(Boolean)
   if (!segments.length) return { key: 'dashboard' }
+  if (segments[0] === 'projects' && segments.length === 1) return { key: 'projects' }
+  if (segments[0] === 'dashboard') return { key: 'dashboard' }
   if (segments[0] === 'projects' && segments[1] === 'new') return { key: 'create-project' }
   if (segments[0] === 'projects' && segments[2] === 'edit') return { key: 'edit-project', projectId: segments[1] }
   if (segments[0] === 'projects' && segments[2] === 'manholes' && segments[3] === 'new') {
@@ -210,6 +214,7 @@ const downloadBlob = (blob: Blob, fileName: string) => {
 
 function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.pathname))
+  const { health, checkNow } = useRealtimeHealth()
   const [online, setOnline] = useState(() => window.navigator.onLine)
   const [showAllProjects, setShowAllProjects] = useState(false)
   const [events, setEvents] = useState<string[]>([])
@@ -222,6 +227,7 @@ function App() {
   const [currentProjectSummary, setCurrentProjectSummary] = useState<ProjectInspectionSummary | null>(null)
   const [currentManholeSummary, setCurrentManholeSummary] = useState<ManholeInspectionSummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [globalSearch, setGlobalSearch] = useState('')
 
   useEffect(() => {
     const onPopstate = () => {
@@ -369,7 +375,7 @@ function App() {
     try {
       await refreshProjects()
 
-      if (route.key === 'dashboard' || route.key === 'create-project') {
+      if (route.key === 'dashboard' || route.key === 'projects' || route.key === 'create-project') {
         clearVisualState()
         setCurrentProject(null)
         setProjectManholes([])
@@ -523,10 +529,11 @@ function App() {
       )
     }
 
-    if (route.key === 'dashboard') {
+    if (route.key === 'dashboard' || route.key === 'projects') {
       return (
         <DashboardPage
           projects={projects}
+          viewMode={route.key === 'projects' ? 'projects' : 'dashboard'}
           showAllProjects={showAllProjects}
           onToggleProjects={() => setShowAllProjects((current) => !current)}
           onNewProject={() => navigate('/projects/new')}
@@ -539,6 +546,8 @@ function App() {
             }
             navigate(`/projects/${projectId}/manholes/new`)
           }}
+          searchQuery={globalSearch}
+          onSearchChange={setGlobalSearch}
         />
       )
     }
@@ -626,8 +635,8 @@ function App() {
             await inspectionQueue.clearManholeQueue(uploadManholeId)
             await refreshRouteData()
           }}
-          onStartInspection={async () => {
-            const result = await processor.processQueuedImages(uploadManholeId)
+          onStartInspection={async (operatorContext?: string) => {
+            const result = await processor.processQueuedImages(uploadManholeId, { operatorContext })
             console.log('PROCESS RESULT:', result)
             if (!result.success || !result.inspectionId) {
               throw new Error(result.message || 'Inspection processing failed')
@@ -790,12 +799,46 @@ function App() {
     return null
   })()
 
+  const currentNavKey: NavKey =
+    route.key === 'dashboard'
+      ? 'dashboard'
+      : route.key === 'projects' ||
+          route.key === 'create-project' ||
+          route.key === 'edit-project' ||
+          route.key === 'new-manhole' ||
+          route.key === 'edit-manhole'
+        ? 'projects'
+        : route.key === 'results' || route.key === 'upload' || route.key === 'upload-inspection'
+          ? 'inspections'
+          : route.key === 'summary'
+            ? 'reports'
+            : 'dashboard'
+
   return (
     <AppShell
-      online={online}
-      navKey={route.key === 'dashboard' ? 'dashboard' : 'projects'}
+      online={health.online}
+      health={health}
+      onRefreshHealth={checkNow}
+      navKey={currentNavKey}
       onNavigateHome={() => navigate('/')}
-      onNavigateProjects={() => navigate('/')}
+      onNavigateProjects={() => navigate('/projects')}
+      onNavigateInspections={() => {
+        const withInspections = projects.find((p) => (p.completedInspections ?? 0) > 0)
+        if (withInspections) {
+          navigate(`/projects/${withInspections.id}/summary`)
+          return
+        }
+        navigate('/projects')
+      }}
+      onNavigateReports={() => {
+        if (projects.length > 0) {
+          navigate(`/projects/${projects[0].id}/summary`)
+          return
+        }
+        navigate('/projects')
+      }}
+      globalSearchQuery={globalSearch}
+      onGlobalSearchChange={setGlobalSearch}
     >
       {page}
     </AppShell>

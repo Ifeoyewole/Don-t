@@ -12,7 +12,37 @@ export type InspectionCaptureSource = 'upload' | 'camera'
 export type QueueStatus = 'queued' | 'processing' | 'completed' | 'failed'
 export type InspectionStatus = 'PASS' | 'REVIEW' | 'FAIL'
 export type GuidedPhotoStatus = 'ready' | 'retake'
-export type MeasurementSource = 'fastapi' | 'cv' | 'ai-assisted' | 'ai-estimated' | 'ai-review' | 'manual' | 'fallback' | 'ai'
+export type InspectionDomainStatus =
+  | 'PIPE_JOINT_INSPECTION'
+  | 'PIPE_INTERIOR_NO_JOINT'
+  | 'UNRELATED_IMAGE'
+  | 'AMBIGUOUS_IMAGE'
+  | 'LOW_QUALITY_IMAGE'
+  | 'UNSUPPORTED_IMAGE'
+export type MeasurementSource = 'fastapi' | 'cv' | 'offline-preview' | 'ai-assisted' | 'ai-review' | 'manual' | 'fallback'
+
+export type MeasurementResultStatus =
+  | 'ACCEPTED_MEASUREMENT'
+  | 'REVIEW_REQUIRED'
+  | 'REJECTED_UNRELIABLE'
+
+export type JointConditionClass =
+  | 'NORMAL'
+  | 'OPEN_JOINT'
+  | 'ANGULAR_DEFLECTION'
+  | 'SURFACE_DAMAGE'
+  | 'DEPOSITS_OBSTACLES'
+  | 'INTRUDING_SEAL'
+  | 'UNKNOWN'
+
+export interface ConfidenceBreakdown {
+  totalConfidence: number
+  qualityFactor: number
+  geometricConsistency: number
+  modelConfidence: number
+  stabilityFactor: number
+  failureRiskRate: number
+}
 
 export interface MeasurementOverlayHints {
   pipeCenter?: { x: number; y: number }
@@ -39,16 +69,22 @@ export interface CvMeasurementDebug {
   failureStage?: string
   enhancementUsed?: boolean
   overlayHints?: MeasurementOverlayHints
+  resultStatus?: MeasurementResultStatus
+  condition?: JointConditionClass
+  confidenceBreakdown?: ConfidenceBreakdown
+  rejectionReason?: string
+  externalClassifier?: ExternalClassifierResult
+  modelComparison?: ModelComparisonResult
 }
 
 export interface AiMeasurementReview {
-  provider: 'mock-gemini' | 'gemini'
+  provider: 'mock-gemini' | 'gemini' | 'mock-dev' | 'unavailable' | 'vertex'
   model: string
   usable: boolean
   jointVisible: boolean
   pipeOpeningVisible: boolean
   cvPlausible: boolean
-  estimatedGapMm: number | null
+  estimatedGapMm?: number | null
   confidence: number
   reason: string
   retakeMessage?: string
@@ -65,6 +101,41 @@ export interface MeasurementAudit {
   aiEstimatedGapMm?: number | null
   enhancementUsed?: boolean
   decision: string
+  resultStatus?: MeasurementResultStatus
+  rejectionReason?: string
+}
+
+export interface ExternalClassTopK {
+  index: number
+  raw_class_name: string
+  raw_class_code?: string
+  score: number
+  jointinspect_mapping?: string | null
+}
+
+export interface ExternalClassifierResult {
+  model_id: string
+  source: string
+  raw_class_code?: string
+  raw_class_name: string
+  confidence: number
+  top_k: ExternalClassTopK[]
+  jointinspect_mapping?: string | null
+  mapping_status: 'DIRECT' | 'GROUPED' | 'UNMAPPED' | 'AMBIGUOUS' | string
+  advisory_only: boolean
+  status: 'SUCCESS' | 'LOW_CONFIDENCE_CLASSIFICATION' | 'EXTERNAL_CLASSIFIER_UNAVAILABLE' | string
+}
+
+export interface ModelComparisonResult {
+  wrc_baseline_prediction?: string | null
+  wrc_baseline_score?: number | null
+  native_model_b_prediction?: string | null
+  native_model_b_score?: number | null
+  vertex_observation?: string | null
+  wrc_vs_native_agreement: 'AGREE' | 'DISAGREE' | 'NOT_COMPARABLE' | 'UNMAPPED' | string
+  wrc_vs_vertex_agreement: 'AGREE' | 'DISAGREE' | 'NOT_COMPARABLE' | 'UNMAPPED' | string
+  native_vs_vertex_agreement: 'AGREE' | 'DISAGREE' | 'NOT_COMPARABLE' | 'UNMAPPED' | string
+  human_review_required: boolean
 }
 
 export interface Project {
@@ -192,6 +263,12 @@ export interface InspectionResult {
   overrideReason?: string
   overrideValueMm?: number
   overrideAt?: string
+  resultStatus?: MeasurementResultStatus
+  condition?: JointConditionClass
+  confidenceBreakdown?: ConfidenceBreakdown
+  rejectionReason?: string
+  externalClassifier?: ExternalClassifierResult
+  modelComparison?: ModelComparisonResult
 }
 
 export interface ApplyOverrideInput {
@@ -224,6 +301,9 @@ export interface ProcessingEvent {
 export interface ProcessOptions {
   concurrency?: number
   failAtImageId?: string
+  operatorContext?: string
+  calibrationSource?: string
+  calibrationVerified?: boolean
 }
 
 export interface ProcessBatchResult {

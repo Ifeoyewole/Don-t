@@ -1,0 +1,60 @@
+# Realistic Underground Sewer Inspection Augmentation Pipeline
+# Only introduces physically plausible distortions present in real CCTV environments
+
+augmentations:
+  photometric:
+    brightness_contrast:
+      brightness_limit: [-0.25, 0.20]
+      contrast_limit: [-0.20, 0.25]
+      p: 0.70
+
+    color_jitter:
+      saturation_limit: [-0.15, 0.15]
+      hue_limit: [-10, 10]
+      p: 0.40
+
+  degradation:
+    motion_blur:
+      blur_limit: [3, 9]
+      p: 0.35
+
+    gaussian_blur:
+      blur_limit: [3, 7]
+      p: 0.30
+
+    sensor_noise:
+      var_limit: [10.0, 50.0]
+      p: 0.40
+
+    jpeg_compression:
+      quality_lower: 40
+      quality_upper: 85
+      p: 0.50
+
+  lighting_and_optics:
+    simulated_torch_glare:
+      num_spots: [1, 3]
+      radius_range: [15, 60]
+      intensity_range: [200, 255]
+      p: 0.40
+
+    shadow_vignette:
+      darken_ratio: 0.35
+      p: 0.50
+
+  geometric:
+    random_affine:
+      scale: [0.90, 1.10]
+      rotate: [-15, 15]
+      shear: [-8, 8]
+      p: 0.60
+
+    perspective:
+      scale: [0.03, 0.08]
+      p: 0.35
+
+    horizontal_flip:
+      p: 0.50
+
+    vertical_flip:
+      p: 0.0  # Pipes maintain consistent orientation in crawler footage
