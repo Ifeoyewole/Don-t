@@ -60,3 +60,19 @@ JointInspect has completed its final technical correction pass before controlled
   - [stress_test_report.png](file:///c:/Users/akint/Documents/Coding/Don-t/docs/ml/benchmark/stress_test_report.png)
 - **Raw Benchmark Telemetry:**
   - [benchmark_results.json](file:///c:/Users/akint/Documents/Coding/Don-t/docs/ml/benchmark/benchmark_results.json)
+
+---
+
+## 4. Verified Live Deployment Traceability
+
+- **Git Commit SHA:** `cfac2b34e74439f9d8848f7ce09aa2b796afb5c7`
+- **Cloud Run Service:** `pipe-joint-api` (`europe-west2`)
+- **Cloud Run Active Revision:** `pipe-joint-api-00009-tdn`
+- **Cloud Run Container Image:** `europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:925793d`
+- **Cloud Run Image Digest:** `sha256:faf49ca89a9ed56658a58303385dc97581768270a6b2d5c09b7e0abc106625e0`
+- **Runtime Service Account:** `joint-inspection-runtime@joint-inspection-510310.iam.gserviceaccount.com`
+- **Frontend Gateway:** `https://joint-inspection.vercel.app` (Deployed commit `cfac2b34e74439f9d8848f7ce09aa2b796afb5c7`)
+- **Direct Anonymous Access:** HTTP 403 Forbidden (`allUsers = 0`)
+- **Vercel Health Liveness:** HTTP 200 OK
+- **Vercel CV Gateway Health:** HTTP 200 OK
+
