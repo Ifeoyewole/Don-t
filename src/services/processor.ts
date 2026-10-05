@@ -1,5 +1,6 @@
 import { db } from '../db'
 import type {
+  CalibrationProfile,
   InspectionImage,
   InspectionResult,
   ProcessBatchResult,
@@ -161,7 +162,6 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
   }
 
   const blobRecord = await db.inspectionBlobs.get(image.blobKey)
-  const manhole = await db.manholes.get(image.manholeId)
 
   emit({ type: 'started', imageId })
 
@@ -179,7 +179,6 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
     options?.pipeDiameterMm ??
     options?.calibrationProfile?.pipeDiameterMm ??
     options?.calibrationProfile?.pipe_diameter_mm ??
-    manhole?.pipeDiameterMm ??
     undefined
   const effectiveOptions: ProcessOptions = {
     ...options,
@@ -329,13 +328,26 @@ export const processor = {
     }
 
     const blobRecord = await db.inspectionBlobs.get(image.blobKey)
-    const manhole = await db.manholes.get(image.manholeId)
 
     emit({ type: 'started', imageId: image.id, inspectionId })
-    emit({ type: 'progress', imageId: image.id, inspectionId, progress: 40, message: 'Re-running CV measurement' })
-    await wait(20)
-
-    const measurement = await runAiAssistedMeasurement(image, blobRecord?.blob, manhole?.pipeDiameterMm)
+    let reprocessOptions: ProcessOptions | undefined = undefined
+    try {
+      const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(`jointinspect_cal_${image.projectId}`) : null
+      if (stored) {
+        const parsed = JSON.parse(stored) as CalibrationProfile
+        reprocessOptions = {
+          calibrationProfile: parsed,
+          pipeDiameterMm: parsed.pipe_diameter_mm ?? parsed.pipeDiameterMm ?? undefined,
+          calibrationSource: parsed.source,
+          calibrationVerified: parsed.verified,
+          calibrationReferenceId: parsed.calibration_reference_id ?? parsed.calibrationReferenceId,
+        }
+      }
+    } catch {
+      // ignore
+    }
+    const calDia = reprocessOptions?.pipeDiameterMm
+    const measurement = await runAiAssistedMeasurement(image, blobRecord?.blob, calDia, reprocessOptions)
 
     const updated: InspectionResult = {
       ...existing,

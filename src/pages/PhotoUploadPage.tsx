@@ -47,14 +47,15 @@ export const PhotoUploadPage = ({
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [reportedDownlink, setReportedDownlink] = useState<number | null>(null)
 
-  // Calibration Profile Setup
-  const [calPipeDiameter, setCalPipeDiameter] = useState<number | ''>(300)
+  // Calibration Profile Setup - Fail-Safe Defaults
+  const [calPipeDiameter, setCalPipeDiameter] = useState<number | ''>('')
   const [calSource, setCalSource] = useState<'PROJECT_METADATA' | 'MANHOLE_METADATA' | 'PHYSICAL_REFERENCE' | 'TEST_RIG' | 'CAMERA_CALIBRATION'>('PROJECT_METADATA')
   const [calReferenceId, setCalReferenceId] = useState<string>('')
-  const [calVerified, setCalVerified] = useState<boolean>(true)
+  const [calVerified, setCalVerified] = useState<boolean>(false)
   const [calNotes, setCalNotes] = useState<string>('')
   const [savedProfile, setSavedProfile] = useState<CalibrationProfile | null>(null)
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('')
+  const [saveErrorMsg, setSaveErrorMsg] = useState<string>('')
 
   // Load saved calibration profile for this project
   useEffect(() => {
@@ -66,16 +67,19 @@ export const PhotoUploadPage = ({
         const parsed = JSON.parse(stored) as CalibrationProfile
         setSavedProfile(parsed)
         const dia = parsed.pipe_diameter_mm ?? parsed.pipeDiameterMm
-        if (dia) setCalPipeDiameter(dia)
+        setCalPipeDiameter(dia ? Number(dia) : '')
         if (parsed.source) setCalSource(parsed.source as any)
         const ref = parsed.calibration_reference_id ?? parsed.calibrationReferenceId
-        if (ref) setCalReferenceId(ref)
+        setCalReferenceId(ref || '')
         setCalVerified(Boolean(parsed.verified))
         if (parsed.notes) setCalNotes(parsed.notes)
       } else {
-        // Default unverified/blank profile for new project
-        const defaultRef = `CAL-${projectId.slice(0, 8).toUpperCase()}`
-        setCalReferenceId(defaultRef)
+        // Default fail-safe unverified/blank profile for new project
+        setSavedProfile(null)
+        setCalPipeDiameter('')
+        setCalReferenceId('')
+        setCalVerified(false)
+        setCalNotes('')
       }
     } catch {
       // ignore JSON parse error
@@ -83,12 +87,24 @@ export const PhotoUploadPage = ({
   }, [projectId])
 
   const handleSaveCalibration = () => {
-    const refId = calReferenceId.trim() || `CAL-${Date.now().toString(36).toUpperCase()}`
-    const dia = calPipeDiameter ? Number(calPipeDiameter) : null
+    setSaveErrorMsg('')
+    setSaveSuccessMsg('')
+
+    const refId = calReferenceId.trim()
+    const dia = calPipeDiameter !== '' ? Number(calPipeDiameter) : null
+
+    // Enforce intentional verification requirements
+    if (calVerified) {
+      if (!dia || dia <= 0 || !refId) {
+        setSaveErrorMsg('Enter a verified pipe diameter and calibration reference before marking this profile as verified.')
+        return
+      }
+    }
+
     const verifiedTimestamp = calVerified ? new Date().toISOString() : null
     const profile: CalibrationProfile = {
-      calibration_reference_id: refId,
-      calibrationReferenceId: refId,
+      calibration_reference_id: refId || `UNVERIFIED-${Date.now().toString(36).toUpperCase()}`,
+      calibrationReferenceId: refId || `UNVERIFIED-${Date.now().toString(36).toUpperCase()}`,
       project_id: projectId,
       projectId,
       source: calSource,
@@ -102,10 +118,13 @@ export const PhotoUploadPage = ({
     try {
       localStorage.setItem(`jointinspect_cal_${projectId}`, JSON.stringify(profile))
       setSavedProfile(profile)
-      setSaveSuccessMsg('Calibration profile saved!')
-      setTimeout(() => setSaveSuccessMsg(''), 3000)
+      setSaveSuccessMsg(calVerified ? 'Verified calibration profile saved!' : 'Unverified calibration profile saved.')
+      setTimeout(() => {
+        setSaveSuccessMsg('')
+        setSaveErrorMsg('')
+      }, 4000)
     } catch {
-      setSaveSuccessMsg('Failed to save profile.')
+      setSaveErrorMsg('Failed to save profile.')
     }
   }
 
@@ -267,9 +286,13 @@ export const PhotoUploadPage = ({
                 </label>
                 <div style={{ display: 'flex', gap: '0.4rem' }}>
                   <select
-                    value={['150', '225', '300', '450', '600', '900'].includes(String(calPipeDiameter)) ? String(calPipeDiameter) : 'custom'}
+                    value={calPipeDiameter ? (['150', '225', '300', '450', '600', '900'].includes(String(calPipeDiameter)) ? String(calPipeDiameter) : 'custom') : ''}
                     onChange={(e) => {
-                      if (e.target.value !== 'custom') setCalPipeDiameter(Number(e.target.value))
+                      if (e.target.value === '') {
+                        setCalPipeDiameter('')
+                      } else if (e.target.value !== 'custom') {
+                        setCalPipeDiameter(Number(e.target.value))
+                      }
                     }}
                     style={{
                       flex: 1,
@@ -280,6 +303,7 @@ export const PhotoUploadPage = ({
                       border: '1px solid rgba(255, 255, 255, 0.15)',
                     }}
                   >
+                    <option value="">Select diameter...</option>
                     <option value="150">150 mm</option>
                     <option value="225">225 mm</option>
                     <option value="300">300 mm</option>
@@ -375,6 +399,11 @@ export const PhotoUploadPage = ({
               {saveSuccessMsg ? (
                 <div style={{ color: '#4ade80', fontSize: '0.75rem', textAlign: 'center' }}>
                   {saveSuccessMsg}
+                </div>
+              ) : null}
+              {saveErrorMsg ? (
+                <div style={{ color: '#f87171', fontSize: '0.75rem', textAlign: 'center' }}>
+                  {saveErrorMsg}
                 </div>
               ) : null}
             </div>

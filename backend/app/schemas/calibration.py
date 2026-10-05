@@ -13,7 +13,10 @@ class CalibrationProfile(BaseModel):
     source: CalibrationSource = Field(..., description="Allowed structured provenance source")
     pipe_diameter_mm: Optional[float] = Field(None, gt=0.0, le=5000.0, description="Verified internal pipe diameter in millimeters")
     camera_id: Optional[str] = Field(None, description="Optional associated camera identifier")
-    verified: bool = Field(default=True, description="Whether calibration parameters have been verified")
+    verified: bool = Field(
+        default=False,
+        description="Whether calibration parameters have been explicitly verified"
+    )
     verified_at: Optional[str] = Field(None, description="ISO timestamp when verification occurred")
     notes: Optional[str] = Field(None, description="Optional engineering notes or calibration protocol reference")
 

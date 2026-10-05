@@ -10,8 +10,8 @@ const BASE_TOO_SMALL_MM = 3
 const BASE_PASS_MAX_MM = 15
 const BASE_REVIEW_MAX_MM = 25
 
-export function classifyGap(gapMm: number, pipeDiameterMm = BASE_PIPE_DIAMETER_MM): ToleranceClassification {
-  const scale = Math.max(0.5, pipeDiameterMm / BASE_PIPE_DIAMETER_MM)
+export function classifyGap(gapMm: number, pipeDiameterMm?: number): ToleranceClassification {
+  const scale = pipeDiameterMm ? Math.max(0.5, pipeDiameterMm / BASE_PIPE_DIAMETER_MM) : 1.0
   const tooSmallMax = BASE_TOO_SMALL_MM * scale
   const passMax = BASE_PASS_MAX_MM * scale
   const reviewMax = BASE_REVIEW_MAX_MM * scale

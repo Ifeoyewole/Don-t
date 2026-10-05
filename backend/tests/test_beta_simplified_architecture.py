@@ -35,6 +35,7 @@ from backend.app.schemas.measurement import (
     ExternalClassifierResult,
     VertexSemanticGateResult,
 )
+from backend.app.schemas.calibration import CalibrationProfile
 
 
 @pytest.fixture
@@ -591,3 +592,17 @@ def test_wrc_classification_cannot_alter_engineering_tolerance(client: TestClien
     assert data["condition"].lower() == "damaged_joint"
     # But engineering_result is strictly derived from gap <= tolerance_mm (PASS)
     assert data["engineering_result"] == "PASS"
+
+
+# ---------------------------------------------------------------------------
+# 16. CalibrationProfile.verified defaults to False
+# ---------------------------------------------------------------------------
+def test_calibration_profile_schema_default_verified_false():
+    """CalibrationProfile must NEVER default verified to True."""
+    profile = CalibrationProfile(
+        calibration_reference_id="CAL-TEST-001",
+        project_id="PRJ-001",
+        source=CalibrationSource.PROJECT_METADATA,
+    )
+    assert profile.verified is False
+

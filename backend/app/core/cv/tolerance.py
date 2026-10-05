@@ -7,7 +7,7 @@ from backend.app.schemas.measurement import ToleranceSpec
 
 def classify_gap(
     gap_mm: float,
-    pipe_diameter_mm: float = 100.0,
+    pipe_diameter_mm: Optional[float] = None,
     tolerance_spec: Optional[ToleranceSpec] = None,
 ) -> ToleranceStatus:
     """Classify measured gap dimension against engineering tolerance standards.
