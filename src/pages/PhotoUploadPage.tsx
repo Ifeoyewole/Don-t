@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
-import type { InspectionImage, ProcessBatchResult } from '../types/domain'
+import type { CalibrationProfile, InspectionImage, ProcessBatchResult } from '../types/domain'
 
 type Props = {
   online: boolean
+  projectId: string
   projectName: string
   manholeLabel: string
   queue: InspectionImage[]
@@ -13,7 +14,7 @@ type Props = {
   onLoadSample: () => Promise<void>
   onRemoveFile: (imageId: string) => Promise<void>
   onClearQueue: () => Promise<void>
-  onStartInspection: (operatorContext?: string) => Promise<ProcessBatchResult>
+  onStartInspection: (operatorContext?: string, calibration?: CalibrationProfile) => Promise<ProcessBatchResult>
 }
 
 const validationTone = (image: InspectionImage) =>
@@ -28,6 +29,7 @@ const phaseLabel = (image: InspectionImage) => {
 
 export const PhotoUploadPage = ({
   online,
+  projectId,
   projectName,
   manholeLabel,
   queue,
@@ -44,6 +46,68 @@ export const PhotoUploadPage = ({
   const [operatorContext, setOperatorContext] = useState('')
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [reportedDownlink, setReportedDownlink] = useState<number | null>(null)
+
+  // Calibration Profile Setup
+  const [calPipeDiameter, setCalPipeDiameter] = useState<number | ''>(300)
+  const [calSource, setCalSource] = useState<'PROJECT_METADATA' | 'MANHOLE_METADATA' | 'PHYSICAL_REFERENCE' | 'TEST_RIG' | 'CAMERA_CALIBRATION'>('PROJECT_METADATA')
+  const [calReferenceId, setCalReferenceId] = useState<string>('')
+  const [calVerified, setCalVerified] = useState<boolean>(true)
+  const [calNotes, setCalNotes] = useState<string>('')
+  const [savedProfile, setSavedProfile] = useState<CalibrationProfile | null>(null)
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('')
+
+  // Load saved calibration profile for this project
+  useEffect(() => {
+    if (!projectId) return
+    const key = `jointinspect_cal_${projectId}`
+    try {
+      const stored = localStorage.getItem(key)
+      if (stored) {
+        const parsed = JSON.parse(stored) as CalibrationProfile
+        setSavedProfile(parsed)
+        const dia = parsed.pipe_diameter_mm ?? parsed.pipeDiameterMm
+        if (dia) setCalPipeDiameter(dia)
+        if (parsed.source) setCalSource(parsed.source as any)
+        const ref = parsed.calibration_reference_id ?? parsed.calibrationReferenceId
+        if (ref) setCalReferenceId(ref)
+        setCalVerified(Boolean(parsed.verified))
+        if (parsed.notes) setCalNotes(parsed.notes)
+      } else {
+        // Default unverified/blank profile for new project
+        const defaultRef = `CAL-${projectId.slice(0, 8).toUpperCase()}`
+        setCalReferenceId(defaultRef)
+      }
+    } catch {
+      // ignore JSON parse error
+    }
+  }, [projectId])
+
+  const handleSaveCalibration = () => {
+    const refId = calReferenceId.trim() || `CAL-${Date.now().toString(36).toUpperCase()}`
+    const dia = calPipeDiameter ? Number(calPipeDiameter) : null
+    const verifiedTimestamp = calVerified ? new Date().toISOString() : null
+    const profile: CalibrationProfile = {
+      calibration_reference_id: refId,
+      calibrationReferenceId: refId,
+      project_id: projectId,
+      projectId,
+      source: calSource,
+      pipe_diameter_mm: dia,
+      pipeDiameterMm: dia,
+      verified: calVerified,
+      verified_at: verifiedTimestamp,
+      verifiedAt: verifiedTimestamp,
+      notes: calNotes.trim() || undefined,
+    }
+    try {
+      localStorage.setItem(`jointinspect_cal_${projectId}`, JSON.stringify(profile))
+      setSavedProfile(profile)
+      setSaveSuccessMsg('Calibration profile saved!')
+      setTimeout(() => setSaveSuccessMsg(''), 3000)
+    } catch {
+      setSaveSuccessMsg('Failed to save profile.')
+    }
+  }
 
   const completedCount = useMemo(() => queue.filter((image) => image.queueStatus === 'completed').length, [queue])
   const processingCount = useMemo(() => queue.filter((image) => image.queueStatus === 'processing').length, [queue])
@@ -91,7 +155,7 @@ export const PhotoUploadPage = ({
     setBusy(true)
     setError('')
     try {
-      await onStartInspection(operatorContext.trim() || undefined)
+      await onStartInspection(operatorContext.trim() || undefined, savedProfile ?? undefined)
     } catch (processingError) {
       setError(processingError instanceof Error ? processingError.message : 'Processing failed.')
     } finally {
@@ -154,6 +218,169 @@ export const PhotoUploadPage = ({
                 <span>Upload order kept</span>
               </div>
             </label>
+          </section>
+
+          {/* Project Reusable Calibration Profile */}
+          <section className="network-card calibration-setup-card">
+            <div className="network-head">
+              <strong>Calibration</strong>
+              <span className={`status-pill ${savedProfile?.verified ? 'is-pass' : 'is-review'}`}>
+                {savedProfile?.verified ? 'VERIFIED' : 'CALIBRATION REQUIRED'}
+              </span>
+            </div>
+
+            {savedProfile ? (
+              <div
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '6px',
+                  padding: '0.6rem 0.75rem',
+                  marginTop: '0.5rem',
+                  fontSize: '0.8rem',
+                  lineHeight: '1.4',
+                }}
+              >
+                <div>
+                  <strong>Calibration:</strong> {savedProfile.verified ? 'VERIFIED' : 'UNVERIFIED'}
+                </div>
+                <div>
+                  <strong>Source:</strong> {savedProfile.source}
+                </div>
+                <div>
+                  <strong>Pipe diameter:</strong>{' '}
+                  {(savedProfile.pipeDiameterMm ?? savedProfile.pipe_diameter_mm)
+                    ? `${savedProfile.pipeDiameterMm ?? savedProfile.pipe_diameter_mm} mm`
+                    : 'Not specified'}
+                </div>
+                <div>
+                  <strong>Reference:</strong>{' '}
+                  {savedProfile.calibrationReferenceId ?? savedProfile.calibration_reference_id}
+                </div>
+              </div>
+            ) : null}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }}>
+              <div>
+                <label style={{ fontSize: '0.75rem', opacity: 0.85, display: 'block', marginBottom: '0.2rem' }}>
+                  Pipe diameter
+                </label>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <select
+                    value={['150', '225', '300', '450', '600', '900'].includes(String(calPipeDiameter)) ? String(calPipeDiameter) : 'custom'}
+                    onChange={(e) => {
+                      if (e.target.value !== 'custom') setCalPipeDiameter(Number(e.target.value))
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '0.4rem',
+                      borderRadius: '4px',
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      color: 'inherit',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                    }}
+                  >
+                    <option value="150">150 mm</option>
+                    <option value="225">225 mm</option>
+                    <option value="300">300 mm</option>
+                    <option value="450">450 mm</option>
+                    <option value="600">600 mm</option>
+                    <option value="900">900 mm</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5000"
+                    placeholder="mm"
+                    value={calPipeDiameter}
+                    onChange={(e) => setCalPipeDiameter(e.target.value ? Number(e.target.value) : '')}
+                    style={{
+                      width: '80px',
+                      padding: '0.4rem',
+                      borderRadius: '4px',
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      color: 'inherit',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.75rem', opacity: 0.85, display: 'block', marginBottom: '0.2rem' }}>
+                  Source
+                </label>
+                <select
+                  value={calSource}
+                  onChange={(e) => setCalSource(e.target.value as any)}
+                  style={{
+                    width: '100%',
+                    padding: '0.4rem',
+                    borderRadius: '4px',
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    color: 'inherit',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                  }}
+                >
+                  <option value="PROJECT_METADATA">Project Metadata</option>
+                  <option value="MANHOLE_METADATA">Manhole Metadata</option>
+                  <option value="PHYSICAL_REFERENCE">Physical Reference</option>
+                  <option value="TEST_RIG">Test Rig</option>
+                  <option value="CAMERA_CALIBRATION">Camera Calibration</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.75rem', opacity: 0.85, display: 'block', marginBottom: '0.2rem' }}>
+                  Reference ID
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. DWG-2026-04, MH-402-SPEC"
+                  value={calReferenceId}
+                  onChange={(e) => setCalReferenceId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.4rem',
+                    borderRadius: '4px',
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    color: 'inherit',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
+                <input
+                  type="checkbox"
+                  id="cal-verified-chk"
+                  checked={calVerified}
+                  onChange={(e) => setCalVerified(e.target.checked)}
+                />
+                <label htmlFor="cal-verified-chk" style={{ fontSize: '0.8rem', cursor: 'pointer' }}>
+                  Verified by operator / metadata
+                </label>
+              </div>
+
+              <button
+                type="button"
+                className="button button-secondary"
+                style={{ marginTop: '0.35rem', width: '100%' }}
+                onClick={handleSaveCalibration}
+              >
+                Save Calibration Profile
+              </button>
+              {saveSuccessMsg ? (
+                <div style={{ color: '#4ade80', fontSize: '0.75rem', textAlign: 'center' }}>
+                  {saveSuccessMsg}
+                </div>
+              ) : null}
+            </div>
+            <p style={{ fontSize: '0.72rem', opacity: 0.7, marginTop: '0.4rem' }}>
+              Calibrate once: saved profile applies automatically to all subsequent photos in this project.
+            </p>
           </section>
 
           <section className="network-card">

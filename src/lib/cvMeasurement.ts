@@ -19,6 +19,8 @@ export interface CvWorkerRequest {
   operatorContext?: string
   calibrationSource?: string
   calibrationVerified?: boolean
+  calibrationReferenceId?: string
+  projectId?: string
 }
 
 export interface CvWorkerResponse {
@@ -34,6 +36,14 @@ export interface CvWorkerResponse {
   condition?: JointConditionClass
   confidenceBreakdown?: ConfidenceBreakdown
   rejectionReason?: string
+  classifierEvidence?: any
+  calibrationProfile?: any
+  geometryTier?: string
+  candidateGapMm?: number | null
+  authoritativeGapMm?: number | null
+  engineeringResult?: string
+  authoritativeReason?: string
+  aiExplanation?: string
 }
 
 // Uncalibrated measurements cannot assume default 225mm pipe diameter

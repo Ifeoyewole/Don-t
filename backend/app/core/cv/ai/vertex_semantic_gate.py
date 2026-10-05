@@ -8,14 +8,16 @@ Performs:
 """
 
 import base64
+import hashlib
 import json
 import logging
 import os
 import re
 import subprocess
+import time
 import urllib.request
 import urllib.error
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 import cv2
 import numpy as np
 
@@ -94,6 +96,9 @@ class VertexSemanticGate:
         self.project_id = self.settings.VERTEX_PROJECT_ID or "joint-inspection-510310"
         self.enabled = self.settings.VERTEX_SEMANTIC_GATE_ENABLED
         self._cached_token: Optional[str] = None
+        self._cache: Dict[str, Tuple[VertexSemanticGateResult, float]] = {}
+        self._consecutive_failures: int = 0
+        self._circuit_open_until: float = 0.0
 
     def _get_access_token(self) -> Optional[str]:
         """Acquire Google Cloud access token via Metadata server, google-auth, or gcloud CLI."""
@@ -135,6 +140,11 @@ class VertexSemanticGate:
 
         return None
 
+    @property
+    def is_circuit_open(self) -> bool:
+        """Returns True if the circuit breaker is currently open."""
+        return time.time() < self._circuit_open_until
+
     def evaluate(
         self,
         image_bgr: np.ndarray,
@@ -161,7 +171,7 @@ class VertexSemanticGate:
         if not self.enabled:
             if is_prod or not is_offline_harness:
                 return self._fail_closed_result(
-                    "AI image validation is temporarily unavailable. Inspection measurement is paused until semantic validation is restored.",
+                    "AI image validation is temporarily unavailable. Retry validation.",
                     error_msg="Vertex AI disabled in production",
                 )
             return self._offline_heuristic_fallback(image_bgr, operator_context)
@@ -169,10 +179,34 @@ class VertexSemanticGate:
         if image_bgr is None or image_bgr.size == 0:
             return self._fail_closed_result("Invalid image payload.", error_msg="Image buffer is empty")
 
+        # Check circuit breaker
+        now = time.time()
+        if now < self._circuit_open_until:
+            logger.warning(
+                "Vertex circuit breaker open (%d consecutive errors). Fast failing.",
+                self._consecutive_failures,
+            )
+            return self._fail_closed_result(
+                "AI image validation is temporarily unavailable. Retry validation.",
+                error_msg="Circuit breaker open after repeated quota or transient errors",
+            )
+
         # Prepare JPEG payload
         success, buffer = cv2.imencode(".jpg", image_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
         if not success:
             return self._fail_closed_result("Image JPEG encode failed", error_msg="Encoding error")
+
+        # Check process-local TTL cache keyed by SHA-256(image_bytes + normalized_operator_context)
+        norm_context = (operator_context or "").strip().lower()
+        cache_key = hashlib.sha256(buffer.tobytes() + b"::" + norm_context.encode("utf-8")).hexdigest()
+
+        if cache_key in self._cache:
+            cached_res, expire_at = self._cache[cache_key]
+            if now < expire_at:
+                logger.info("Vertex semantic gate cache hit for fingerprint %s...", cache_key[:12])
+                return cached_res
+            else:
+                del self._cache[cache_key]
 
         b64_image = base64.b64encode(buffer).decode("utf-8")
         token = self._get_access_token()
@@ -180,7 +214,7 @@ class VertexSemanticGate:
             logger.warning("No Google access token available for Vertex AI.")
             if is_prod or not is_offline_harness:
                 return self._fail_closed_result(
-                    "AI image validation is temporarily unavailable. Inspection measurement is paused until semantic validation is restored.",
+                    "AI image validation is temporarily unavailable. Retry validation.",
                     error_msg="GCP token unavailable",
                 )
             return self._offline_heuristic_fallback(image_bgr, operator_context, error_msg="GCP token unavailable")
@@ -244,19 +278,67 @@ Return ONLY a valid JSON object matching this structure:
             },
         }
 
-        try:
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(body).encode("utf-8"),
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Content-Type": "application/json",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                resp_data = json.loads(resp.read().decode("utf-8"))
+        timeout = getattr(self.settings, "VERTEX_TIMEOUT_SECONDS", 10.0)
+        max_retries = getattr(self.settings, "VERTEX_MAX_RETRIES", 1)
+        resp_data = None
 
-            candidates = resp_data.get("candidates", [])
+        for attempt in range(max_retries + 1):
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(body).encode("utf-8"),
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    resp_data = json.loads(resp.read().decode("utf-8"))
+
+                # Reset circuit breaker on success
+                self._consecutive_failures = 0
+                self._circuit_open_until = 0.0
+                break
+
+            except urllib.error.HTTPError as http_err:
+                status_code = http_err.code
+                is_transient = status_code in (429, 500, 502, 503, 504)
+                if is_transient and attempt < max_retries:
+                    retry_after_hdr = http_err.headers.get("Retry-After")
+                    sleep_sec = 1.0
+                    if retry_after_hdr:
+                        try:
+                            val = float(retry_after_hdr)
+                            if 0.0 < val <= 5.0:
+                                sleep_sec = val
+                        except ValueError:
+                            pass
+                    logger.warning("Transient HTTP %d from Vertex AI. Retrying once after %.1fs...", status_code, sleep_sec)
+                    time.sleep(sleep_sec)
+                    continue
+                else:
+                    self._consecutive_failures += 1
+                    if self._consecutive_failures >= 3:
+                        self._circuit_open_until = time.time() + 30.0
+                        logger.error("Tripped Vertex circuit breaker for 30s after %d consecutive failures.", self._consecutive_failures)
+                    logger.error("Vertex AI HTTP error: %s. Enforcing fail-closed gate.", http_err)
+                    return self._fail_closed_result(
+                        "AI image validation is temporarily unavailable. Retry validation.",
+                        error_msg=f"HTTP {status_code}",
+                    )
+
+            except Exception as exc:
+                self._consecutive_failures += 1
+                if self._consecutive_failures >= 3:
+                    self._circuit_open_until = time.time() + 30.0
+                logger.error("Vertex AI call failed: %s. Enforcing fail-closed gate.", exc)
+                return self._fail_closed_result(
+                    "AI image validation is temporarily unavailable. Retry validation.",
+                    error_msg=str(exc),
+                )
+
+        try:
+            candidates = resp_data.get("candidates", []) if resp_data else []
             if not candidates:
                 raise ValueError("Vertex AI returned no candidates")
 
@@ -294,7 +376,7 @@ Return ONLY a valid JSON object matching this structure:
                 )
             )
 
-            return VertexSemanticGateResult(
+            result = VertexSemanticGateResult(
                 domain_status=domain_status,
                 pipe_visible=pipe_visible,
                 joint_visible=joint_visible,
@@ -308,11 +390,18 @@ Return ONLY a valid JSON object matching this structure:
                 confidence=0.95,
             )
 
+            # Cache successful non-failure evaluations
+            if result.domain_status != DomainStatus.DOMAIN_VALIDATION_UNAVAILABLE:
+                ttl = getattr(self.settings, "VERTEX_CACHE_TTL_SECONDS", 600)
+                self._cache[cache_key] = (result, time.time() + ttl)
+
+            return result
+
         except Exception as exc:
-            logger.error(f"Vertex AI call failed: {exc}. Enforcing fail-closed gate.")
+            logger.error("Vertex AI response parsing failed: %s. Enforcing fail-closed gate.", exc)
             if is_prod or not is_offline_harness:
                 return self._fail_closed_result(
-                    "AI image validation is temporarily unavailable. Inspection measurement is paused until semantic validation is restored.",
+                    "AI image validation is temporarily unavailable. Retry validation.",
                     error_msg=str(exc),
                 )
             return self._offline_heuristic_fallback(image_bgr, operator_context, error_msg=str(exc))

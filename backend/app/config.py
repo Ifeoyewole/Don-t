@@ -48,7 +48,16 @@ class Settings(BaseModel):
     STANDARD_TOLERANCE_MAX_PASS_MM: float = 15.0
     STANDARD_TOLERANCE_MAX_REVIEW_MM: float = 25.0
 
-    # External Sewer Defect Baseline Classifier (WRc InceptionResNetV2 - Advisory Only)
+    # Primary Condition Classifier Runtime Selection
+    PRIMARY_CONDITION_CLASSIFIER: str = os.getenv("PRIMARY_CONDITION_CLASSIFIER", "wrc").lower()
+
+    # Geometry Evidence Tier Thresholds (Beta Configurable Defaults)
+    GEOMETRY_ACCEPT_RAY_FRACTION: float = float(os.getenv("GEOMETRY_ACCEPT_RAY_FRACTION", "0.60"))
+    GEOMETRY_ACCEPT_MIN_SECTORS: int = int(os.getenv("GEOMETRY_ACCEPT_MIN_SECTORS", "6"))
+    GEOMETRY_PARTIAL_RAY_FRACTION: float = float(os.getenv("GEOMETRY_PARTIAL_RAY_FRACTION", "0.45"))
+    GEOMETRY_PARTIAL_MIN_SECTORS: int = int(os.getenv("GEOMETRY_PARTIAL_MIN_SECTORS", "5"))
+
+    # External Sewer Defect Baseline Classifier (WRc InceptionResNetV2 - Primary Live Defect Classifier)
     WRC_BASELINE_ENABLED: bool = os.getenv("WRC_BASELINE_ENABLED", "true").lower() in ("true", "1", "yes")
     WRC_BASELINE_MODEL_ID: str = os.getenv("WRC_BASELINE_MODEL_ID", "wrc-inceptionresnetv2-baseline-v1")
     WRC_BASELINE_PATH: str = os.getenv(
@@ -56,12 +65,16 @@ class Settings(BaseModel):
         str(Path(__file__).resolve().parent.parent / "models" / "external" / "wrc" / "wrc_inceptionresnetv2_baseline_v1.onnx"),
     )
     WRC_BASELINE_MIN_SCORE: float = float(os.getenv("WRC_BASELINE_MIN_SCORE", "0.20"))
+    WRC_LOW_CONFIDENCE_THRESHOLD: float = float(os.getenv("WRC_LOW_CONFIDENCE_THRESHOLD", "0.40"))
 
     # Vertex AI Semantic Domain Gate & Multi-Modal Context Understanding
     VERTEX_INSPECTION_MODEL: str = os.getenv("VERTEX_INSPECTION_MODEL", "gemini-2.5-flash")
     VERTEX_INSPECTION_LOCATION: str = os.getenv("VERTEX_INSPECTION_LOCATION", "europe-west2")
     VERTEX_PROJECT_ID: str = os.getenv("VERTEX_PROJECT_ID", "joint-inspection-510310")
     VERTEX_SEMANTIC_GATE_ENABLED: bool = os.getenv("VERTEX_SEMANTIC_GATE_ENABLED", "true").lower() in ("true", "1", "yes")
+    VERTEX_CACHE_TTL_SECONDS: int = int(os.getenv("VERTEX_CACHE_TTL_SECONDS", "600"))
+    VERTEX_MAX_RETRIES: int = int(os.getenv("VERTEX_MAX_RETRIES", "1"))
+    VERTEX_TIMEOUT_SECONDS: float = float(os.getenv("VERTEX_TIMEOUT_SECONDS", "10.0"))
 
 
 settings = Settings()

@@ -3,6 +3,20 @@
 from typing import List, Optional, Tuple
 from pydantic import BaseModel, Field
 
+from backend.app.schemas.domain import CalibrationSource
+
+
+class CalibrationProfile(BaseModel):
+    """Reusable structured calibration profile for an inspection project/rig."""
+    calibration_reference_id: str = Field(..., description="Unique calibration reference identifier (e.g. 'CAL-MH-104-300MM')")
+    project_id: str = Field(..., description="Project identifier to which this calibration profile binds")
+    source: CalibrationSource = Field(..., description="Allowed structured provenance source")
+    pipe_diameter_mm: Optional[float] = Field(None, gt=0.0, le=5000.0, description="Verified internal pipe diameter in millimeters")
+    camera_id: Optional[str] = Field(None, description="Optional associated camera identifier")
+    verified: bool = Field(default=True, description="Whether calibration parameters have been verified")
+    verified_at: Optional[str] = Field(None, description="ISO timestamp when verification occurred")
+    notes: Optional[str] = Field(None, description="Optional engineering notes or calibration protocol reference")
+
 
 class CameraProfile(BaseModel):
     """Camera intrinsic parameters and lens distortion model."""

@@ -19,6 +19,7 @@ import {
   summaryService,
 } from './services'
 import type {
+  CalibrationProfile,
   CreateManholeInput,
   CreateProjectInput,
   FlaggedInspectionSummary,
@@ -595,6 +596,7 @@ function App() {
       return (
         <PhotoUploadPage
           online={online}
+          projectId={uploadProjectId}
           projectName={currentProject?.name ?? 'Untitled project'}
           manholeLabel={currentManhole?.manholeId ?? 'Unassigned manhole'}
           queue={currentQueue}
@@ -635,8 +637,12 @@ function App() {
             await inspectionQueue.clearManholeQueue(uploadManholeId)
             await refreshRouteData()
           }}
-          onStartInspection={async (operatorContext?: string) => {
-            const result = await processor.processQueuedImages(uploadManholeId, { operatorContext })
+          onStartInspection={async (operatorContext?: string, calibration?: CalibrationProfile) => {
+            const result = await processor.processQueuedImages(uploadManholeId, {
+              operatorContext,
+              calibrationProfile: calibration,
+              projectId: uploadProjectId,
+            })
             console.log('PROCESS RESULT:', result)
             if (!result.success || !result.inspectionId) {
               throw new Error(result.message || 'Inspection processing failed')

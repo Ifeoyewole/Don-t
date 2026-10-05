@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 from pydantic import BaseModel, Field
+from backend.app.schemas.calibration import CalibrationProfile
 from backend.app.schemas.domain import (
     CalibrationSource,
     DomainStatus,
@@ -98,6 +99,7 @@ class CvMeasurementDebug(BaseModel):
     coverage_sector_count: Optional[int] = Field(None, description="Number of occupied angular sectors.")
     coverage_status: Optional[str] = Field(None, description="FULL, PARTIAL, or INSUFFICIENT.")
     invalid_reason_counts: Optional[dict[str, int]] = Field(None, description="Counts of rejected rays by reason.")
+    geometry_tier: Optional[str] = Field(None, description="Geometry evidence tier: ACCEPTABLE_GEOMETRY, PARTIAL_REVIEW_GEOMETRY, or REJECTED_UNRELIABLE.")
 
 class ConfidenceBreakdown(BaseModel):
     """Detailed multi-component confidence metrics and calibrated decision gating."""
@@ -106,7 +108,9 @@ class ConfidenceBreakdown(BaseModel):
     condition_score: float = Field(..., description="Joint condition classifier confidence (0.0 to 1.0)")
     geometry_score: float = Field(..., description="OpenCV edge gradient & circle fit score (0.0 to 1.0)")
     temporal_score: Optional[float] = Field(None, description="Multi-frame temporal consistency score (0.0 to 1.0)")
-    overall_confidence: float = Field(..., description="Weighted fused confidence score (0.0 to 1.0)")
+    measurement_confidence: float = Field(..., description="Measurement-only confidence score (quality, localization, geometry, temporal)")
+    classification_confidence: Optional[float] = Field(None, description="Defect classification confidence score (WRc)")
+    overall_confidence: float = Field(..., description="Measurement confidence score governing acceptance gating")
     decision: MeasurementResultStatus = Field(
         ...,
         description="Calibrated gating decision: ACCEPTED_MEASUREMENT, REVIEW_REQUIRED, or REJECTED_UNRELIABLE",
@@ -134,6 +138,19 @@ class ExternalClassifierResult(BaseModel):
     mapping_status: str = Field(..., description="Mapping outcome: DIRECT, GROUPED, UNMAPPED, or AMBIGUOUS")
     advisory_only: bool = Field(default=True, description="Strictly advisory; no measurement or tolerance authority")
     status: str = Field(default="SUCCESS", description="SUCCESS, LOW_CONFIDENCE_CLASSIFICATION, or EXTERNAL_CLASSIFIER_UNAVAILABLE")
+
+
+class ClassifierEvidence(BaseModel):
+    """Evidence and top-k distributions from the primary condition classifier (WRc InceptionResNetV2)."""
+    classifier: str = Field(default="WRc InceptionResNetV2", description="Active live classifier name")
+    model_id: str = Field(default="wrc-inceptionresnetv2-baseline-v1", description="Model architecture identifier")
+    raw_prediction: str = Field(..., description="Top-1 raw predicted defect name")
+    raw_code: Optional[str] = Field(None, description="Top-1 standard defect code (e.g. JD, CK, DE)")
+    confidence: float = Field(..., description="Classifier confidence score")
+    mapped_condition: Optional[str] = Field(None, description="Mapped JointInspect condition concept or None")
+    mapping_status: str = Field(..., description="Outcome: DIRECT, GROUPED, UNMAPPED, or AMBIGUOUS")
+    top_k: List[ExternalClassTopK] = Field(default_factory=list, description="Top-k distribution")
+    classification_status: str = Field(default="SUCCESS", description="SUCCESS, LOW_CONFIDENCE_CLASSIFICATION, or EXTERNAL_CLASSIFIER_UNAVAILABLE")
 
 
 class ModelComparisonResult(BaseModel):
@@ -201,9 +218,13 @@ class MeasurementResponse(BaseModel):
         default=None,
         description="External sewer baseline classifier result (WRc InceptionResNetV2).",
     )
+    classifier_evidence: Optional[ClassifierEvidence] = Field(
+        default=None,
+        description="Primary live defect condition classifier evidence (WRc InceptionResNetV2).",
+    )
     model_comparison: Optional[ModelComparisonResult] = Field(
         default=None,
-        description="Beta-testing model comparison and disagreement telemetry.",
+        description="Beta-testing model comparison and disagreement telemetry (None in normal beta).",
     )
     semantic_gate: Optional[VertexSemanticGateResult] = Field(
         default=None,
@@ -212,6 +233,14 @@ class MeasurementResponse(BaseModel):
     calibration_source: Optional[CalibrationSource] = Field(
         default=None,
         description="Provenance of calibration data.",
+    )
+    calibration_profile: Optional[CalibrationProfile] = Field(
+        default=None,
+        description="Structured reusable project calibration profile applied to measurement.",
+    )
+    geometry_tier: Optional[str] = Field(
+        default=None,
+        description="Zero-guessing geometry tier: ACCEPTABLE_GEOMETRY, PARTIAL_REVIEW_GEOMETRY, or REJECTED_UNRELIABLE.",
     )
     physical_measurement_available: bool = Field(
         default=False,
@@ -228,6 +257,10 @@ class MeasurementResponse(BaseModel):
     authoritative_reason: str = Field(
         default="Default initial evaluation pending pipeline execution.",
         description="Engineering determination rationale.",
+    )
+    ai_explanation: Optional[str] = Field(
+        default=None,
+        description="Vertex AI explanation of inspection results.",
     )
     timestamp: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(),

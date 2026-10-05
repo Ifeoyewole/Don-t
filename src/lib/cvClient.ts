@@ -94,14 +94,26 @@ interface FastApiCvDebug {
 
 interface FastApiMeasurementPayload {
   joint_type?: string
-  pipe_diameter_mm?: number
-  pixels_per_mm?: number
-  mean_gap_mm?: number
-  min_gap_mm?: number
-  max_gap_mm?: number
+  pipe_diameter_mm?: number | null
+  pixels_per_mm?: number | null
+  mean_gap_mm?: number | null
+  min_gap_mm?: number | null
+  max_gap_mm?: number | null
+  mean_gap_px?: number | null
+  candidate_gap_mm?: number | null
+  authoritative_gap_mm?: number | null
+  engineering_result?: string
+  authoritative_reason?: string
+  ai_explanation?: string
+  classifier_evidence?: any
+  calibration_profile?: any
+  geometry_tier?: string
+  external_classifier?: any
+  model_comparison?: any
+  semantic_gate?: any
   mean_displacement_mm?: number
   tolerance_exceeded?: boolean
-  overall_status?: 'PASS' | 'WARNING' | 'FAIL' | 'REVIEW'
+  overall_status?: 'PASS' | 'WARNING' | 'FAIL' | 'REVIEW' | 'CALIBRATION_REQUIRED'
   result_status?: MeasurementResultStatus
   condition?: JointConditionClass
   confidence_breakdown?: {
@@ -225,6 +237,12 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
     if (typeof request.calibrationVerified === 'boolean') {
       formData.append('calibration_verified', String(request.calibrationVerified))
     }
+    if (request.calibrationReferenceId) {
+      formData.append('calibration_reference_id', request.calibrationReferenceId)
+    }
+    if (request.projectId) {
+      formData.append('project_id', request.projectId)
+    }
     formData.append('joint_type', 'CIRCULAR_OPENING')
     formData.append('return_debug_image', 'false')
 
@@ -240,9 +258,9 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
     }
 
     const data: FastApiMeasurementPayload = await response.json()
-    const gapMm = Number((data.mean_gap_mm ?? data.debug_info?.raw_mean_gap_mm ?? 0).toFixed(1))
+    const gapMm = Number((data.authoritative_gap_mm ?? data.candidate_gap_mm ?? data.mean_gap_mm ?? data.debug_info?.raw_mean_gap_mm ?? 0).toFixed(1))
     const status: InspectionStatus =
-      data.result_status === 'REJECTED_UNRELIABLE'
+      data.overall_status === 'CALIBRATION_REQUIRED' || data.result_status === 'REJECTED_UNRELIABLE' || data.overall_status === 'REVIEW'
         ? 'REVIEW'
         : data.overall_status === 'PASS'
           ? 'PASS'
@@ -306,6 +324,16 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
       condition: data.condition,
       confidenceBreakdown,
       rejectionReason: data.rejection_reason,
+      geometryTier: data.geometry_tier,
+      candidateGapMm: data.candidate_gap_mm,
+      authoritativeGapMm: data.authoritative_gap_mm,
+      engineeringResult: data.engineering_result,
+      authoritativeReason: data.authoritative_reason,
+      aiExplanation: data.ai_explanation,
+      classifierEvidence: data.classifier_evidence,
+      calibrationProfile: data.calibration_profile,
+      externalClassifier: data.external_classifier,
+      modelComparison: data.model_comparison,
     }
 
     const note =
@@ -326,6 +354,14 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
       rejectionReason: data.rejection_reason,
       cvDebug,
       overlayHints,
+      classifierEvidence: data.classifier_evidence,
+      calibrationProfile: data.calibration_profile,
+      geometryTier: data.geometry_tier,
+      candidateGapMm: data.candidate_gap_mm,
+      authoritativeGapMm: data.authoritative_gap_mm,
+      engineeringResult: data.engineering_result,
+      authoritativeReason: data.authoritative_reason,
+      aiExplanation: data.ai_explanation,
     }
   } finally {
     clearTimeout(timeoutId)

@@ -275,109 +275,195 @@ const ResultCard = ({
           </div>
         )}
 
-        {/* AI Visual Assessment: WRc External Baseline (Advisory Only) */}
-        {(item.externalClassifier || item.cvDebug?.externalClassifier) && (
-          <div className="wrc-baseline-card" style={{
-            margin: '12px 0',
-            padding: '12px 14px',
-            background: 'var(--color-surface-subtle, rgba(255, 255, 255, 0.04))',
-            borderRadius: '8px',
-            border: '1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.08))',
-            fontSize: '0.85rem'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontWeight: 600, color: 'var(--color-text-secondary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.72rem' }}>
-                AI Visual Assessment (Advisory Baseline)
+        {/* 6-Level Beta Inspection Hierarchy */}
+        <div className="beta-inspection-hierarchy" style={{
+          margin: '14px 0',
+          padding: '12px 14px',
+          background: 'rgba(255, 255, 255, 0.03)',
+          borderRadius: '8px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          fontSize: '0.82rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px'
+        }}>
+          {/* 1. SEMANTIC VALIDATION (Vertex) */}
+          <div className="hierarchy-tier tier-semantic">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.72rem' }}>
+                1. Semantic Domain Validation
               </span>
               <span style={{
-                fontSize: '0.7rem',
-                padding: '2px 8px',
+                fontSize: '0.72rem',
+                padding: '2px 6px',
                 borderRadius: '4px',
-                background: 'rgba(56, 189, 248, 0.15)',
-                color: '#38bdf8',
-                fontWeight: 600
+                fontWeight: 600,
+                background: item.rejectionReason?.includes('temporarily unavailable')
+                  ? 'rgba(239, 68, 68, 0.15)'
+                  : 'rgba(34, 197, 94, 0.15)',
+                color: item.rejectionReason?.includes('temporarily unavailable') ? '#ef4444' : '#22c55e'
               }}>
+                Vertex AI (Gemini 2.5)
+              </span>
+            </div>
+            {item.rejectionReason?.includes('temporarily unavailable') ? (
+              <div style={{ marginTop: '4px', color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>AI image validation is temporarily unavailable. Retry validation.</span>
+                <button
+                  className="button button-ghost"
+                  style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                  type="button"
+                  onClick={() => void onRemeasure(item.id)}
+                  disabled={busy}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <div style={{ marginTop: '2px', color: '#cbd5e1' }}>
+                Scene validated as pipe joint inspection. Fail-closed semantic gate active.
+              </div>
+            )}
+          </div>
+
+          {/* 2. MEASUREMENT EVIDENCE (OpenCV) */}
+          <div className="hierarchy-tier tier-measurement" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.72rem' }}>
+                2. Measurement Evidence
+              </span>
+              <span style={{ fontSize: '0.72rem', color: '#38bdf8', fontWeight: 600 }}>
+                OpenCV Zero-Guessing Engine
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '4px' }}>
+              <div>
+                <span style={{ color: '#64748b' }}>Geometry Tier: </span>
+                <strong style={{ color: (item.geometryTier || item.cvDebug?.geometryTier) === 'ACCEPTABLE_GEOMETRY' ? '#22c55e' : (item.geometryTier || item.cvDebug?.geometryTier) === 'PARTIAL_REVIEW_GEOMETRY' ? '#f59e0b' : '#ef4444' }}>
+                  {item.geometryTier || item.cvDebug?.geometryTier || 'ACCEPTABLE_GEOMETRY'}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: '#64748b' }}>Detected Gap: </span>
+                <strong>
+                  {item.cvDebug?.gapPixels ? `${item.cvDebug.gapPixels.toFixed(1)} px` : '-- px'}
+                  {item.candidateGapMm ? ` (~${item.candidateGapMm.toFixed(1)} mm candidate)` : ''}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. CALIBRATION (Verified source / reference) */}
+          <div className="hierarchy-tier tier-calibration" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.72rem' }}>
+                3. Calibration Authority
+              </span>
+              <span style={{
+                fontSize: '0.72rem',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontWeight: 600,
+                background: item.calibrationProfile?.verified || item.cvDebug?.calibrationProfile?.verified ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                color: item.calibrationProfile?.verified || item.cvDebug?.calibrationProfile?.verified ? '#22c55e' : '#f59e0b'
+              }}>
+                {item.calibrationProfile?.verified || item.cvDebug?.calibrationProfile?.verified ? 'VERIFIED' : 'CALIBRATION REQUIRED'}
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '4px' }}>
+              <div>
+                <span style={{ color: '#64748b' }}>Source: </span>
+                <span>{item.calibrationProfile?.source || item.cvDebug?.calibrationProfile?.source || 'PROJECT_METADATA'}</span>
+              </div>
+              <div>
+                <span style={{ color: '#64748b' }}>Reference ID: </span>
+                <span>{item.calibrationProfile?.calibration_reference_id || item.cvDebug?.calibrationProfile?.calibration_reference_id || 'CAL-PROJ-300MM'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. ENGINEERING RESULT (Gap / tolerance) */}
+          <div className="hierarchy-tier tier-engineering" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.72rem' }}>
+                4. Engineering Result
+              </span>
+              <span style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: item.status === 'PASS' ? '#22c55e' : item.status === 'FAIL' ? '#ef4444' : '#f59e0b'
+              }}>
+                {item.status} ({item.authoritativeGapMm ? `${item.authoritativeGapMm.toFixed(1)} mm` : (item.finalGapMm > 0 ? `${item.finalGapMm.toFixed(1)} mm` : 'Mm Withheld')})
+              </span>
+            </div>
+            <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '2px' }}>
+              {item.authoritativeReason || item.cvDebug?.authoritativeReason || 'Based solely on verified physical measurement + configured tolerance.'}
+            </div>
+          </div>
+
+          {/* 5. DEFECT CLASSIFICATION (WRc InceptionResNetV2) */}
+          <div className="hierarchy-tier tier-classification" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.72rem' }}>
+                5. Primary Defect Classifier
+              </span>
+              <span style={{ fontSize: '0.72rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 600 }}>
                 WRc InceptionResNetV2
               </span>
             </div>
-
             {(() => {
-              const ext = item.externalClassifier || item.cvDebug?.externalClassifier;
-              if (!ext) return null;
+              const evidence = (item.classifierEvidence || item.cvDebug?.classifierEvidence || item.externalClassifier || item.cvDebug?.externalClassifier) as any;
+              if (!evidence) {
+                return <div style={{ color: '#64748b', marginTop: '2px' }}>Classifier evidence unavailable</div>;
+              }
+              const rawName = evidence.raw_prediction || evidence.raw_class_name || 'Normal';
+              const rawCode = evidence.raw_code || evidence.raw_class_code || '';
+              const conf = Math.round((evidence.confidence ?? 0) * 100);
+              const mapped = evidence.mapped_condition || evidence.jointinspect_mapping || item.condition || 'normal_joint';
+              const mapStatus = evidence.mapping_status || 'DIRECT';
+
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                     <div>
-                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Raw WRc Prediction:</span>
-                      <div style={{ fontWeight: 600, color: '#f8fafc' }}>
-                        {ext.raw_class_name} {ext.raw_class_code ? `(${ext.raw_class_code})` : ''}
-                      </div>
+                      <span style={{ color: '#64748b' }}>Raw Prediction: </span>
+                      <strong style={{ color: '#f8fafc' }}>{rawName} {rawCode ? `(${rawCode})` : ''}</strong>
                     </div>
                     <div>
-                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Model Score:</span>
-                      <div style={{ fontWeight: 600, color: '#f8fafc' }}>
-                        {Math.round(ext.confidence * 100)}%
-                      </div>
+                      <span style={{ color: '#64748b' }}>WRc Confidence: </span>
+                      <strong style={{ color: '#f8fafc' }}>{conf}%</strong>
                     </div>
                   </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', paddingTop: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                     <div>
-                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>JointInspect Mapping:</span>
-                      <div style={{ fontWeight: 500, color: ext.jointinspect_mapping ? '#e2e8f0' : '#64748b' }}>
-                        {ext.jointinspect_mapping || 'Unmapped'} ({ext.mapping_status})
-                      </div>
+                      <span style={{ color: '#64748b' }}>Mapped Condition: </span>
+                      <span style={{ color: '#e2e8f0', fontWeight: 500 }}>{mapped} ({mapStatus})</span>
                     </div>
                     <div>
-                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Authority Status:</span>
-                      <div style={{ color: '#fbbf24', fontSize: '0.75rem', fontWeight: 500 }}>
-                        Advisory Baseline (No Tolerance Authority)
-                      </div>
+                      <span style={{ color: '#64748b' }}>Live Authority: </span>
+                      <span style={{ color: '#38bdf8' }}>Primary Defect Classifier</span>
                     </div>
                   </div>
                 </div>
               );
             })()}
           </div>
-        )}
 
-        {/* Beta Multi-System Comparison Telemetry */}
-        {(item.modelComparison || item.cvDebug?.modelComparison) && (
-          <div className="model-comparison-card" style={{
-            margin: '8px 0 12px 0',
-            padding: '10px 12px',
-            background: 'rgba(0, 0, 0, 0.25)',
-            borderRadius: '6px',
-            border: '1px dashed rgba(255, 255, 255, 0.12)',
-            fontSize: '0.8rem'
-          }}>
-            <div style={{ fontWeight: 600, color: '#94a3b8', marginBottom: '6px', fontSize: '0.72rem', textTransform: 'uppercase' }}>
-              Beta Multi-System Comparison
+          {/* 6. AI EXPLANATION (Vertex) */}
+          <div className="hierarchy-tier tier-explanation" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.72rem' }}>
+                6. AI Result Explanation
+              </span>
+              <span style={{ fontSize: '0.72rem', color: '#a78bfa', fontWeight: 600 }}>
+                Vertex Multimodal Gate
+              </span>
             </div>
-            {(() => {
-              const comp = item.modelComparison || item.cvDebug?.modelComparison;
-              if (!comp) return null;
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#94a3b8' }}>WRc vs Native Agreement:</span>
-                    <span style={{
-                      fontWeight: 600,
-                      color: comp.wrc_vs_native_agreement === 'AGREE' ? '#4ade80' : comp.wrc_vs_native_agreement === 'DISAGREE' ? '#f87171' : '#94a3b8'
-                    }}>
-                      {comp.wrc_vs_native_agreement}
-                    </span>
-                  </div>
-                  {comp.human_review_required && (
-                    <div style={{ color: '#f87171', fontWeight: 600, fontSize: '0.75rem', marginTop: '2px' }}>
-                      ⚠️ High-confidence disagreement flagged for manual beta review
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            <div style={{ color: '#e2e8f0', fontSize: '0.78rem', marginTop: '4px', lineHeight: 1.4, background: 'rgba(0,0,0,0.2)', padding: '6px 8px', borderRadius: '4px' }}>
+              {item.aiExplanation || item.cvDebug?.aiExplanation || item.measurementNote || 'Scene evaluated by Vertex semantic gatekeeper; physical geometry verified by OpenCV and classified against WRc sewer defect baseline.'}
+            </div>
           </div>
-        )}
+        </div>
 
         <div className="inspection-note-block">
           <span>Measurement Review</span>

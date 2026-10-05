@@ -250,6 +250,18 @@ def measure_seam_gap(
     valid_right = [right_points[i] for i in inlier_indices]
     filtered_gaps_px = [raw_gaps_px[i] for i in inlier_indices]
 
+    valid_samples_count = len(filtered_gaps_px)
+    valid_fraction = valid_samples_count / max(1, num_scanlines)
+
+    # Geometry Evidence Tiers (Zero Guessing)
+    is_acceptable = valid_fraction >= 0.50 and valid_samples_count >= 5
+    is_partial_review = not is_acceptable and valid_fraction >= 0.25 and valid_samples_count >= 3
+
+    if not is_acceptable and not is_partial_review:
+        raise ValueError("joint_geometry_not_reliable: Insufficient seam edge boundaries detected.")
+
+    geometry_tier = "ACCEPTABLE_GEOMETRY" if is_acceptable else "PARTIAL_REVIEW_GEOMETRY"
+
     mean_gap_px = float(np.mean(filtered_gaps_px))
     min_gap_px = float(np.min(filtered_gaps_px))
     max_gap_px = float(np.max(filtered_gaps_px))
@@ -260,11 +272,13 @@ def measure_seam_gap(
     mean_gap_mm: Optional[float] = None
     min_gap_mm: Optional[float] = None
     max_gap_mm: Optional[float] = None
+    candidate_gap_mm: Optional[float] = None
     std_gap_mm: Optional[float] = None
     authoritative_gap_mm: Optional[float] = None
     overall_status: ToleranceStatus
     engineering_result: ToleranceStatus
     authoritative_reason: str
+    physical_measurement_available = False
 
     if has_calibration:
         # Verified physical scale only; unverified heuristic defaults eliminated
@@ -272,22 +286,32 @@ def measure_seam_gap(
         pixels_per_mm = float(reference_px / float(pipe_diameter_mm))
         gaps_mm = [gap_px / pixels_per_mm for gap_px in filtered_gaps_px]
         gaps_arr = np.array(gaps_mm)
-        mean_gap_mm = float(np.mean(gaps_arr))
-        min_gap_mm = float(np.min(gaps_arr))
-        max_gap_mm = float(np.max(gaps_arr))
         std_gap_mm = float(np.std(gaps_arr))
-        authoritative_gap_mm = round(mean_gap_mm, 2)
+
+        if is_acceptable:
+            mean_gap_mm = float(np.mean(gaps_arr))
+            min_gap_mm = float(np.min(gaps_arr))
+            max_gap_mm = float(np.max(gaps_arr))
+            authoritative_gap_mm = round(mean_gap_mm, 2)
+            physical_measurement_available = True
+        else:
+            candidate_gap_mm = round(float(np.mean(gaps_arr)), 2)
+            mean_gap_mm = None
+            min_gap_mm = None
+            max_gap_mm = None
+            authoritative_gap_mm = None
+            physical_measurement_available = False
 
     gap_lines: List[GapLine] = []
     line_statuses: List[ToleranceStatus] = []
 
     for lp, rp, gap_px in zip(valid_left, valid_right, filtered_gaps_px):
         if has_calibration and pixels_per_mm is not None:
-            gap_mm = round(gap_px / pixels_per_mm, 2)
-            status = classify_gap(gap_mm, float(pipe_diameter_mm), tolerance_spec)
+            gap_mm_sample = round(gap_px / pixels_per_mm, 2)
+            status = classify_gap(gap_mm_sample, float(pipe_diameter_mm), tolerance_spec)
             line_statuses.append(status)
         else:
-            gap_mm = None
+            gap_mm_sample = None
             status = ToleranceStatus.CALIBRATION_REQUIRED
 
         gap_lines.append(
@@ -295,25 +319,41 @@ def measure_seam_gap(
                 start=lp,
                 end=rp,
                 gap_px=round(gap_px, 2),
-                gap_mm=gap_mm,
+                gap_mm=gap_mm_sample if is_acceptable else None,
                 status=status,
             )
         )
 
-    if has_calibration and line_statuses:
-        overall_status = evaluate_overall_status(line_statuses)
-        engineering_result = overall_status
-        authoritative_reason = (
-            f"Seam scale calibrated ({pipe_diameter_mm:.1f} mm). "
-            f"Measured mean seam gap: {authoritative_gap_mm} mm evaluated as {overall_status.value}."
-        )
+    if is_acceptable:
+        result_status = MeasurementResultStatus.ACCEPTED_MEASUREMENT
+        if has_calibration and line_statuses:
+            overall_status = evaluate_overall_status(line_statuses)
+            engineering_result = overall_status
+            authoritative_reason = (
+                f"Seam scale calibrated ({pipe_diameter_mm:.1f} mm). "
+                f"Measured mean seam gap: {authoritative_gap_mm} mm evaluated as {overall_status.value}."
+            )
+        else:
+            overall_status = ToleranceStatus.CALIBRATION_REQUIRED
+            engineering_result = ToleranceStatus.CALIBRATION_REQUIRED
+            authoritative_reason = (
+                "Seam edge boundaries verified in pixel space. "
+                "Physical millimeter calculation withheld pending verified scale calibration."
+            )
     else:
-        overall_status = ToleranceStatus.CALIBRATION_REQUIRED
-        engineering_result = ToleranceStatus.CALIBRATION_REQUIRED
-        authoritative_reason = (
-            "Seam edge boundaries verified in pixel space. "
-            "Physical millimeter calculation withheld pending verified scale calibration."
-        )
+        result_status = MeasurementResultStatus.REVIEW_REQUIRED
+        overall_status = ToleranceStatus.REVIEW
+        engineering_result = ToleranceStatus.REVIEW
+        if has_calibration:
+            authoritative_reason = (
+                f"PARTIAL_REVIEW_GEOMETRY: Seam evidence partially resolved ({valid_samples_count}/{num_scanlines} scanlines); "
+                f"candidate gap: {candidate_gap_mm} mm. Manual review required; authoritative millimeters withheld."
+            )
+        else:
+            authoritative_reason = (
+                f"PARTIAL_REVIEW_GEOMETRY: Seam evidence partially resolved ({valid_samples_count}/{num_scanlines} scanlines); "
+                "uncalibrated. Authoritative millimeters withheld."
+            )
 
     # Step 6: Overlay Hints
     overlay_hints = OverlayHints(
@@ -331,7 +371,7 @@ def measure_seam_gap(
             valid_left,
             valid_right,
             gap_lines,
-            mean_gap_mm if mean_gap_mm is not None else 0.0,
+            mean_gap_mm if mean_gap_mm is not None else (candidate_gap_mm if candidate_gap_mm is not None else 0.0),
             min_gap_mm if min_gap_mm is not None else 0.0,
             max_gap_mm if max_gap_mm is not None else 0.0,
             overall_status,
@@ -351,9 +391,10 @@ def measure_seam_gap(
         debug_image_base64=debug_image_b64,
         total_ray_count=num_scanlines,
         valid_ray_count=len(gap_lines),
-        valid_ray_fraction=round(len(gap_lines) / max(1, num_scanlines), 4),
-        coverage_status="FULL" if len(gap_lines) >= min_required_samples else "PARTIAL",
+        valid_ray_fraction=round(valid_fraction, 4),
+        coverage_status="FULL" if is_acceptable else "PARTIAL",
         invalid_reason_counts={"OUTLIER": len(outlier_indices), "REJECTED_SCANLINES": num_scanlines - len(raw_gaps_px)},
+        geometry_tier=geometry_tier,
     )
 
     return MeasurementResponse(
@@ -361,17 +402,19 @@ def measure_seam_gap(
         mean_gap_px=round(mean_gap_px, 2),
         min_gap_px=round(min_gap_px, 2),
         max_gap_px=round(max_gap_px, 2),
-        pipe_diameter_mm=pipe_diameter_mm,
-        pixels_per_mm=round(pixels_per_mm, 4) if pixels_per_mm else None,
+        pipe_diameter_mm=pipe_diameter_mm if has_calibration else None,
+        pixels_per_mm=round(pixels_per_mm, 4) if (pixels_per_mm and is_acceptable) else None,
         mean_gap_mm=round(mean_gap_mm, 2) if mean_gap_mm is not None else None,
         min_gap_mm=round(min_gap_mm, 2) if min_gap_mm is not None else None,
         max_gap_mm=round(max_gap_mm, 2) if max_gap_mm is not None else None,
+        candidate_gap_mm=candidate_gap_mm,
         overall_status=overall_status,
-        result_status=MeasurementResultStatus.ACCEPTED_MEASUREMENT,
+        result_status=result_status,
         overlay_hints=overlay_hints,
         debug_info=debug_info,
-        physical_measurement_available=has_calibration,
+        physical_measurement_available=physical_measurement_available,
         authoritative_gap_mm=authoritative_gap_mm,
         engineering_result=engineering_result,
         authoritative_reason=authoritative_reason,
+        geometry_tier=geometry_tier,
     )

@@ -94,6 +94,8 @@ async function runAiAssistedMeasurement(
       operatorContext: options?.operatorContext,
       calibrationSource: options?.calibrationSource,
       calibrationVerified: options?.calibrationVerified,
+      calibrationReferenceId: options?.calibrationReferenceId,
+      projectId: options?.projectId,
     })
     const aiReview = shouldReviewWithAi(cvMeasurement)
       ? await reviewMeasurementWithAi({
@@ -173,7 +175,24 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
   emit({ type: 'progress', imageId, progress: 60, message: image.validationStatus === 'retake' ? 'Running enhanced CV and AI review' : 'Running CV pipeline' })
   await wait(20)
 
-  const measurement = await runAiAssistedMeasurement(image, blobRecord?.blob, manhole?.pipeDiameterMm, options)
+  const pipeDiameter =
+    options?.pipeDiameterMm ??
+    options?.calibrationProfile?.pipeDiameterMm ??
+    options?.calibrationProfile?.pipe_diameter_mm ??
+    manhole?.pipeDiameterMm ??
+    undefined
+  const effectiveOptions: ProcessOptions = {
+    ...options,
+    projectId: options?.projectId ?? image.projectId,
+    calibrationSource: options?.calibrationSource ?? options?.calibrationProfile?.source,
+    calibrationVerified: options?.calibrationVerified ?? options?.calibrationProfile?.verified,
+    calibrationReferenceId:
+      options?.calibrationReferenceId ??
+      options?.calibrationProfile?.calibrationReferenceId ??
+      options?.calibrationProfile?.calibration_reference_id,
+  }
+
+  const measurement = await runAiAssistedMeasurement(image, blobRecord?.blob, pipeDiameter, effectiveOptions)
 
   const resultId = createId()
   const result: InspectionResult = {
@@ -198,6 +217,14 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
     condition: measurement.condition,
     confidenceBreakdown: measurement.confidenceBreakdown,
     rejectionReason: measurement.rejectionReason,
+    classifierEvidence: measurement.classifierEvidence ?? measurement.cvDebug?.classifierEvidence,
+    calibrationProfile: measurement.calibrationProfile ?? measurement.cvDebug?.calibrationProfile,
+    geometryTier: measurement.geometryTier ?? measurement.cvDebug?.geometryTier,
+    candidateGapMm: measurement.candidateGapMm ?? measurement.cvDebug?.candidateGapMm,
+    authoritativeGapMm: measurement.authoritativeGapMm ?? measurement.cvDebug?.authoritativeGapMm,
+    engineeringResult: measurement.engineeringResult ?? measurement.cvDebug?.engineeringResult,
+    authoritativeReason: measurement.authoritativeReason ?? measurement.cvDebug?.authoritativeReason,
+    aiExplanation: measurement.aiExplanation ?? measurement.cvDebug?.aiExplanation,
   }
 
   await db.transaction('rw', db.inspectionImages, db.inspectionResults, async () => {

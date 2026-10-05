@@ -75,6 +75,44 @@ export interface CvMeasurementDebug {
   rejectionReason?: string
   externalClassifier?: ExternalClassifierResult
   modelComparison?: ModelComparisonResult
+  classifierEvidence?: ClassifierEvidence
+  calibrationProfile?: CalibrationProfile
+  geometryTier?: 'ACCEPTABLE_GEOMETRY' | 'PARTIAL_REVIEW_GEOMETRY' | 'REJECTED_UNRELIABLE' | string
+  candidateGapMm?: number | null
+  authoritativeGapMm?: number | null
+  engineeringResult?: string
+  authoritativeReason?: string
+  aiExplanation?: string
+}
+
+export interface CalibrationProfile {
+  calibration_reference_id: string
+  project_id: string
+  source: string
+  pipe_diameter_mm?: number | null
+  camera_id?: string | null
+  verified: boolean
+  verified_at?: string | null
+  notes?: string | null
+
+  // camelCase aliases
+  calibrationReferenceId?: string
+  projectId?: string
+  pipeDiameterMm?: number | null
+  cameraId?: string | null
+  verifiedAt?: string | null
+}
+
+export interface ClassifierEvidence {
+  classifier: string
+  model_id: string
+  raw_prediction: string
+  raw_code?: string
+  confidence: number
+  mapped_condition?: string | null
+  mapping_status: string
+  top_k: ExternalClassTopK[]
+  classification_status: string
 }
 
 export interface AiMeasurementReview {
@@ -269,6 +307,14 @@ export interface InspectionResult {
   rejectionReason?: string
   externalClassifier?: ExternalClassifierResult
   modelComparison?: ModelComparisonResult
+  classifierEvidence?: ClassifierEvidence
+  calibrationProfile?: CalibrationProfile
+  geometryTier?: 'ACCEPTABLE_GEOMETRY' | 'PARTIAL_REVIEW_GEOMETRY' | 'REJECTED_UNRELIABLE' | string
+  candidateGapMm?: number | null
+  authoritativeGapMm?: number | null
+  engineeringResult?: string
+  authoritativeReason?: string
+  aiExplanation?: string
 }
 
 export interface ApplyOverrideInput {
@@ -304,6 +350,10 @@ export interface ProcessOptions {
   operatorContext?: string
   calibrationSource?: string
   calibrationVerified?: boolean
+  calibrationReferenceId?: string
+  projectId?: string
+  pipeDiameterMm?: number
+  calibrationProfile?: CalibrationProfile
 }
 
 export interface ProcessBatchResult {

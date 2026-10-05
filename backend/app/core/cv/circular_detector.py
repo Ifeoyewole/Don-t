@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from scipy.signal import find_peaks
 
+from backend.app.config import get_settings
 from backend.app.core.cv.preprocessor import enhance_edges_clahe, filter_bilateral_smooth
 from backend.app.core.cv.tolerance import classify_gap, evaluate_overall_status
 from backend.app.schemas.domain import JointType, MeasurementResultStatus, ToleranceStatus
@@ -385,18 +386,33 @@ def measure_circular_gap(
     valid_samples = [detected_samples[i] for i in inlier_indices]
     filtered_gaps_px = [raw_detected_gaps_px[i] for i in inlier_indices]
 
-    # Step 4: Strict Independent Radial Evidence Gating
+    # Step 4: Strict Independent Radial Evidence Gating & Geometry Tiers (Zero Guessing)
     valid_ray_count = len(valid_samples)
     valid_ray_fraction = valid_ray_count / max(1, num_rays)
     occupied_sectors = {min(7, int(angle // 45.0)) for angle, _, _ in valid_samples}
     coverage_sector_count = len(occupied_sectors)
     angular_coverage = coverage_sector_count / 8.0
 
-    if valid_ray_fraction < 0.60 or coverage_sector_count < 6:
+    settings = get_settings()
+    accept_ray_frac = getattr(settings, "GEOMETRY_ACCEPT_RAY_FRACTION", 0.60)
+    accept_min_sectors = getattr(settings, "GEOMETRY_ACCEPT_MIN_SECTORS", 6)
+    partial_ray_frac = getattr(settings, "GEOMETRY_PARTIAL_RAY_FRACTION", 0.45)
+    partial_min_sectors = getattr(settings, "GEOMETRY_PARTIAL_MIN_SECTORS", 5)
+
+    is_acceptable = (valid_ray_fraction >= accept_ray_frac and coverage_sector_count >= accept_min_sectors)
+    is_partial_review = (
+        not is_acceptable
+        and valid_ray_fraction >= partial_ray_frac
+        and coverage_sector_count >= partial_min_sectors
+    )
+
+    if not is_acceptable and not is_partial_review:
         raise ValueError(
             "joint_geometry_not_reliable: insufficient independent radial evidence "
             f"({valid_ray_count}/{num_rays} valid rays; {coverage_sector_count}/8 sectors)."
         )
+
+    geometry_tier = "ACCEPTABLE_GEOMETRY" if is_acceptable else "PARTIAL_REVIEW_GEOMETRY"
 
     valid_angles = [sample[0] for sample in valid_samples]
     in_radii = [float(sample[1]) for sample in valid_samples]
@@ -408,27 +424,40 @@ def measure_circular_gap(
     min_gap_px = float(np.min(filtered_gaps_px))
     max_gap_px = float(np.max(filtered_gaps_px))
 
-    # Step 5: Calibration Authority Assessment
+    # Step 5: Calibration Authority Assessment & Millimeter Calculation
     has_calibration = pipe_diameter_mm is not None and pipe_diameter_mm > 0
     pixels_per_mm: Optional[float] = None
     mean_gap_mm: Optional[float] = None
     min_gap_mm: Optional[float] = None
     max_gap_mm: Optional[float] = None
+    candidate_gap_mm: Optional[float] = None
     std_gap_mm: Optional[float] = None
     authoritative_gap_mm: Optional[float] = None
     overall_status: ToleranceStatus
     engineering_result: ToleranceStatus
     authoritative_reason: str
+    physical_measurement_available = False
 
     if has_calibration:
         pixels_per_mm = float((2.0 * mean_inner_r_px) / float(pipe_diameter_mm))
         raw_gaps_mm = [g / pixels_per_mm for g in filtered_gaps_px]
         gaps_arr = np.array(raw_gaps_mm)
-        mean_gap_mm = float(np.mean(gaps_arr))
-        min_gap_mm = float(np.min(gaps_arr))
-        max_gap_mm = float(np.max(gaps_arr))
         std_gap_mm = float(np.std(gaps_arr))
-        authoritative_gap_mm = round(mean_gap_mm, 2)
+
+        if is_acceptable:
+            mean_gap_mm = float(np.mean(gaps_arr))
+            min_gap_mm = float(np.min(gaps_arr))
+            max_gap_mm = float(np.max(gaps_arr))
+            authoritative_gap_mm = round(mean_gap_mm, 2)
+            physical_measurement_available = True
+        else:
+            # PARTIAL_REVIEW_GEOMETRY: Expose candidate_gap_mm for diagnostics; authoritative_gap_mm remains None
+            candidate_gap_mm = round(float(np.mean(gaps_arr)), 2)
+            mean_gap_mm = None
+            min_gap_mm = None
+            max_gap_mm = None
+            authoritative_gap_mm = None
+            physical_measurement_available = False
 
     # Step 6: Ray Samples Construction
     ray_samples: List[RaySample] = []
@@ -448,11 +477,11 @@ def measure_circular_gap(
         )
 
         if has_calibration and pixels_per_mm is not None:
-            gap_mm = round(gap_px / pixels_per_mm, 2)
-            status = classify_gap(gap_mm, float(pipe_diameter_mm), tolerance_spec)
+            gap_mm_sample = round(gap_px / pixels_per_mm, 2)
+            status = classify_gap(gap_mm_sample, float(pipe_diameter_mm), tolerance_spec)
             ray_statuses.append(status)
         else:
-            gap_mm = None
+            gap_mm_sample = None
             status = ToleranceStatus.CALIBRATION_REQUIRED
 
         ray_samples.append(
@@ -461,25 +490,43 @@ def measure_circular_gap(
                 inner_point=inner_pt,
                 outer_point=outer_pt,
                 gap_px=round(gap_px, 2),
-                gap_mm=gap_mm,
+                gap_mm=gap_mm_sample if is_acceptable else None,
                 status=status,
             )
         )
 
-    if has_calibration and ray_statuses:
-        overall_status = evaluate_overall_status(ray_statuses)
-        engineering_result = overall_status
-        authoritative_reason = (
-            f"Physical scale verified ({pipe_diameter_mm:.1f} mm ID). "
-            f"Measured mean annular gap: {authoritative_gap_mm} mm evaluated as {overall_status.value}."
-        )
+    if is_acceptable:
+        result_status = MeasurementResultStatus.ACCEPTED_MEASUREMENT
+        if has_calibration and ray_statuses:
+            overall_status = evaluate_overall_status(ray_statuses)
+            engineering_result = overall_status
+            authoritative_reason = (
+                f"Physical scale verified ({pipe_diameter_mm:.1f} mm ID). "
+                f"Measured mean annular gap: {authoritative_gap_mm} mm evaluated as {overall_status.value}."
+            )
+        else:
+            overall_status = ToleranceStatus.CALIBRATION_REQUIRED
+            engineering_result = ToleranceStatus.CALIBRATION_REQUIRED
+            authoritative_reason = (
+                "OpenCV annular geometry verified in pixel space. "
+                "Physical millimeter calculation withheld pending verified scale calibration."
+            )
     else:
-        overall_status = ToleranceStatus.CALIBRATION_REQUIRED
-        engineering_result = ToleranceStatus.CALIBRATION_REQUIRED
-        authoritative_reason = (
-            "OpenCV annular geometry verified in pixel space. "
-            "Physical millimeter calculation withheld pending verified scale calibration."
-        )
+        # PARTIAL_REVIEW_GEOMETRY
+        result_status = MeasurementResultStatus.REVIEW_REQUIRED
+        overall_status = ToleranceStatus.REVIEW
+        engineering_result = ToleranceStatus.REVIEW
+        if has_calibration:
+            authoritative_reason = (
+                f"PARTIAL_REVIEW_GEOMETRY: Evidence partially resolved ({valid_ray_count}/{num_rays} rays; "
+                f"{coverage_sector_count}/8 sectors); candidate gap: {candidate_gap_mm} mm. "
+                "Manual review required; authoritative millimeters withheld."
+            )
+        else:
+            authoritative_reason = (
+                f"PARTIAL_REVIEW_GEOMETRY: Evidence partially resolved ({valid_ray_count}/{num_rays} rays; "
+                f"{coverage_sector_count}/8 sectors); uncalibrated. Authoritative millimeters withheld."
+            )
 
     # Step 7: Overlay Hints for Frontend Rendering
     center_pt = Point2D(x=round(cx, 2), y=round(cy, 2))
@@ -487,15 +534,15 @@ def measure_circular_gap(
         center_x=round(cx, 2),
         center_y=round(cy, 2),
         radius_px=round(mean_inner_r_px, 2),
-        radius_mm=round((mean_inner_r_px / pixels_per_mm), 2) if pixels_per_mm else None,
-        confidence=0.95,
+        radius_mm=round((mean_inner_r_px / pixels_per_mm), 2) if (pixels_per_mm and is_acceptable) else None,
+        confidence=0.95 if is_acceptable else 0.75,
     )
     outer_detected = DetectedCircle(
         center_x=round(cx, 2),
         center_y=round(cy, 2),
         radius_px=round(mean_outer_r_px, 2),
-        radius_mm=round((mean_outer_r_px / pixels_per_mm), 2) if pixels_per_mm else None,
-        confidence=0.95,
+        radius_mm=round((mean_outer_r_px / pixels_per_mm), 2) if (pixels_per_mm and is_acceptable) else None,
+        confidence=0.95 if is_acceptable else 0.75,
     )
 
     overlay_hints = OverlayHints(
@@ -514,7 +561,7 @@ def measure_circular_gap(
             inner_detected,
             outer_detected,
             ray_samples,
-            mean_gap_mm if mean_gap_mm is not None else 0.0,
+            mean_gap_mm if mean_gap_mm is not None else (candidate_gap_mm if candidate_gap_mm is not None else 0.0),
             min_gap_mm if min_gap_mm is not None else 0.0,
             max_gap_mm if max_gap_mm is not None else 0.0,
             overall_status,
@@ -541,6 +588,7 @@ def measure_circular_gap(
         coverage_sector_count=coverage_sector_count,
         coverage_status="FULL" if coverage_sector_count == 8 else "PARTIAL",
         invalid_reason_counts=invalid_reason_counts,
+        geometry_tier=geometry_tier,
     )
 
     return MeasurementResponse(
@@ -548,17 +596,19 @@ def measure_circular_gap(
         mean_gap_px=round(mean_gap_px, 2),
         min_gap_px=round(min_gap_px, 2),
         max_gap_px=round(max_gap_px, 2),
-        pipe_diameter_mm=pipe_diameter_mm,
-        pixels_per_mm=round(pixels_per_mm, 4) if pixels_per_mm else None,
+        pipe_diameter_mm=pipe_diameter_mm if has_calibration else None,
+        pixels_per_mm=round(pixels_per_mm, 4) if (pixels_per_mm and is_acceptable) else None,
         mean_gap_mm=round(mean_gap_mm, 2) if mean_gap_mm is not None else None,
         min_gap_mm=round(min_gap_mm, 2) if min_gap_mm is not None else None,
         max_gap_mm=round(max_gap_mm, 2) if max_gap_mm is not None else None,
+        candidate_gap_mm=candidate_gap_mm,
         overall_status=overall_status,
-        result_status=MeasurementResultStatus.ACCEPTED_MEASUREMENT,
+        result_status=result_status,
         overlay_hints=overlay_hints,
         debug_info=debug_info,
-        physical_measurement_available=has_calibration,
+        physical_measurement_available=physical_measurement_available,
         authoritative_gap_mm=authoritative_gap_mm,
         engineering_result=engineering_result,
         authoritative_reason=authoritative_reason,
+        geometry_tier=geometry_tier,
     )

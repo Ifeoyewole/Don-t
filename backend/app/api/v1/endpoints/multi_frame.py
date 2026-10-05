@@ -88,7 +88,12 @@ async def measure_multi_frame_burst(
     total_payload_bytes = 0
     max_total_bytes = 30 * 1024 * 1024  # 30 MB
 
-    for file in files:
+    from backend.app.core.cv.ai.vertex_semantic_gate import get_vertex_semantic_gate
+    from backend.app.core.cv.ai.image_quality import validate_image_quality
+    vertex_gate = get_vertex_semantic_gate()
+    representative_validated = False
+
+    for idx, file in enumerate(files):
         content = await file.read()
         if not content:
             continue
@@ -100,6 +105,22 @@ async def measure_multi_frame_burst(
             )
         try:
             image_bgr = decode_image_bytes(content)
+
+            # Representative frame semantic domain validation for multi-frame burst
+            if not representative_validated:
+                sem_res = vertex_gate.evaluate(image_bgr)
+                if not sem_res.processing_allowed:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=sem_res.user_message or "Semantic gatekeeper blocked multi-frame burst (fail-closed).",
+                    )
+                representative_validated = True
+            else:
+                # Deterministic local optical quality checks on remaining frames
+                q_res = validate_image_quality(image_bgr)
+                if not q_res.usable:
+                    continue
+
             res = measure_circular_gap(
                 image_bgr=image_bgr,
                 pipe_diameter_mm=pipe_diameter_mm if is_calibrated else None,
@@ -111,6 +132,8 @@ async def measure_multi_frame_burst(
                 measured_gaps_px.append(gap_px)
                 if is_calibrated and res.mean_gap_mm is not None:
                     measured_gaps_mm.append(res.mean_gap_mm)
+        except HTTPException:
+            raise
         except Exception:
             # Skip unresolvable or rejected frames in burst
             continue
