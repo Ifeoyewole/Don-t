@@ -8,11 +8,11 @@ steps:
         mkdir -p backend/models
         gcloud storage cp gs://joint-inspection-510310-data/models/external/wrc/inceptionresnetv2/v1/wrc_inceptionresnetv2_baseline_v1.onnx backend/models/wrc_inceptionresnetv2_baseline_v1.onnx
         EXPECTED_SHA="8a6115e9f6f6f3a5a4f5cc749cc35420a623a4547e904174ae9a18ceab63f9f4"
-        ACTUAL_SHA=$(sha256sum backend/models/wrc_inceptionresnetv2_baseline_v1.onnx | awk '{print $1}')
+        ACTUAL_SHA=$$(sha256sum backend/models/wrc_inceptionresnetv2_baseline_v1.onnx | awk '{print $$1}')
         echo "Verifying WRc ONNX artifact integrity..."
-        echo "Expected SHA-256: $EXPECTED_SHA"
-        echo "Actual SHA-256:   $ACTUAL_SHA"
-        if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+        echo "Expected SHA-256: $$EXPECTED_SHA"
+        echo "Actual SHA-256:   $$ACTUAL_SHA"
+        if [ "$$ACTUAL_SHA" != "$$EXPECTED_SHA" ]; then
           echo "ERROR: EXTERNAL_CLASSIFIER_INTEGRITY_FAILURE! WRc ONNX hash mismatch."
           exit 1
         fi
