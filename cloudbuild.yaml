@@ -7,7 +7,7 @@ steps:
       - |
         mkdir -p backend/models
         gcloud storage cp gs://joint-inspection-510310-data/models/external/wrc/inceptionresnetv2/v1/wrc_inceptionresnetv2_baseline_v1.onnx backend/models/wrc_inceptionresnetv2_baseline_v1.onnx
-        EXPECTED_SHA="42527d8c4d38e6113f079bcb007715a5476d39cd3cc327f4ba87269d3c7de253"
+        EXPECTED_SHA="8a6115e9f6f6f3a5a4f5cc749cc35420a623a4547e904174ae9a18ceab63f9f4"
         ACTUAL_SHA=$(sha256sum backend/models/wrc_inceptionresnetv2_baseline_v1.onnx | awk '{print $1}')
         echo "Verifying WRc ONNX artifact integrity..."
         echo "Expected SHA-256: $EXPECTED_SHA"
@@ -41,6 +41,23 @@ steps:
     args:
       - 'push'
       - 'europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:latest'
+
+  # Step 4: Deploy immutable image to Cloud Run service pipe-joint-api
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'pipe-joint-api'
+      - '--image=europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:$SHORT_SHA'
+      - '--region=europe-west2'
+      - '--project=joint-inspection-510310'
+      - '--service-account=joint-inspection-runtime@joint-inspection-510310.iam.gserviceaccount.com'
+      - '--no-allow-unauthenticated'
+      - '--max-instances=10'
+      - '--concurrency=80'
+      - '--timeout=60s'
+      - '--set-env-vars=ENVIRONMENT=production,ENABLE_DOCS=false,CALIBRATION_MUTATION_ENABLED=false,WRC_BASELINE_ENABLED=true,WRC_BASELINE_PATH=/app/backend/models/wrc_inceptionresnetv2_baseline_v1.onnx'
 
 images:
   - 'europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-app/pipe-joint-api:latest'
