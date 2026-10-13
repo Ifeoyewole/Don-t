@@ -1,0 +1,14 @@
+steps:
+  - name: 'python:3.10-slim'
+    entrypoint: 'python'
+    secretEnv: ['SEWER_PASSWORD']
+    args:
+      - 'scripts/sewer_ml_pipeline/probe_archives.py'
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/joint-inspection-510310/secrets/sewer-ml-download-password/versions/latest
+      env: 'SEWER_PASSWORD'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

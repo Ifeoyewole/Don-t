@@ -2,9 +2,9 @@
   "total_test_images": 18,
   "unique_images": 11,
   "duplicate_images": 7,
-  "opencv_accepted": 18,
-  "opencv_zero_guessing_rejections": 0,
-  "acceptance_rate_pct": 100.0,
+  "opencv_accepted": 7,
+  "opencv_zero_guessing_rejections": 11,
+  "acceptance_rate_pct": 38.89,
   "results": [
     {
       "file_name": "test 1.jpeg",
@@ -15,14 +15,9 @@
       "is_duplicate": false,
       "duplicate_of": null,
       "opencv_measurement": {
-        "status": "ACCEPTED",
-        "overall_status": "FAIL",
-        "mean_gap_mm": 31.32,
-        "min_gap_mm": 3.17,
-        "max_gap_mm": 83.6,
-        "pixels_per_mm": 1.5789,
-        "inner_radius_px": 236.83,
-        "outer_radius_px": 286.28
+        "status": "REJECTED_UNRELIABLE",
+        "rejection_reason": "joint_geometry_not_reliable: insufficient independent radial evidence (16/72 valid rays; 3/8 sectors).",
+        "zero_guessing_invariant": "Refused to guess unresolvable physical boundary."
       },
       "ai_segmenter": {
         "model_available": true,
@@ -31,9 +26,9 @@
       },
       "ai_classifier": {
         "model_available": true,
-        "predicted_class": "OPEN_JOINT",
+        "predicted_class": "DEPOSITS_OBSTACLES",
         "confidence": 0.3655,
-        "tolerance_overridden": true,
+        "tolerance_overridden": false,
         "distribution": {
           "NORMAL_JOINT": 0.1247,
           "DISPLACED_JOINT": 0.0993,
@@ -70,13 +65,13 @@
       "duplicate_of": null,
       "opencv_measurement": {
         "status": "ACCEPTED",
-        "overall_status": "FAIL",
-        "mean_gap_mm": 63.69,
-        "min_gap_mm": 1.81,
-        "max_gap_mm": 103.31,
-        "pixels_per_mm": 1.6552,
-        "inner_radius_px": 248.28,
-        "outer_radius_px": 353.69
+        "overall_status": "REVIEW",
+        "mean_gap_mm": null,
+        "min_gap_mm": null,
+        "max_gap_mm": null,
+        "pixels_per_mm": null,
+        "inner_radius_px": 250.22,
+        "outer_radius_px": 353.8
       },
       "ai_segmenter": {
         "model_available": true,
@@ -84,18 +79,8 @@
         "segmentation_mask_generated": true
       },
       "ai_classifier": {
-        "model_available": true,
-        "predicted_class": "OPEN_JOINT",
-        "confidence": 0.5163,
-        "tolerance_overridden": true,
-        "distribution": {
-          "NORMAL_JOINT": 0.1014,
-          "DISPLACED_JOINT": 0.066,
-          "DAMAGED_JOINT": 0.0767,
-          "INTRUDING_SEAL": 0.1296,
-          "DEPOSITS_OBSTACLES": 0.5163,
-          "DIFFICULT_CONDITION": 0.11
-        }
+        "model_available": false,
+        "error": "'>' not supported between instances of 'NoneType' and 'float'"
       },
       "rag_advisory": [
         {
@@ -125,12 +110,12 @@
       "opencv_measurement": {
         "status": "ACCEPTED",
         "overall_status": "FAIL",
-        "mean_gap_mm": 40.84,
-        "min_gap_mm": 1.08,
-        "max_gap_mm": 80.54,
-        "pixels_per_mm": 1.8499,
-        "inner_radius_px": 277.49,
-        "outer_radius_px": 353.03
+        "mean_gap_mm": 43.9,
+        "min_gap_mm": 1.1,
+        "max_gap_mm": 81.84,
+        "pixels_per_mm": 1.8207,
+        "inner_radius_px": 273.11,
+        "outer_radius_px": 353.04
       },
       "ai_segmenter": {
         "model_available": true,
@@ -177,14 +162,9 @@
       "is_duplicate": false,
       "duplicate_of": null,
       "opencv_measurement": {
-        "status": "ACCEPTED",
-        "overall_status": "REVIEW",
-        "mean_gap_mm": 20.74,
-        "min_gap_mm": 20.74,
-        "max_gap_mm": 20.74,
-        "pixels_per_mm": 2.0733,
-        "inner_radius_px": 311.0,
-        "outer_radius_px": 354.0
+        "status": "REJECTED_UNRELIABLE",
+        "rejection_reason": "joint_geometry_not_reliable: insufficient independent radial evidence (0/72 valid rays; 0/8 sectors).",
+        "zero_guessing_invariant": "Refused to guess unresolvable physical boundary."
       },
       "ai_segmenter": {
         "model_available": true,
@@ -193,9 +173,9 @@
       },
       "ai_classifier": {
         "model_available": true,
-        "predicted_class": "OPEN_JOINT",
+        "predicted_class": "DEPOSITS_OBSTACLES",
         "confidence": 0.3762,
-        "tolerance_overridden": true,
+        "tolerance_overridden": false,
         "distribution": {
           "NORMAL_JOINT": 0.1174,
           "DISPLACED_JOINT": 0.0949,
@@ -231,14 +211,9 @@
       "is_duplicate": false,
       "duplicate_of": null,
       "opencv_measurement": {
-        "status": "ACCEPTED",
-        "overall_status": "PASS",
-        "mean_gap_mm": 4.12,
-        "min_gap_mm": 4.12,
-        "max_gap_mm": 4.12,
-        "pixels_per_mm": 2.6667,
-        "inner_radius_px": 400.0,
-        "outer_radius_px": 411.0
+        "status": "REJECTED_UNRELIABLE",
+        "rejection_reason": "joint_geometry_not_reliable: insufficient independent radial evidence (0/72 valid rays; 0/8 sectors).",
+        "zero_guessing_invariant": "Refused to guess unresolvable physical boundary."
       },
       "ai_segmenter": {
         "model_available": true,
@@ -247,9 +222,9 @@
       },
       "ai_classifier": {
         "model_available": true,
-        "predicted_class": "OPEN_JOINT",
+        "predicted_class": "DEPOSITS_OBSTACLES",
         "confidence": 0.4194,
-        "tolerance_overridden": true,
+        "tolerance_overridden": false,
         "distribution": {
           "NORMAL_JOINT": 0.1159,
           "DISPLACED_JOINT": 0.0869,
@@ -285,14 +260,9 @@
       "is_duplicate": false,
       "duplicate_of": null,
       "opencv_measurement": {
-        "status": "ACCEPTED",
-        "overall_status": "FAIL",
-        "mean_gap_mm": 32.66,
-        "min_gap_mm": 0.59,
-        "max_gap_mm": 64.29,
-        "pixels_per_mm": 1.6956,
-        "inner_radius_px": 254.33,
-        "outer_radius_px": 309.71
+        "status": "REJECTED_UNRELIABLE",
+        "rejection_reason": "joint_geometry_not_reliable: insufficient independent radial evidence (29/72 valid rays; 7/8 sectors).",
+        "zero_guessing_invariant": "Refused to guess unresolvable physical boundary."
       },
       "ai_segmenter": {
         "model_available": true,
@@ -301,9 +271,9 @@
       },
       "ai_classifier": {
         "model_available": true,
-        "predicted_class": "OPEN_JOINT",
+        "predicted_class": "DEPOSITS_OBSTACLES",
         "confidence": 0.4816,
-        "tolerance_overridden": true,
+        "tolerance_overridden": false,
         "distribution": {
           "NORMAL_JOINT": 0.086,
           "DISPLACED_JOINT": 0.0665,
@@ -341,12 +311,12 @@
       "opencv_measurement": {
         "status": "ACCEPTED",
         "overall_status": "FAIL",
-        "mean_gap_mm": 31.48,
-        "min_gap_mm": 1.79,
-        "max_gap_mm": 57.79,
-        "pixels_per_mm": 2.2322,
-        "inner_radius_px": 334.83,
-        "outer_radius_px": 405.11
+        "mean_gap_mm": 32.01,
+        "min_gap_mm": 1.8,
+        "max_gap_mm": 57.92,
+        "pixels_per_mm": 2.2272,
+        "inner_radius_px": 334.08,
+        "outer_radius_px": 405.38
       },
       "ai_segmenter": {
         "model_available": true,
@@ -395,12 +365,12 @@
       "opencv_measurement": {
         "status": "ACCEPTED",
         "overall_status": "FAIL",
-        "mean_gap_mm": 23.64,
-        "min_gap_mm": 1.21,
-        "max_gap_mm": 49.03,
-        "pixels_per_mm": 2.4883,
-        "inner_radius_px": 373.25,
-        "outer_radius_px": 432.07
+        "mean_gap_mm": 25.04,
+        "min_gap_mm": 1.22,
+        "max_gap_mm": 49.44,
+        "pixels_per_mm": 2.4678,
+        "inner_radius_px": 370.17,
+        "outer_radius_px": 431.95
       },
       "ai_segmenter": {
         "model_available": true,
@@ -447,14 +417,9 @@
       "is_duplicate": false,
       "duplicate_of": null,
       "opencv_measurement": {
-        "status": "ACCEPTED",
-        "overall_status": "FAIL",
-        "mean_gap_mm": 34.65,
-        "min_gap_mm": 0.45,
-        "max_gap_mm": 68.77,
-        "pixels_per_mm": 2.2104,
-        "inner_radius_px": 331.56,
-        "outer_radius_px": 408.15
+        "status": "REJECTED_UNRELIABLE",
+        "rejection_reason": "joint_geometry_not_reliable: insufficient independent radial evidence (22/72 valid rays; 5/8 sectors).",
+        "zero_guessing_invariant": "Refused to guess unresolvable physical boundary."
       },
       "ai_segmenter": {
         "model_available": true,
@@ -463,9 +428,9 @@
       },
       "ai_classifier": {
         "model_available": true,
-        "predicted_class": "OPEN_JOINT",
+        "predicted_class": "DEPOSITS_OBSTACLES",
         "confidence": 0.4499,
-        "tolerance_overridden": true,
+        "tolerance_overridden": false,
         "distribution": {
           "NORMAL_JOINT": 0.1088,
           "DISPLACED_JOINT": 0.0796,
@@ -501,14 +466,9 @@
       "is_duplicate": true,
       "duplicate_of": "test 6.jpeg",
       "opencv_measurement": {
-        "status": "ACCEPTED",
-        "overall_status": "FAIL",
-        "mean_gap_mm": 32.66,
-        "min_gap_mm": 0.59,
-        "max_gap_mm": 64.29,
-        "pixels_per_mm": 1.6956,
-        "inner_radius_px": 254.33,
-        "outer_radius_px": 309.71
+        "status": "REJECTED_UNRELIABLE",
+        "rejection_reason": "joint_geometry_not_reliable: insufficient independent radial evidence (29/72 valid rays; 7/8 sectors).",
+        "zero_guessing_invariant": "Refused to guess unresolvable physical boundary."
       },
       "ai_segmenter": {
         "model_available": true,
@@ -517,9 +477,9 @@
       },
       "ai_classifier": {
         "model_available": true,
-        "predicted_class": "OPEN_JOINT",
+        "predicted_class": "DEPOSITS_OBSTACLES",
         "confidence": 0.4816,
-        "tolerance_overridden": true,
+        "tolerance_overridden": false,
         "distribution": {
           "NORMAL_JOINT": 0.086,
           "DISPLACED_JOINT": 0.0665,
@@ -555,14 +515,9 @@
       "is_duplicate": true,
       "duplicate_of": "test 4.jpeg",
       "opencv_measurement": {
-        "status": "ACCEPTED",
-        "overall_status": "REVIEW",
-        "mean_gap_mm": 20.74,
-        "min_gap_mm": 20.74,
-        "max_gap_mm": 20.74,
-        "pixels_per_mm": 2.0733,
-        "inner_radius_px": 311.0,
-        "outer_radius_px": 354.0
+        "status": "REJECTED_UNRELIABLE",
+        "rejection_reason": "joint_geometry_not_reliable: insufficient independent radial evidence (0/72 valid rays; 0/8 sectors).",
+        "zero_guessing_invariant": "Refused to guess unresolvable physical boundary."
       },
       "ai_segmenter": {
         "model_available": true,
@@ -571,9 +526,9 @@
       },
       "ai_classifier": {
         "model_available": true,
-        "predicted_class": "OPEN_JOINT",
+        "predicted_class": "DEPOSITS_OBSTACLES",
         "confidence": 0.3762,
-        "tolerance_overridden": true,
+        "tolerance_overridden": false,
         "distribution": {
           "NORMAL_JOINT": 0.1174,
           "DISPLACED_JOINT": 0.0949,
@@ -610,13 +565,13 @@
       "duplicate_of": "test 2.jpeg",
       "opencv_measurement": {
         "status": "ACCEPTED",
-        "overall_status": "FAIL",
-        "mean_gap_mm": 63.69,
-        "min_gap_mm": 1.81,
-        "max_gap_mm": 103.31,
-        "pixels_per_mm": 1.6552,
-        "inner_radius_px": 248.28,
-        "outer_radius_px": 353.69
+        "overall_status": "REVIEW",
+        "mean_gap_mm": null,
+        "min_gap_mm": null,
+        "max_gap_mm": null,
+        "pixels_per_mm": null,
+        "inner_radius_px": 250.22,
+        "outer_radius_px": 353.8
       },
       "ai_segmenter": {
         "model_available": true,
@@ -624,18 +579,8 @@
         "segmentation_mask_generated": true
       },
       "ai_classifier": {
-        "model_available": true,
-        "predicted_class": "OPEN_JOINT",
-        "confidence": 0.5163,
-        "tolerance_overridden": true,
-        "distribution": {
-          "NORMAL_JOINT": 0.1014,
-          "DISPLACED_JOINT": 0.066,
-          "DAMAGED_JOINT": 0.0767,
-          "INTRUDING_SEAL": 0.1296,
-          "DEPOSITS_OBSTACLES": 0.5163,
-          "DIFFICULT_CONDITION": 0.11
-        }
+        "model_available": false,
+        "error": "'>' not supported between instances of 'NoneType' and 'float'"
       },
       "rag_advisory": [
         {
@@ -665,12 +610,12 @@
       "opencv_measurement": {
         "status": "ACCEPTED",
         "overall_status": "FAIL",
-        "mean_gap_mm": 40.84,
-        "min_gap_mm": 1.08,
-        "max_gap_mm": 80.54,
-        "pixels_per_mm": 1.8499,
-        "inner_radius_px": 277.49,
-        "outer_radius_px": 353.03
+        "mean_gap_mm": 43.9,
+        "min_gap_mm": 1.1,
+        "max_gap_mm": 81.84,
+        "pixels_per_mm": 1.8207,
+        "inner_radius_px": 273.11,
+        "outer_radius_px": 353.04
       },
       "ai_segmenter": {
         "model_available": true,
@@ -717,14 +662,9 @@
       "is_duplicate": true,
       "duplicate_of": "test 5.jpeg",
       "opencv_measurement": {
-        "status": "ACCEPTED",
-        "overall_status": "PASS",
-        "mean_gap_mm": 4.12,
-        "min_gap_mm": 4.12,
-        "max_gap_mm": 4.12,
-        "pixels_per_mm": 2.6667,
-        "inner_radius_px": 400.0,
-        "outer_radius_px": 411.0
+        "status": "REJECTED_UNRELIABLE",
+        "rejection_reason": "joint_geometry_not_reliable: insufficient independent radial evidence (0/72 valid rays; 0/8 sectors).",
+        "zero_guessing_invariant": "Refused to guess unresolvable physical boundary."
       },
       "ai_segmenter": {
         "model_available": true,
@@ -733,9 +673,9 @@
       },
       "ai_classifier": {
         "model_available": true,
-        "predicted_class": "OPEN_JOINT",
+        "predicted_class": "DEPOSITS_OBSTACLES",
         "confidence": 0.4194,
-        "tolerance_overridden": true,
+        "tolerance_overridden": false,
         "distribution": {
           "NORMAL_JOINT": 0.1159,
           "DISPLACED_JOINT": 0.0869,
@@ -771,14 +711,9 @@
       "is_duplicate": true,
       "duplicate_of": "test 6.jpeg",
       "opencv_measurement": {
-        "status": "ACCEPTED",
-        "overall_status": "FAIL",
-        "mean_gap_mm": 32.66,
-        "min_gap_mm": 0.59,
-        "max_gap_mm": 64.29,
-        "pixels_per_mm": 1.6956,
-        "inner_radius_px": 254.33,
-        "outer_radius_px": 309.71
+        "status": "REJECTED_UNRELIABLE",
+        "rejection_reason": "joint_geometry_not_reliable: insufficient independent radial evidence (29/72 valid rays; 7/8 sectors).",
+        "zero_guessing_invariant": "Refused to guess unresolvable physical boundary."
       },
       "ai_segmenter": {
         "model_available": true,
@@ -787,9 +722,9 @@
       },
       "ai_classifier": {
         "model_available": true,
-        "predicted_class": "OPEN_JOINT",
+        "predicted_class": "DEPOSITS_OBSTACLES",
         "confidence": 0.4816,
-        "tolerance_overridden": true,
+        "tolerance_overridden": false,
         "distribution": {
           "NORMAL_JOINT": 0.086,
           "DISPLACED_JOINT": 0.0665,
@@ -825,14 +760,9 @@
       "is_duplicate": true,
       "duplicate_of": "test 1.jpeg",
       "opencv_measurement": {
-        "status": "ACCEPTED",
-        "overall_status": "FAIL",
-        "mean_gap_mm": 31.32,
-        "min_gap_mm": 3.17,
-        "max_gap_mm": 83.6,
-        "pixels_per_mm": 1.5789,
-        "inner_radius_px": 236.83,
-        "outer_radius_px": 286.28
+        "status": "REJECTED_UNRELIABLE",
+        "rejection_reason": "joint_geometry_not_reliable: insufficient independent radial evidence (16/72 valid rays; 3/8 sectors).",
+        "zero_guessing_invariant": "Refused to guess unresolvable physical boundary."
       },
       "ai_segmenter": {
         "model_available": true,
@@ -841,9 +771,9 @@
       },
       "ai_classifier": {
         "model_available": true,
-        "predicted_class": "OPEN_JOINT",
+        "predicted_class": "DEPOSITS_OBSTACLES",
         "confidence": 0.3655,
-        "tolerance_overridden": true,
+        "tolerance_overridden": false,
         "distribution": {
           "NORMAL_JOINT": 0.1247,
           "DISPLACED_JOINT": 0.0993,
@@ -879,14 +809,9 @@
       "is_duplicate": false,
       "duplicate_of": null,
       "opencv_measurement": {
-        "status": "ACCEPTED",
-        "overall_status": "REVIEW",
-        "mean_gap_mm": 0.93,
-        "min_gap_mm": 0.93,
-        "max_gap_mm": 0.93,
-        "pixels_per_mm": 2.1467,
-        "inner_radius_px": 322.0,
-        "outer_radius_px": 324.0
+        "status": "REJECTED_UNRELIABLE",
+        "rejection_reason": "joint_geometry_not_reliable: insufficient independent radial evidence (0/72 valid rays; 0/8 sectors).",
+        "zero_guessing_invariant": "Refused to guess unresolvable physical boundary."
       },
       "ai_segmenter": {
         "model_available": true,
@@ -934,13 +859,13 @@
       "duplicate_of": null,
       "opencv_measurement": {
         "status": "ACCEPTED",
-        "overall_status": "FAIL",
-        "mean_gap_mm": 44.78,
-        "min_gap_mm": 1.72,
-        "max_gap_mm": 120.47,
-        "pixels_per_mm": 1.7432,
-        "inner_radius_px": 261.49,
-        "outer_radius_px": 339.56
+        "overall_status": "REVIEW",
+        "mean_gap_mm": null,
+        "min_gap_mm": null,
+        "max_gap_mm": null,
+        "pixels_per_mm": null,
+        "inner_radius_px": 263.53,
+        "outer_radius_px": 334.72
       },
       "ai_segmenter": {
         "model_available": true,
@@ -948,18 +873,8 @@
         "segmentation_mask_generated": true
       },
       "ai_classifier": {
-        "model_available": true,
-        "predicted_class": "OPEN_JOINT",
-        "confidence": 0.3845,
-        "tolerance_overridden": true,
-        "distribution": {
-          "NORMAL_JOINT": 0.1262,
-          "DISPLACED_JOINT": 0.0953,
-          "DAMAGED_JOINT": 0.1058,
-          "INTRUDING_SEAL": 0.1532,
-          "DEPOSITS_OBSTACLES": 0.3845,
-          "DIFFICULT_CONDITION": 0.135
-        }
+        "model_available": false,
+        "error": "'>' not supported between instances of 'NoneType' and 'float'"
       },
       "rag_advisory": [
         {

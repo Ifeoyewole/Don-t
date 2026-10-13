@@ -1,0 +1,56 @@
+steps:
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'bash'
+    secretEnv: ['SEWER_PASSWORD']
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        echo "=== Fetching Sewer-ML Metadata and Original Annotations ==="
+        BASE_URL="https://sciencedata.dk/public/Large%20AAU%20files/Sewer_ML"
+
+        mkdir -p /tmp/meta /tmp/ann
+
+        echo "--- Downloading LICENSE.txt ---"
+        curl --location-trusted -u "operator:$${SEWER_PASSWORD}" -f -s -S -o /tmp/meta/LICENSE.txt "$${BASE_URL}/LICENSE.txt"
+
+        echo "--- Downloading README.txt ---"
+        curl --location-trusted -u "operator:$${SEWER_PASSWORD}" -f -s -S -o /tmp/meta/README.txt "$${BASE_URL}/README.txt"
+
+        echo "--- Downloading SewerML_Val.csv ---"
+        curl --location-trusted -u "operator:$${SEWER_PASSWORD}" -f -s -S -o /tmp/ann/SewerML_Val.csv "$${BASE_URL}/SewerML_Val.csv"
+
+        echo "--- Downloading SewerML_Test.csv ---"
+        curl --location-trusted -u "operator:$${SEWER_PASSWORD}" -f -s -S -o /tmp/ann/SewerML_Test.csv "$${BASE_URL}/SewerML_Test.csv"
+
+        echo "--- Downloading SewerML_Train.csv ---"
+        curl --location-trusted -u "operator:$${SEWER_PASSWORD}" -f -s -S -o /tmp/ann/SewerML_Train.csv "$${BASE_URL}/SewerML_Train.csv"
+
+        echo "=== Downloaded files summary ==="
+        ls -lh /tmp/meta /tmp/ann
+
+        echo "=== Checksums ==="
+        sha256sum /tmp/meta/* /tmp/ann/*
+
+        echo "=== Header of SewerML_Train.csv ==="
+        head -n 5 /tmp/ann/SewerML_Train.csv
+
+        echo "=== Line counts ==="
+        wc -l /tmp/ann/*.csv
+
+        echo "=== Uploading source-metadata to GCS ==="
+        gcloud storage cp /tmp/meta/* gs://joint-inspection-510310-data/datasets/sewer-ml/source-metadata/
+
+        echo "=== Uploading original-annotations to GCS ==="
+        gcloud storage cp /tmp/ann/* gs://joint-inspection-510310-data/datasets/sewer-ml/original-annotations/
+
+        echo "=== Metadata and Annotations Ingestion Complete ==="
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/joint-inspection-510310/secrets/sewer-ml-download-password/versions/latest
+      env: 'SEWER_PASSWORD'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'

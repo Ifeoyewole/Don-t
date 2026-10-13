@@ -1,0 +1,51 @@
+steps:
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        gcloud storage cp gs://joint-inspection-510310-data/datasets/sewer-ml/scripts/train_sewer_condition_classifier.py /workspace/train.py
+        gcloud storage cp gs://joint-inspection-510310-data/datasets/sewer-ml/splits/train/curated_train.csv /workspace/curated_train.csv
+        gcloud storage cp gs://joint-inspection-510310-data/datasets/sewer-ml/splits/validation/curated_val.csv /workspace/curated_val.csv
+        mkdir -p /workspace/images
+        echo "Staging a pilot subset of curated images for smoke training..."
+        gcloud storage cp -r "gs://joint-inspection-510310-data/datasets/sewer-ml/curated/images/00000*.png" /workspace/images/ || true
+        echo "Pilot images staged: $(ls -1 /workspace/images/ | wc -l)"
+
+  - name: 'python:3.10'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        apt-get update && apt-get install -y libgl1 libglib2.0-0 || true
+        pip install --no-cache-dir torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
+        pip install --no-cache-dir opencv-python-headless numpy onnx onnxscript google-cloud-storage
+        mkdir -p /workspace/output
+        python3 /workspace/train.py \
+          --images-dir /workspace/images \
+          --train-csv /workspace/curated_train.csv \
+          --val-csv /workspace/curated_val.csv \
+          --output-dir /workspace/output \
+          --epochs 2 \
+          --batch-size 16 \
+          --lr 0.001 \
+          --version sewer-condition-v1.0.0-smoke \
+          --smoke
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        echo "=== Uploading smoke candidate artifacts to GCS ==="
+        gcloud storage cp -r /workspace/output/* gs://joint-inspection-510310-data/models/candidates/sewer-condition-v1/smoke/
+        echo "Smoke training artifacts uploaded successfully."
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+timeout: '1800s'

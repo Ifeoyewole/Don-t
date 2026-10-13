@@ -1,0 +1,83 @@
+steps:
+  - name: 'python:3.10-slim'
+    entrypoint: 'python3'
+    secretEnv: ['SEWER_PASSWORD']
+    args:
+      - '-c'
+      - |
+        import os, urllib.request, base64, io, zipfile
+
+        pwd = os.environ.get("SEWER_PASSWORD", "").strip()
+        base_url = "https://sciencedata.dk/public/Large%20AAU%20files/Sewer_ML"
+        auth = "Basic " + base64.b64encode(f"operator:{pwd}".encode()).decode()
+
+        def inspect_zip_filenames(archive_name, tail_bytes=4*1024*1024):
+            url = f"{base_url}/{archive_name}"
+            # 1. Get file size
+            req = urllib.request.Request(url, headers={"Authorization": auth}, method="HEAD")
+            with urllib.request.urlopen(req, timeout=30) as r:
+                total_len = int(r.headers.get("Content-Length", 0))
+
+            print(f"=== Inspecting {archive_name} (Total: {total_len / (1024**3):.2f} GB) ===")
+            # 2. Fetch last tail_bytes
+            start_range = max(0, total_len - tail_bytes)
+            range_header = f"bytes={start_range}-{total_len - 1}"
+            req2 = urllib.request.Request(url, headers={"Authorization": auth, "Range": range_header})
+            
+            class RangeSeeker:
+                def __init__(self, tail_data, total_size, start_offset):
+                    self.tail_data = tail_data
+                    self.total_size = total_size
+                    self.start_offset = start_offset
+                    self.pos = 0
+
+                def seek(self, offset, whence=io.SEEK_SET):
+                    if whence == io.SEEK_SET:
+                        self.pos = offset
+                    elif whence == io.SEEK_CUR:
+                        self.pos += offset
+                    elif whence == io.SEEK_END:
+                        self.pos = self.total_size + offset
+                    return self.pos
+
+                def tell(self):
+                    return self.pos
+
+                def read(self, size=-1):
+                    if self.pos < self.start_offset:
+                        # fetch on demand
+                        fetch_size = min(size if size > 0 else 65536, self.start_offset - self.pos)
+                        r = urllib.request.Request(url, headers={"Authorization": auth, "Range": f"bytes={self.pos}-{self.pos + fetch_size - 1}"})
+                        with urllib.request.urlopen(r, timeout=30) as resp:
+                            data = resp.read()
+                        self.pos += len(data)
+                        return data
+                    rel = self.pos - self.start_offset
+                    chunk = self.tail_data[rel: rel + size] if size > 0 else self.tail_data[rel:]
+                    self.pos += len(chunk)
+                    return chunk
+
+            with urllib.request.urlopen(req2, timeout=60) as resp2:
+                tail = resp2.read()
+
+            seeker = RangeSeeker(tail, total_len, start_range)
+            zf = zipfile.ZipFile(seeker)
+            names = zf.namelist()
+            print(f"Total files in {archive_name}: {len(names)}")
+            print("First 5 files:", names[:5])
+            print("Last 5 files:", names[-5:])
+            return names
+
+        for arch in ["valid00.zip", "valid01.zip", "train00.zip", "test00.zip"]:
+            try:
+                inspect_zip_filenames(arch, 8*1024*1024)
+            except Exception as e:
+                print(f"Error inspecting {arch}: {e}")
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/joint-inspection-510310/secrets/sewer-ml-download-password/versions/latest
+      env: 'SEWER_PASSWORD'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

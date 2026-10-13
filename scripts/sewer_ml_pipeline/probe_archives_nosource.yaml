@@ -1,0 +1,34 @@
+steps:
+  - name: 'python:3.10-slim'
+    entrypoint: 'python3'
+    secretEnv: ['SEWER_PASSWORD']
+    args:
+      - '-c'
+      - |
+        import os, urllib.request, base64
+        pwd = os.environ.get("SEWER_PASSWORD", "").strip()
+        base_url = "https://sciencedata.dk/public/Large%20AAU%20files/Sewer_ML"
+        auth = "Basic " + base64.b64encode(f"operator:{pwd}".encode()).decode()
+        files = ["LICENSE.txt", "README.txt", "SewerML_Test.csv", "SewerML_Train.csv", "SewerML_Val.csv", "test00.zip", "test01.zip", "valid00.zip", "valid01.zip"] + [f"train{i:02d}.zip" for i in range(14)]
+        print(f"{'Filename':<20} | {'Bytes':<15} | {'Size (GB)':<10}")
+        print("-" * 50)
+        tot = 0
+        for f in files:
+            req = urllib.request.Request(f"{base_url}/{f}", headers={"Authorization": auth}, method="HEAD")
+            try:
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    cl = int(r.headers.get("Content-Length", 0))
+                    tot += cl
+                    print(f"{f:<20} | {cl:<15} | {cl/(1024**3):<10.3f} GB")
+            except Exception as e:
+                print(f"{f:<20} | ERROR: {e}")
+        print("-" * 50)
+        print(f"TOTAL: {tot/(1024**3):.2f} GB ({tot} bytes)")
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/joint-inspection-510310/secrets/sewer-ml-download-password/versions/latest
+      env: 'SEWER_PASSWORD'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

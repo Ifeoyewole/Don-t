@@ -1,0 +1,25 @@
+steps:
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'bash'
+    secretEnv: ['SEWER_PASSWORD']
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        echo "=== Verifying authorized Sewer-ML source access from GCP Worker ==="
+        curl --location-trusted -u "operator:$${SEWER_PASSWORD}" -f -s -S -o /tmp/FILELIST.txt "https://sciencedata.dk/public/Large%20AAU%20files/Sewer_ML/FILELIST.txt"
+        echo "Successfully downloaded FILELIST.txt. Total lines: $$(wc -l < /tmp/FILELIST.txt)"
+        ls -lh /tmp/FILELIST.txt
+        echo "=== Structure of Sewer-ML repository ==="
+        cat /tmp/FILELIST.txt
+        echo "=== Uploading FILELIST.txt to GCS source-metadata ==="
+        gcloud storage cp /tmp/FILELIST.txt gs://joint-inspection-510310-data/datasets/sewer-ml/source-metadata/FILELIST.txt
+        echo "=== Source metadata upload verified ==="
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/joint-inspection-510310/secrets/sewer-ml-download-password/versions/latest
+      env: 'SEWER_PASSWORD'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
