@@ -1,0 +1,19 @@
+steps:
+  - name: 'python:3.10'
+    entrypoint: 'bash'
+    secretEnv: ['SEWER_PASSWORD']
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        pip install --no-cache-dir google-cloud-storage
+        python scripts/sewer_ml_pipeline/extract_locked_test_images.py
+availableSecrets:
+  secretManager:
+    - versionName: projects/joint-inspection-510310/secrets/sewer-ml-download-password/versions/latest
+      env: 'SEWER_PASSWORD'
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: 75
+timeout: '7200s'
