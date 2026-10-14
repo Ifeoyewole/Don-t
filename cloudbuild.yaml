@@ -56,7 +56,7 @@ steps:
       - '--no-allow-unauthenticated'
       - '--max-instances=10'
       - '--concurrency=80'
-      - '--timeout=60s'
+      - '--timeout=120s'
       - '--set-env-vars=ENVIRONMENT=production,ENABLE_DOCS=false,CALIBRATION_MUTATION_ENABLED=false,WRC_BASELINE_ENABLED=true,WRC_BASELINE_PATH=/app/backend/models/wrc_inceptionresnetv2_baseline_v1.onnx'
 
 images:

@@ -28,7 +28,7 @@ type DraftOverride = {
 const sourceLabels: Record<MeasurementSource, string> = {
   fastapi: 'Optical CV Engine',
   cv: 'CV Measured',
-  'offline-preview': 'Offline preview (unverified)',
+  'offline-preview': 'LOCAL CV PREVIEW — NOT VERIFIED',
   'ai-assisted': 'AI assisted',
   'ai-review': 'AI review',
   manual: 'Manual override',
@@ -59,15 +59,9 @@ const measurementLabel = (item: InspectionResult) => {
 const sourceLabel = (item: InspectionResult) => sourceLabels[item.measurementSource ?? 'cv']
 
 const measurementValueLabel = (item: InspectionResult) => {
-  if (item.measurementSource === 'ai-review') {
-    return item.cvDebug?.gapPixels ? `${item.cvDebug.gapPixels.toFixed(1)} px gap - calibrate for mm` : 'Calibration needed'
-  }
-
-  if (item.measurementSource === 'ai-assisted' && !item.cvDebug?.pipeDetected) {
-    return `~${item.finalGapMm.toFixed(1)} mm from ${item.cvDebug?.gapPixels?.toFixed(1) ?? '--'} px`
-  }
-
-  return `${item.finalGapMm.toFixed(1)} mm`
+  if (item.authoritativeGapMm != null) return `${item.authoritativeGapMm.toFixed(1)} mm`
+  if (item.cvDebug?.gapPixels != null) return `${item.cvDebug.gapPixels.toFixed(1)} px — physical gap unavailable`
+  return 'Measurement unavailable'
 }
 
 const toSmoothPath = (points: Array<{ x: number; y: number }>) => {
@@ -298,17 +292,18 @@ const ResultCard = ({
                 padding: '2px 6px',
                 borderRadius: '4px',
                 fontWeight: 600,
-                background: item.rejectionReason?.includes('temporarily unavailable')
-                  ? 'rgba(239, 68, 68, 0.15)'
-                  : 'rgba(34, 197, 94, 0.15)',
-                color: item.rejectionReason?.includes('temporarily unavailable') ? '#ef4444' : '#22c55e'
+                background: item.semanticGate?.domainStatus === 'PIPE_JOINT_INSPECTION' && item.semanticGate.processingAllowed === true
+                  ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                color: item.semanticGate?.domainStatus === 'PIPE_JOINT_INSPECTION' && item.semanticGate.processingAllowed === true ? '#22c55e' : '#ef4444'
               }}>
                 Vertex AI (Gemini 2.5)
               </span>
             </div>
-            {item.rejectionReason?.includes('temporarily unavailable') ? (
+            {!item.semanticGate ? (
+              <div style={{ marginTop: '4px', color: '#f59e0b' }}>Semantic validation not reported by the backend.</div>
+            ) : item.semanticGate.domainStatus !== 'PIPE_JOINT_INSPECTION' || item.semanticGate.processingAllowed !== true ? (
               <div style={{ marginTop: '4px', color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>AI image validation is temporarily unavailable. Retry validation.</span>
+                <span>{item.semanticGate.userMessage || item.semanticGate.reason || `Validation state: ${item.semanticGate.domainStatus ?? 'UNAVAILABLE'}`}</span>
                 <button
                   className="button button-ghost"
                   style={{ padding: '2px 8px', fontSize: '0.75rem' }}
@@ -321,7 +316,7 @@ const ResultCard = ({
               </div>
             ) : (
               <div style={{ marginTop: '2px', color: '#cbd5e1' }}>
-                Scene validated as pipe joint inspection. Fail-closed semantic gate active.
+                {item.semanticGate.observation || `Validated by ${item.semanticGate.provider ?? 'semantic service'} ${item.semanticGate.model ?? ''}.`}
               </div>
             )}
           </div>
@@ -340,14 +335,14 @@ const ResultCard = ({
               <div>
                 <span style={{ color: '#64748b' }}>Geometry Tier: </span>
                 <strong style={{ color: (item.geometryTier || item.cvDebug?.geometryTier) === 'ACCEPTABLE_GEOMETRY' ? '#22c55e' : (item.geometryTier || item.cvDebug?.geometryTier) === 'PARTIAL_REVIEW_GEOMETRY' ? '#f59e0b' : '#ef4444' }}>
-                  {item.geometryTier || item.cvDebug?.geometryTier || 'ACCEPTABLE_GEOMETRY'}
+                  {item.geometryTier || item.cvDebug?.geometryTier || 'NOT_REPORTED'}
                 </strong>
               </div>
               <div>
                 <span style={{ color: '#64748b' }}>Detected Gap: </span>
                 <strong>
-                  {item.cvDebug?.gapPixels ? `${item.cvDebug.gapPixels.toFixed(1)} px` : '-- px'}
-                  {item.candidateGapMm ? ` (~${item.candidateGapMm.toFixed(1)} mm candidate)` : ''}
+                  {item.cvDebug?.gapPixels != null ? `${item.cvDebug.gapPixels.toFixed(1)} px` : 'NOT REPORTED'}
+                  {item.candidateGapMm != null ? ` (~${item.candidateGapMm.toFixed(1)} mm candidate)` : ''}
                 </strong>
               </div>
             </div>
@@ -373,11 +368,11 @@ const ResultCard = ({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '4px' }}>
               <div>
                 <span style={{ color: '#64748b' }}>Source: </span>
-                <span>{item.calibrationProfile?.source || item.cvDebug?.calibrationProfile?.source || 'PROJECT_METADATA'}</span>
+                <span>{item.calibrationProfile?.source || item.cvDebug?.calibrationProfile?.source || 'NOT REPORTED'}</span>
               </div>
               <div>
                 <span style={{ color: '#64748b' }}>Reference ID: </span>
-                <span>{item.calibrationProfile?.calibration_reference_id || item.cvDebug?.calibrationProfile?.calibration_reference_id || 'CAL-PROJ-300MM'}</span>
+                <span>{item.calibrationProfile?.calibration_reference_id || item.cvDebug?.calibrationProfile?.calibration_reference_id || 'NOT REPORTED'}</span>
               </div>
             </div>
           </div>
@@ -393,11 +388,11 @@ const ResultCard = ({
                 fontWeight: 700,
                 color: item.status === 'PASS' ? '#22c55e' : item.status === 'FAIL' ? '#ef4444' : '#f59e0b'
               }}>
-                {item.status} ({item.authoritativeGapMm ? `${item.authoritativeGapMm.toFixed(1)} mm` : (item.finalGapMm > 0 ? `${item.finalGapMm.toFixed(1)} mm` : 'Mm Withheld')})
+                {item.status} ({item.authoritativeGapMm != null ? `${item.authoritativeGapMm.toFixed(1)} mm` : 'Physical mm unavailable'})
               </span>
             </div>
             <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '2px' }}>
-              {item.authoritativeReason || item.cvDebug?.authoritativeReason || 'Based solely on verified physical measurement + configured tolerance.'}
+              {item.authoritativeReason || item.cvDebug?.authoritativeReason || 'Engineering result not reported.'}
             </div>
           </div>
 
@@ -426,11 +421,11 @@ const ResultCard = ({
               if (!evidence) {
                 return <div style={{ color: '#64748b', marginTop: '2px' }}>Classifier evidence unavailable</div>;
               }
-              const rawName = evidence.raw_prediction || evidence.raw_class_name || 'Normal';
+              const rawName = evidence.raw_prediction || evidence.raw_class_name || 'NOT REPORTED';
               const rawCode = evidence.raw_code || evidence.raw_class_code || '';
               const conf = Math.round((evidence.confidence ?? 0) * 100);
-              const mapped = evidence.mapped_condition || evidence.jointinspect_mapping || item.condition || 'normal_joint';
-              const mapStatus = evidence.mapping_status || 'DIRECT';
+              const mapped = evidence.mapped_condition || evidence.jointinspect_mapping || item.condition || 'NOT REPORTED';
+              const mapStatus = evidence.mapping_status || 'NOT REPORTED';
 
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
@@ -470,7 +465,7 @@ const ResultCard = ({
               </span>
             </div>
             <div style={{ color: '#e2e8f0', fontSize: '0.78rem', marginTop: '4px', lineHeight: 1.4, background: 'rgba(0,0,0,0.2)', padding: '6px 8px', borderRadius: '4px' }}>
-              {item.aiExplanation || item.cvDebug?.aiExplanation || item.measurementNote || 'Scene evaluated by Vertex semantic gatekeeper; physical geometry verified by OpenCV and classified against WRc sewer defect baseline.'}
+              {item.aiExplanation || item.cvDebug?.aiExplanation || 'Backend explanation unavailable.'}
             </div>
           </div>
         </div>

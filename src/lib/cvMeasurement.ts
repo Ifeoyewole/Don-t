@@ -8,6 +8,9 @@ import type {
   MeasurementOverlayHints,
   MeasurementResultStatus,
   MeasurementSource,
+  SemanticGateEvidence,
+  ExecutionSource,
+  JointGeometryType,
 } from '../types'
 import { loadOpenCv } from './opencv'
 import { classifyGap } from '../utils'
@@ -23,6 +26,7 @@ export interface CvWorkerRequest {
   calibrationVerified?: boolean
   calibrationReferenceId?: string
   projectId?: string
+  jointType?: JointGeometryType
 }
 
 export interface CvWorkerResponse {
@@ -46,6 +50,10 @@ export interface CvWorkerResponse {
   engineeringResult?: string
   authoritativeReason?: string
   aiExplanation?: string
+  semanticGate?: SemanticGateEvidence
+  executionSource?: ExecutionSource
+  executionErrorCode?: string
+  jointType?: JointGeometryType
 }
 
 // Uncalibrated measurements cannot assume default 225mm pipe diameter

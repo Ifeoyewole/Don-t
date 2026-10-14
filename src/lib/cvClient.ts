@@ -104,6 +104,8 @@ interface FastApiMeasurementPayload {
   min_gap_mm?: number | null
   max_gap_mm?: number | null
   mean_gap_px?: number | null
+  min_gap_px?: number | null
+  max_gap_px?: number | null
   candidate_gap_mm?: number | null
   authoritative_gap_mm?: number | null
   engineering_result?: string
@@ -134,7 +136,8 @@ interface FastApiMeasurementPayload {
   timestamp?: string
 }
 
-const FASTAPI_MEASURE_TIMEOUT_MS = 10000
+// Must remain below the 120s Vercel/Cloud Run ceiling configured for this route.
+export const FASTAPI_MEASURE_TIMEOUT_MS = 110000
 const CV_WORKER_WARMUP_TIMEOUT_MS = 30000
 const CV_WORKER_MEASURE_TIMEOUT_MS = 30000
 
@@ -247,7 +250,7 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
     if (request.projectId) {
       formData.append('project_id', request.projectId)
     }
-    formData.append('joint_type', 'CIRCULAR_OPENING')
+    formData.append('joint_type', request.jointType ?? 'CIRCULAR_OPENING')
     formData.append('return_debug_image', 'false')
 
     const response = await fetch('/api/v1/cv/measure', {
@@ -258,11 +261,16 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '')
-      throw new Error(`FastAPI measurement endpoint returned HTTP ${response.status}: ${errorText || response.statusText}`)
+      const code = response.status === 401 || response.status === 403 ? 'AUTHENTICATION_ERROR'
+        : response.status === 429 ? 'RATE_LIMITED'
+        : response.status >= 500 ? 'SERVER_ERROR'
+        : 'HTTP_ERROR'
+      throw new CloudMeasurementError(code, `Cloud measurement returned HTTP ${response.status}: ${errorText || response.statusText}`, response.status)
     }
 
     const data: FastApiMeasurementPayload = await response.json()
-    const gapMm = Number((data.authoritative_gap_mm ?? data.candidate_gap_mm ?? data.mean_gap_mm ?? data.debug_info?.raw_mean_gap_mm ?? 0).toFixed(1))
+    const reportedGapMm = data.authoritative_gap_mm ?? data.candidate_gap_mm ?? data.mean_gap_mm ?? data.debug_info?.raw_mean_gap_mm
+    const gapMm = reportedGapMm == null ? 0 : Number(reportedGapMm.toFixed(1))
     const status: InspectionStatus =
       data.overall_status === 'CALIBRATION_REQUIRED' || data.result_status === 'REJECTED_UNRELIABLE' || data.overall_status === 'REVIEW'
         ? 'REVIEW'
@@ -319,10 +327,9 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
       innerRadiusPx: data.debug_info?.inner_radius_px ?? data.overlay_hints?.inner_circle?.radius_px,
       outerRadiusPx: data.debug_info?.outer_radius_px ?? data.overlay_hints?.outer_circle?.radius_px,
       visibleSectors: data.debug_info?.num_samples,
-      gapPixels:
-        data.debug_info?.inner_radius_px && data.debug_info?.outer_radius_px
-          ? Number((data.debug_info.outer_radius_px - data.debug_info.inner_radius_px).toFixed(1))
-          : undefined,
+      gapPixels: data.mean_gap_px ?? undefined,
+      minGapPixels: data.min_gap_px ?? undefined,
+      maxGapPixels: data.max_gap_px ?? undefined,
       overlayHints,
       resultStatus: data.result_status,
       condition: data.condition,
@@ -338,6 +345,8 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
       calibrationProfile: data.calibration_profile,
       externalClassifier: data.external_classifier,
       modelComparison: data.model_comparison,
+      semanticGate: mapSemanticGate(data.semantic_gate),
+      jointType: (data.joint_type ?? request.jointType) as CvWorkerResponse['jointType'],
     }
 
     const note =
@@ -366,7 +375,16 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
       engineeringResult: data.engineering_result,
       authoritativeReason: data.authoritative_reason,
       aiExplanation: data.ai_explanation,
+      semanticGate: mapSemanticGate(data.semantic_gate),
+      executionSource: 'CLOUD_AUTHORITATIVE',
+      jointType: (data.joint_type ?? request.jointType) as CvWorkerResponse['jointType'],
     }
+  } catch (error) {
+    if (error instanceof CloudMeasurementError) throw error
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new CloudMeasurementError('TIMEOUT', `Cloud measurement exceeded ${FASTAPI_MEASURE_TIMEOUT_MS / 1000} seconds.`)
+    }
+    throw new CloudMeasurementError('CONNECTION_ERROR', error instanceof Error ? error.message : 'Cloud measurement connection failed.')
   } finally {
     clearTimeout(timeoutId)
   }
@@ -445,10 +463,37 @@ export async function measureWithWebWorker(request: CvWorkerRequest): Promise<Cv
 }
 
 export async function measureWithCv(request: CvWorkerRequest): Promise<CvWorkerResponse> {
-  try {
-    return await measureWithFastApi(request)
-  } catch (error) {
-    console.warn('[cvClient] FastAPI unavailable, falling back to in-browser Web Worker', error)
-    return await measureWithWebWorker(request)
+  return measureWithFastApi(request)
+}
+
+export async function measureLocalPreview(request: CvWorkerRequest): Promise<CvWorkerResponse> {
+  const result = await measureWithWebWorker(request)
+  return { ...result, status: 'REVIEW', measurementSource: 'offline-preview', executionSource: 'LOCAL_PREVIEW_UNVERIFIED', authoritativeGapMm: null, engineeringResult: 'REVIEW' }
+}
+
+export type CloudMeasurementErrorCode = 'TIMEOUT' | 'CONNECTION_ERROR' | 'AUTHENTICATION_ERROR' | 'RATE_LIMITED' | 'SERVER_ERROR' | 'HTTP_ERROR'
+export class CloudMeasurementError extends Error {
+  readonly code: CloudMeasurementErrorCode
+  readonly status?: number
+  constructor(code: CloudMeasurementErrorCode, message: string, status?: number) {
+    super(message)
+    this.name = 'CloudMeasurementError'
+    this.code = code
+    this.status = status
+  }
+}
+
+function mapSemanticGate(raw: Record<string, unknown> | null | undefined): CvWorkerResponse['semanticGate'] {
+  if (!raw) return undefined
+  return {
+    domainStatus: typeof raw.domain_status === 'string' ? raw.domain_status as NonNullable<CvWorkerResponse['semanticGate']>['domainStatus'] : undefined,
+    processingAllowed: typeof raw.processing_allowed === 'boolean' ? raw.processing_allowed : undefined,
+    confidence: typeof raw.confidence === 'number' ? raw.confidence : undefined,
+    provider: typeof raw.provider === 'string' ? raw.provider : undefined,
+    model: typeof raw.model === 'string' ? raw.model : undefined,
+    reason: typeof raw.reason === 'string' ? raw.reason : undefined,
+    userMessage: typeof raw.user_message === 'string' ? raw.user_message : undefined,
+    observation: typeof raw.observation === 'string' ? raw.observation : undefined,
+    error: typeof raw.error === 'string' ? raw.error : undefined,
   }
 }

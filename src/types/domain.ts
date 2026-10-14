@@ -20,6 +20,20 @@ export type InspectionDomainStatus =
   | 'LOW_QUALITY_IMAGE'
   | 'UNSUPPORTED_IMAGE'
 export type MeasurementSource = 'fastapi' | 'cv' | 'offline-preview' | 'ai-assisted' | 'ai-review' | 'manual' | 'fallback'
+export type ExecutionSource = 'CLOUD_AUTHORITATIVE' | 'CLOUD_PENDING' | 'CLOUD_FAILED' | 'LOCAL_PREVIEW_UNVERIFIED'
+export type JointGeometryType = 'CIRCULAR_OPENING' | 'HORIZONTAL_SEAM' | 'VERTICAL_SEAM'
+export type GeometrySelectionProvenance = 'INSPECTOR_SELECTED' | 'EVIDENCE_SUGGESTED' | 'LEGACY_DEFAULT'
+export interface SemanticGateEvidence {
+  domainStatus?: InspectionDomainStatus | 'DOMAIN_VALIDATION_UNAVAILABLE'
+  processingAllowed?: boolean
+  confidence?: number
+  provider?: string
+  model?: string
+  reason?: string
+  userMessage?: string
+  observation?: string
+  error?: string
+}
 
 export type MeasurementResultStatus =
   | 'ACCEPTED_MEASUREMENT'
@@ -62,6 +76,8 @@ export interface CvMeasurementDebug {
   innerRadiusPx?: number
   outerRadiusPx?: number
   gapPixels?: number
+  minGapPixels?: number
+  maxGapPixels?: number
   gapPixelSamples?: number[]
   mmPerPixel?: number
   visibleSectors?: number
@@ -83,6 +99,8 @@ export interface CvMeasurementDebug {
   engineeringResult?: string
   authoritativeReason?: string
   aiExplanation?: string
+  semanticGate?: SemanticGateEvidence
+  jointType?: JointGeometryType
 }
 
 export interface CalibrationProfile {
@@ -315,6 +333,11 @@ export interface InspectionResult {
   engineeringResult?: string
   authoritativeReason?: string
   aiExplanation?: string
+  semanticGate?: SemanticGateEvidence
+  executionSource?: ExecutionSource
+  executionErrorCode?: string
+  jointType?: JointGeometryType
+  geometrySelectionProvenance?: GeometrySelectionProvenance
 }
 
 export interface ApplyOverrideInput {
@@ -354,6 +377,9 @@ export interface ProcessOptions {
   projectId?: string
   pipeDiameterMm?: number
   calibrationProfile?: CalibrationProfile
+  jointType?: JointGeometryType
+  geometrySelectionProvenance?: GeometrySelectionProvenance
+  executionMode?: 'cloud' | 'local-preview'
 }
 
 export interface ProcessBatchResult {
