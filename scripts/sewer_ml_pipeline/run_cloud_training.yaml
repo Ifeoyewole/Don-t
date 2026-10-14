@@ -21,7 +21,7 @@ steps:
         set -euo pipefail
         apt-get update && apt-get install -y libgl1 libglib2.0-0 || true
         pip install --no-cache-dir torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
-        pip install --no-cache-dir opencv-python-headless numpy onnx onnxscript google-cloud-storage
+        pip install --no-cache-dir opencv-python-headless numpy onnx onnxruntime onnxscript google-cloud-storage
         mkdir -p /workspace/output
         python3 /workspace/train.py \
           --images-dir /workspace/images \
