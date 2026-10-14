@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -94,3 +95,50 @@ def validate_onnx_artifact(model_path: Path, native_outputs: np.ndarray, sample_
     if max_abs_error > tolerance:
         raise ValueError(f"PyTorch/ONNX parity failed: {max_abs_error} > {tolerance}")
     return {"sha256": hashlib.sha256(model_path.read_bytes()).hexdigest(), "max_abs_error": max_abs_error, "runtime": "onnxruntime-cpu"}
+
+
+def audit_split_leakage(splits: dict[str, Sequence[dict[str, Any]]]) -> dict[str, Any]:
+    """Finds filename/source-group overlap and emits a deterministic manifest digest."""
+    normalized: dict[str, set[str]] = {}
+    source_groups: dict[str, set[str]] = {}
+    manifest_rows = []
+    for split, rows in sorted(splits.items()):
+        normalized[split] = set()
+        source_groups[split] = set()
+        for row in rows:
+            filename = str(row.get("Filename", "")).strip().casefold()
+            group = str(row.get("source_group") or row.get("video_id") or row.get("archive") or "").strip().casefold()
+            if filename:
+                normalized[split].add(filename)
+            if group:
+                source_groups[split].add(group)
+            manifest_rows.append({"split": split, "filename": filename, "source_group": group})
+    overlaps = []
+    names = sorted(normalized)
+    for left_index, left in enumerate(names):
+        for right in names[left_index + 1:]:
+            duplicate_names = sorted(normalized[left] & normalized[right])
+            duplicate_groups = sorted(source_groups[left] & source_groups[right])
+            if duplicate_names or duplicate_groups:
+                overlaps.append({"left": left, "right": right, "filenames": duplicate_names, "source_groups": duplicate_groups})
+    payload = json.dumps(manifest_rows, sort_keys=True, separators=(",", ":")).encode()
+    return {"manifest_sha256": hashlib.sha256(payload).hexdigest(), "split_counts": {name: len(rows) for name, rows in splits.items()}, "overlaps": overlaps, "leakage_detected": bool(overlaps)}
+
+
+def compare_same_input_predictions(
+    ground_truth: np.ndarray,
+    predictions: dict[str, np.ndarray],
+    concept_indices: dict[str, Sequence[int]],
+) -> dict[str, Any]:
+    """Evaluates precomputed model decisions on one ordered image manifest."""
+    truth = np.asarray(ground_truth)
+    report: dict[str, Any] = {"sample_count": int(truth.shape[0]), "models": {}}
+    for model_name, model_predictions in predictions.items():
+        pred = np.asarray(model_predictions)
+        if pred.shape != truth.shape:
+            raise ValueError(f"{model_name} predictions do not match the common ground-truth shape")
+        report["models"][model_name] = {
+            concept: grouped_binary_metrics(truth, pred, indices)
+            for concept, indices in concept_indices.items()
+        }
+    return report
