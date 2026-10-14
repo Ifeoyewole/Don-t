@@ -408,6 +408,7 @@ def train_sewer_condition_classifier(
     model_version: str = "sewer-condition-v1.0.0-candidate",
     smoke_max_samples: Optional[int] = None,
     architecture: str = "efficientnet_b0",
+    num_workers: int = 0,
 ) -> Dict[str, Any]:
     """Runs full PyTorch multi-label training pipeline."""
     torch.manual_seed(42)
@@ -485,14 +486,14 @@ def train_sewer_condition_classifier(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=2,
+        num_workers=num_workers,
         pin_memory=(device.type == "cuda"),
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=2,
+        num_workers=num_workers,
         pin_memory=(device.type == "cuda"),
     )
 
@@ -665,6 +666,7 @@ def train_sewer_condition_classifier(
             "threshold_tuning_split": "first deterministic half of validation",
             "evaluation_split": "second deterministic half of validation; official test remains locked",
             "device": str(device),
+            "data_loader_workers": num_workers,
         },
     }
 
@@ -691,6 +693,7 @@ def main():
     parser.add_argument("--img-size", type=int, default=128, help="Square input image resolution")
     parser.add_argument("--version", type=str, default="sewer-condition-v1.0.0-candidate", help="Model version tag")
     parser.add_argument("--architecture", choices=["efficientnet_b0", "legacy_cnn"], default="efficientnet_b0")
+    parser.add_argument("--num-workers", type=int, default=0, help="DataLoader workers; keep 0 on Cloud Build because /dev/shm is small")
     parser.add_argument("--smoke", action="store_true", help="Run rapid smoke test on subsample")
     args = parser.parse_args()
 
@@ -707,6 +710,7 @@ def main():
         model_version=args.version,
         smoke_max_samples=smoke_samples,
         architecture=args.architecture,
+        num_workers=args.num_workers,
     )
 
 
