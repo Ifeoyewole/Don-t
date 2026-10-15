@@ -114,4 +114,3 @@ def run():
     lock_blob.upload_from_string(json.dumps(integrity,sort_keys=True),content_type='application/json',if_generation_match=0)
     print(json.dumps(integrity,indent=2))
 if __name__=='__main__':run()
-

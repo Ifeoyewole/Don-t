@@ -58,4 +58,3 @@ def complete_report(truth,probabilities,class_names,thresholds):
             'macro_f2':float(np.mean([x['f2'] for x in classes.values()])),
             'micro':metrics(t,pred), 'calibration':calibration(t,p),
             'thresholds':{name:float(thresholds[i]) for i,name in enumerate(class_names)}}
-

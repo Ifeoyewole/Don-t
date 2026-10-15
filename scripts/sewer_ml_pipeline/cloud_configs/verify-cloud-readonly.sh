@@ -13,4 +13,3 @@ gcloud run services describe pipe-joint-api --project "$PROJECT" \
     --region "$REGION" --format='value(status.latestReadyRevisionName)'
 gcloud storage ls "$BUCKET/datasets/sewer-ml/" || true
 gcloud storage ls "$BUCKET/models/candidates/" || true
-

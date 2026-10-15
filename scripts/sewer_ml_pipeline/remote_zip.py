@@ -149,4 +149,3 @@ class RemoteZip(io.RawIOBase):
         if hasattr(self, 'cache'):
             self.cache.clear()
         super().close()
-

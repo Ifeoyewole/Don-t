@@ -163,4 +163,3 @@ def main():
     result=run_evaluation(specs,rows,args.images_dir,args.output)
     print(json.dumps({'evaluated_models':list(result),'images':len(rows),'production_approved':False},indent=2))
 if __name__=='__main__':main()
-

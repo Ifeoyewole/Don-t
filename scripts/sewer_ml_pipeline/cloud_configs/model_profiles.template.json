@@ -22,4 +22,3 @@
   ],
   "note":"Only 2 verified model artifact hashes shown. Add v2/v3 using actual GCS-verified SHA and their frozen development thresholds before evaluation. Verify v1 original threshold policy. Never tune against locked test."
 }
-

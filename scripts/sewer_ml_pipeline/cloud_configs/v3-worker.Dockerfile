@@ -7,4 +7,3 @@ RUN python -m pip install --no-cache-dir torchvision==0.20.1 \
 COPY scripts/sewer_ml_pipeline/ /workspace/scripts/sewer_ml_pipeline/
 ENV PYTHONUNBUFFERED=1
 ENTRYPOINT ["python", "scripts/sewer_ml_pipeline/train_v3.py"]
-

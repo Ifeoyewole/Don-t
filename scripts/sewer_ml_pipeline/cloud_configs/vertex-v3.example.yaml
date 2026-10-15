@@ -22,4 +22,3 @@ workerPoolSpecs:
     - --architecture=efficientnet_b0
     - --epochs=20
     - --batch-size=32
-
