@@ -6,8 +6,8 @@ steps:
       - '-c'
       - |
         set -euo pipefail
-        pip install --no-cache-dir google-cloud-storage
-        python scripts/sewer_ml_pipeline/extract_locked_test_images.py
+        pip install --no-cache-dir google-cloud-storage requests pillow
+        python scripts/sewer_ml_pipeline/extract_locked_test_v2.py
 availableSecrets:
   secretManager:
     - versionName: projects/joint-inspection-510310/secrets/sewer-ml-download-password/versions/latest

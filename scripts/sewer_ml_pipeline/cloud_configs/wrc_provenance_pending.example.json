@@ -1,0 +1,15 @@
+{
+  "model_id": "wrc-inceptionresnetv2-baseline-v1",
+  "original_weights_sha256": "42527d8c4d38e6113f079bcb007715a5476d39cd3cc327f4ba87269d3c7de253",
+  "source_commit": "7ac0b0f9edf430d43e5f180466e2e456d98fdfe7",
+  "original_class_codes": ["B", "CN", "CK", "CND", "D", "DE", "JD", "F", "H", "J", "LL", "R", "W"],
+  "preprocessing": "299x299 aspect-preserved padded raw RGB NHWC in [0,255]",
+  "research_finetune_allowed": false,
+  "commercial_release_allowed": false,
+  "rights_evidence_uri": null,
+  "authorized_training_dataset": null,
+  "architecture_available": true,
+  "training_head_strategy": null,
+  "label_mapping_verified": false
+}
+

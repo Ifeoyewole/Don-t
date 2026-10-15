@@ -43,6 +43,7 @@ import torch.optim as optim
 from torchvision.models import EfficientNet_B0_Weights, efficientnet_b0
 from torch.utils.data import DataLoader, Dataset
 from benchmark_integrity import calibration_report, grouped_binary_metrics, optimize_thresholds, validate_onnx_artifact
+from curate_staged import partition_validation, verify_disjoint
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("sewer_ml_trainer")
@@ -455,7 +456,13 @@ def train_sewer_condition_classifier(
     if attempted and len(rejected) / attempted > 0.01:
         raise RuntimeError(f"Rejected image rate {len(rejected)}/{attempted} exceeds 1% integrity threshold")
 
-    logger.info("Active dataset split: %d train samples, %d val samples", len(matched_train), len(matched_val))
+    val_partitions = partition_validation(matched_val)
+    verify_disjoint({'train': matched_train, **val_partitions})
+    index_of = {row['Filename']: i for i, row in enumerate(matched_val)}
+    val_indices = {name: np.array([index_of[row['Filename']] for row in rows], dtype=int)
+                   for name, rows in val_partitions.items()}
+    logger.info('Active dataset: %d train, %d validation. Split groups: early=%d threshold=%d dev=%d',
+        len(matched_train), len(matched_val), *(len(val_indices[name]) for name in ('early_stop','threshold_tune','dev_report')))
 
     # 2. Compute class-wise pos_weights for BCEWithLogitsLoss
     pos_counts = Counter()
@@ -555,7 +562,7 @@ def train_sewer_condition_classifier(
         y_true = np.concatenate(all_targets, axis=0) if all_targets else np.zeros((0, NUM_CLASSES))
         y_probs = np.concatenate(all_probs, axis=0) if all_probs else np.zeros((0, NUM_CLASSES))
 
-        epoch_metrics = compute_metrics(y_true, y_probs, threshold=0.5)
+        epoch_metrics = compute_metrics(y_true[val_indices['early_stop']], y_probs[val_indices['early_stop']], threshold=0.5)
         epoch_macro_f1 = epoch_metrics["macro_f1"]
 
         logger.info(
@@ -600,11 +607,14 @@ def train_sewer_condition_classifier(
 
     final_true = np.concatenate(all_targets, axis=0)
     final_probs = np.concatenate(all_probs, axis=0)
-    # Validation is deterministically split: first half tunes thresholds; second half evaluates them.
-    # The official Sewer-ML test partition remains locked for the final benchmark.
-    split_index = max(1, len(final_true) // 2)
-    thresholds = optimize_thresholds(final_true[:split_index], final_probs[:split_index])
-    final_metrics = compute_metrics(final_true[split_index:], final_probs[split_index:], threshold=thresholds)
+    thresholds = optimize_thresholds(final_true[val_indices['threshold_tune']],
+                                     final_probs[val_indices['threshold_tune']])
+    final_metrics = compute_metrics(final_true[val_indices['dev_report']],
+                                   final_probs[val_indices['dev_report']], threshold=thresholds)
+    final_metrics['early_stop_count'] = len(val_indices['early_stop'])
+    final_metrics['threshold_tuning_count'] = len(val_indices['threshold_tune'])
+    final_metrics['development_report_count'] = len(val_indices['dev_report'])
+    final_metrics['locked_test_evaluated'] = False
     final_metrics["total_train_duration_sec"] = round(total_duration, 2)
     final_metrics["epochs_completed"] = epochs
     final_metrics["train_samples"] = len(matched_train)
@@ -663,8 +673,8 @@ def train_sewer_condition_classifier(
             "training_epochs": epochs,
             "batch_size": batch_size,
             "initial_lr": lr,
-            "threshold_tuning_split": "first deterministic half of validation",
-            "evaluation_split": "second deterministic half of validation; official test remains locked",
+            "threshold_tuning_split": "group-disjoint threshold_tune partition",
+            "evaluation_split": "group-disjoint dev_report partition; official test remains locked",
             "device": str(device),
             "data_loader_workers": num_workers,
         },

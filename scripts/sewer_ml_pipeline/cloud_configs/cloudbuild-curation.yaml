@@ -1,0 +1,24 @@
+# Explicitly billable operation. Do NOT run until budget authorization is verified.
+substitutions:
+  _STAGE: '20000'
+steps:
+  - name: 'python:3.11-slim'
+    id: cloud-only-staged-curation
+    entrypoint: bash
+    secretEnv: ['SEWER_PASSWORD']
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        python -m pip install --no-cache-dir google-cloud-storage requests 'pillow>=10,<14'
+        python scripts/sewer_ml_pipeline/curate_staged.py --project=joint-inspection-510310 --stage=${_STAGE} --execute
+availableSecrets:
+  secretManager:
+    - versionName: projects/joint-inspection-510310/secrets/sewer-ml-download-password/versions/latest
+      env: SEWER_PASSWORD
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+  diskSizeGb: 50
+timeout: 7200s
+
