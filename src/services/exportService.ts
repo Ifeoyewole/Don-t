@@ -150,7 +150,7 @@ async function createPdfBlob(data: ExportProjectData): Promise<Blob> {
       `Pipe type: ${result.pipeType}`,
       `Pipe diameter: ${result.pipeDiameterMm ?? 'N/A'} mm`,
       `Number of joints captured: ${result.numberOfJointsCaptured}`,
-      `Gap value (mm): ${result.gapValueMm.toFixed(1)}`,
+      `Gap value (mm): ${result.gapValueMm == null ? 'Unavailable' : result.gapValueMm.toFixed(1)}`,
       `Gap status: ${result.gapStatus}`,
       `User notes: ${result.userNotes || 'None'}`,
     ].join(' | ')
