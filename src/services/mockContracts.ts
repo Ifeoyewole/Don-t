@@ -452,12 +452,15 @@ export const createMockServices = ({ getStore, updateStore, emit }: StoreContext
       updateStore((current) => {
         const inspection = current.inspections.find((item) => item.id === inspectionId)
         if (!inspection) return current
-        const adjustedValue = Number(Math.max(0.5, inspection.originalGapMm - 0.4 + Math.random() * 1.1).toFixed(1))
+        const adjustedValue = inspection.originalGapMm == null
+          ? null
+          : Number(Math.max(0.5, inspection.originalGapMm - 0.4 + Math.random() * 1.1).toFixed(1))
+        const effectiveValue = inspection.overrideApplied ? inspection.finalGapMm : adjustedValue
         updated = {
           ...inspection,
           originalGapMm: adjustedValue,
-          finalGapMm: inspection.overrideApplied ? inspection.finalGapMm : adjustedValue,
-          status: classifyGap(inspection.overrideApplied ? inspection.finalGapMm : adjustedValue),
+          finalGapMm: effectiveValue,
+          status: effectiveValue == null ? 'REVIEW' : classifyGap(effectiveValue),
           confidence: Number(Math.min(0.99, (inspection.confidence ?? 0) + 0.03).toFixed(2)),
           processedAt: new Date().toISOString(),
         }
@@ -533,7 +536,7 @@ export const createMockServices = ({ getStore, updateStore, emit }: StoreContext
         updated = {
           ...existing,
           finalGapMm: existing.originalGapMm,
-          status: classifyGap(existing.originalGapMm),
+          status: existing.originalGapMm == null ? 'REVIEW' : classifyGap(existing.originalGapMm),
           overrideApplied: false,
           overrideValueMm: undefined,
           overrideReason: undefined,

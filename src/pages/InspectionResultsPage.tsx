@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
+import { classifyWrcEvidence } from '../lib/wrcEvidence'
 import type { CvMeasurementDebug, InspectionResult, ManholeInspectionSummary, MeasurementOverlayHints, MeasurementSource } from '../types/domain'
 
 type Props = {
@@ -164,7 +165,7 @@ const ResultCard = ({
 }) => {
   const [note, setNote] = useState(item.notes ?? '')
   const [overrideDraft, setOverrideDraft] = useState<DraftOverride>({
-    value: item.overrideValueMm?.toString() ?? item.finalGapMm.toString(),
+    value: item.overrideValueMm?.toString() ?? item.finalGapMm?.toString() ?? '',
     reason: item.overrideReason ?? '',
   })
   const [busy, setBusy] = useState(false)
@@ -416,15 +417,18 @@ const ResultCard = ({
                 mapped_condition?: string
                 jointinspect_mapping?: string
                 mapping_status?: string
+                classification_status?: string
+                status?: string
               }
               const evidence = (item.classifierEvidence || item.cvDebug?.classifierEvidence || item.externalClassifier || item.cvDebug?.externalClassifier) as ClassifierEvidenceView | undefined;
+              const evidenceState = classifyWrcEvidence(evidence)
               if (!evidence) {
-                return <div style={{ color: '#64748b', marginTop: '2px' }}>Classifier evidence unavailable</div>;
+                return <div style={{ color: '#64748b', marginTop: '2px' }}>WRc: MISSING_RESPONSE — no classification evidence supplied.</div>;
               }
               const rawName = evidence.raw_prediction || evidence.raw_class_name || 'NOT REPORTED';
               const rawCode = evidence.raw_code || evidence.raw_class_code || '';
-              const conf = Math.round((evidence.confidence ?? 0) * 100);
-              const mapped = evidence.mapped_condition || evidence.jointinspect_mapping || item.condition || 'NOT REPORTED';
+              const conf = typeof evidence.confidence === 'number' && Number.isFinite(evidence.confidence) ? `${Math.round(evidence.confidence * 100)}%` : 'NOT REPORTED';
+              const mapped = evidenceState === 'SUCCESS' ? (evidence.mapped_condition || evidence.jointinspect_mapping || 'UNMAPPED') : 'NOT COMPARABLE';
               const mapStatus = evidence.mapping_status || 'NOT REPORTED';
 
               return (
@@ -436,7 +440,7 @@ const ResultCard = ({
                     </div>
                     <div>
                       <span style={{ color: '#64748b' }}>WRc Confidence: </span>
-                      <strong style={{ color: '#f8fafc' }}>{conf}%</strong>
+                      <strong style={{ color: '#f8fafc' }}>{conf}</strong>
                     </div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
@@ -446,7 +450,7 @@ const ResultCard = ({
                     </div>
                     <div>
                       <span style={{ color: '#64748b' }}>Live Authority: </span>
-                      <span style={{ color: '#38bdf8' }}>Primary Defect Classifier</span>
+                      <span style={{ color: '#38bdf8' }}>WRc advisory — {evidenceState}</span>
                     </div>
                   </div>
                 </div>

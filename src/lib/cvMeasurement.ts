@@ -31,7 +31,7 @@ export interface CvWorkerRequest {
 
 export interface CvWorkerResponse {
   imageId: string
-  originalGapMm: number
+  originalGapMm: number | null
   status: InspectionStatus
   confidence: number
   measurementSource: MeasurementSource

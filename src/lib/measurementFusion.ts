@@ -32,7 +32,7 @@ export function fuseMeasurementWithAi(cvResult: CvWorkerResponse, aiReview?: AiM
   if (cvResult.resultStatus === 'REJECTED_UNRELIABLE') {
     return {
       ...cvResult,
-      originalGapMm: 0,
+      originalGapMm: null,
       status: 'REVIEW',
       resultStatus: 'REJECTED_UNRELIABLE',
       measurementNote: cvResult.rejectionReason
@@ -44,7 +44,7 @@ export function fuseMeasurementWithAi(cvResult: CvWorkerResponse, aiReview?: AiM
         finalSource: cvResult.measurementSource,
         cvConfidence: cvResult.confidence,
         aiConfidence: aiReview?.confidence,
-        cvGapMm: 0,
+        cvGapMm: null,
         resultStatus: 'REJECTED_UNRELIABLE',
         rejectionReason: cvResult.rejectionReason,
         enhancementUsed: cvResult.cvDebug?.enhancementUsed,
@@ -59,7 +59,7 @@ export function fuseMeasurementWithAi(cvResult: CvWorkerResponse, aiReview?: AiM
     if (closeUpJoint && !hasVisibleScaleReference(cvResult)) {
       return {
         ...cvResult,
-        originalGapMm: 0,
+        originalGapMm: null,
         status: 'REVIEW',
         confidence: Number(Math.min(cvResult.confidence, 0.62).toFixed(2)),
         measurementSource: 'ai-review',
@@ -95,7 +95,7 @@ export function fuseMeasurementWithAi(cvResult: CvWorkerResponse, aiReview?: AiM
   if (cvResult.measurementSource === 'fallback') {
     return {
       ...cvResult,
-      originalGapMm: 0,
+      originalGapMm: null,
       status: 'REVIEW',
       measurementSource: 'ai-review',
       measurementNote: aiReview.retakeMessage ?? 'OpenCV geometry was unavailable. AI observations are advisory and cannot create a millimetre measurement.',
@@ -112,7 +112,7 @@ export function fuseMeasurementWithAi(cvResult: CvWorkerResponse, aiReview?: AiM
 
   if (closeUpJoint && !hasVisibleScaleReference(cvResult)) {
     return {
-      ...cvResult, originalGapMm: 0, status: 'REVIEW', measurementSource: 'ai-review', aiReview,
+      ...cvResult, originalGapMm: null, status: 'REVIEW', measurementSource: 'ai-review', aiReview,
       measurementNote: 'Physical millimetre measurement requires a verified pipe diameter or calibration reference.',
       overlayHints: chooseOverlayHints(aiReview.overlayHints, cvResult.overlayHints),
       measurementAudit: { originalSource: cvResult.measurementSource, finalSource: 'ai-review', cvConfidence, aiConfidence: aiReview.confidence, cvGapMm: cvResult.originalGapMm, enhancementUsed: cvResult.cvDebug?.enhancementUsed, decision: 'Uncalibrated close-up image retained pixel evidence only; AI measurement was blocked.' },
