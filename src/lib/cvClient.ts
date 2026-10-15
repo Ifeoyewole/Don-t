@@ -123,12 +123,13 @@ interface FastApiMeasurementPayload {
   result_status?: MeasurementResultStatus
   condition?: JointConditionClass
   confidence_breakdown?: {
-    total_confidence: number
-    quality_factor: number
-    geometric_consistency: number
-    model_confidence: number
-    stability_factor: number
-    failure_risk_rate: number
+    overall_confidence?: number
+    total_confidence?: number
+    quality_factor?: number
+    geometric_consistency?: number
+    model_confidence?: number
+    stability_factor?: number
+    failure_risk_rate?: number
   }
   rejection_reason?: string
   overlay_hints?: FastApiOverlayHints
@@ -269,10 +270,13 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
     }
 
     const data: FastApiMeasurementPayload = await response.json()
-    const reportedGapMm = data.authoritative_gap_mm ?? data.candidate_gap_mm ?? data.mean_gap_mm ?? data.debug_info?.raw_mean_gap_mm
-    const gapMm = reportedGapMm == null ? 0 : Number(reportedGapMm.toFixed(1))
+    const reportedGapMm = data.authoritative_gap_mm
+    if (reportedGapMm != null && (!Number.isFinite(reportedGapMm) || reportedGapMm < 0)) {
+      throw new CloudMeasurementError('INVALID_RESPONSE', 'Backend returned invalid authoritative mm')
+    }
+    const gapMm = reportedGapMm == null ? null : Number(reportedGapMm.toFixed(1))
     const status: InspectionStatus =
-      data.overall_status === 'CALIBRATION_REQUIRED' || data.result_status === 'REJECTED_UNRELIABLE' || data.overall_status === 'REVIEW'
+      gapMm == null || data.overall_status === 'CALIBRATION_REQUIRED' || data.result_status === 'REJECTED_UNRELIABLE' || data.overall_status === 'REVIEW'
         ? 'REVIEW'
         : data.overall_status === 'PASS'
           ? 'PASS'
@@ -280,22 +284,22 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
             ? 'FAIL'
             : 'REVIEW'
 
-    const stdGap = data.debug_info?.std_gap_mm ?? 0
-    const rawFallbackConfidence =
-      typeof data.debug_info?.std_gap_mm === 'number'
-        ? Math.max(0.72, Math.min(0.98, Number((1 - stdGap / Math.max(1, gapMm)).toFixed(2))))
-        : 0.9
-
-    const totalConfidence = data.confidence_breakdown?.total_confidence ?? rawFallbackConfidence
-
-    const confidenceBreakdown: ConfidenceBreakdown | undefined = data.confidence_breakdown
+    const actualConfidence = data.confidence_breakdown?.overall_confidence ?? data.confidence_breakdown?.total_confidence
+    if (typeof actualConfidence !== 'number' || !Number.isFinite(actualConfidence) || actualConfidence < 0 || actualConfidence > 1) {
+      throw new CloudMeasurementError('INVALID_RESPONSE', 'Backend measurement confidence missing or invalid')
+    }
+    const totalConfidence = actualConfidence
+    const parts = data.confidence_breakdown
+    const confidenceBreakdown: ConfidenceBreakdown | undefined = parts &&
+      [parts.quality_factor, parts.geometric_consistency, parts.model_confidence,
+       parts.stability_factor, parts.failure_risk_rate].every((value) => typeof value === 'number' && Number.isFinite(value))
       ? {
-          totalConfidence: data.confidence_breakdown.total_confidence,
-          qualityFactor: data.confidence_breakdown.quality_factor,
-          geometricConsistency: data.confidence_breakdown.geometric_consistency,
-          modelConfidence: data.confidence_breakdown.model_confidence,
-          stabilityFactor: data.confidence_breakdown.stability_factor,
-          failureRiskRate: data.confidence_breakdown.failure_risk_rate,
+          totalConfidence,
+          qualityFactor: parts.quality_factor!,
+          geometricConsistency: parts.geometric_consistency!,
+          modelConfidence: parts.model_confidence!,
+          stabilityFactor: parts.stability_factor!,
+          failureRiskRate: parts.failure_risk_rate!,
         }
       : undefined
 
@@ -352,7 +356,9 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
     const note =
       data.result_status === 'REJECTED_UNRELIABLE'
         ? `Rejected: ${data.rejection_reason ?? 'Confidence below acceptable threshold'}`
-        : `AI/CV: gap ${gapMm.toFixed(1)} mm [${data.result_status ?? 'ACCEPTED_MEASUREMENT'}] (${data.debug_info?.num_samples ?? 0} samples, ${(data.debug_info?.processing_time_ms ?? 0).toFixed(0)}ms)`
+        : gapMm == null
+          ? `AI/CV: physical millimetres unavailable; pixel evidence retained [${data.result_status ?? 'REVIEW_REQUIRED'}]`
+          : `AI/CV: gap ${gapMm.toFixed(1)} mm [${data.result_status ?? 'ACCEPTED_MEASUREMENT'}] (${data.debug_info?.num_samples ?? 0} samples, ${(data.debug_info?.processing_time_ms ?? 0).toFixed(0)}ms)`
 
     return {
       imageId: request.imageId,
@@ -361,7 +367,7 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
       confidence: totalConfidence,
       measurementSource: 'fastapi',
       measurementNote: note,
-      resultStatus: data.result_status ?? (totalConfidence >= 0.7 ? 'ACCEPTED_MEASUREMENT' : 'REVIEW_REQUIRED'),
+      resultStatus: gapMm == null ? 'REVIEW_REQUIRED' : data.result_status ?? (totalConfidence >= 0.7 ? 'ACCEPTED_MEASUREMENT' : 'REVIEW_REQUIRED'),
       condition: data.condition,
       confidenceBreakdown,
       rejectionReason: data.rejection_reason,
@@ -471,7 +477,7 @@ export async function measureLocalPreview(request: CvWorkerRequest): Promise<CvW
   return { ...result, status: 'REVIEW', measurementSource: 'offline-preview', executionSource: 'LOCAL_PREVIEW_UNVERIFIED', authoritativeGapMm: null, engineeringResult: 'REVIEW' }
 }
 
-export type CloudMeasurementErrorCode = 'TIMEOUT' | 'CONNECTION_ERROR' | 'AUTHENTICATION_ERROR' | 'RATE_LIMITED' | 'SERVER_ERROR' | 'HTTP_ERROR'
+export type CloudMeasurementErrorCode = 'TIMEOUT' | 'CONNECTION_ERROR' | 'AUTHENTICATION_ERROR' | 'RATE_LIMITED' | 'SERVER_ERROR' | 'HTTP_ERROR' | 'INVALID_RESPONSE'
 export class CloudMeasurementError extends Error {
   readonly code: CloudMeasurementErrorCode
   readonly status?: number

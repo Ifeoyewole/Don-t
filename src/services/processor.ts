@@ -288,12 +288,18 @@ export const processor = {
     const blobRecord = await db.inspectionBlobs.get(image.blobKey)
 
     emit({ type: 'started', imageId: image.id, inspectionId })
-    let reprocessOptions: ProcessOptions | undefined = undefined
+    let reprocessOptions: ProcessOptions = {
+      projectId: image.projectId,
+      jointType: existing.jointType ?? 'CIRCULAR_OPENING',
+      geometrySelectionProvenance: existing.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
+      executionMode: existing.executionSource === 'LOCAL_PREVIEW_UNVERIFIED' ? 'local-preview' : 'cloud',
+    }
     try {
       const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(`jointinspect_cal_${image.projectId}`) : null
       if (stored) {
         const parsed = JSON.parse(stored) as CalibrationProfile
         reprocessOptions = {
+          ...reprocessOptions,
           calibrationProfile: parsed,
           pipeDiameterMm: parsed.pipe_diameter_mm ?? parsed.pipeDiameterMm ?? undefined,
           calibrationSource: parsed.source,
@@ -304,7 +310,7 @@ export const processor = {
     } catch {
       // ignore
     }
-    const calDia = reprocessOptions?.pipeDiameterMm
+    const calDia = reprocessOptions.pipeDiameterMm
     const measurement = await runAiAssistedMeasurement(image, blobRecord?.blob, calDia, reprocessOptions)
 
     const updated: InspectionResult = {

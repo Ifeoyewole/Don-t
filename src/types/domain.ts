@@ -153,7 +153,7 @@ export interface MeasurementAudit {
   finalSource: MeasurementSource
   cvConfidence?: number
   aiConfidence?: number
-  cvGapMm?: number
+  cvGapMm?: number | null
   aiEstimatedGapMm?: number | null
   enhancementUsed?: boolean
   decision: string
@@ -302,8 +302,8 @@ export interface InspectionResult {
   jointLabel: string
   fileName?: string
   manholeLabel?: string
-  originalGapMm: number
-  finalGapMm: number
+  originalGapMm: number | null
+  finalGapMm: number | null
   status: InspectionStatus
   confidence?: number
   measurementSource?: MeasurementSource
@@ -401,7 +401,7 @@ export interface FlaggedInspectionSummary {
   fileName?: string
   manholeLabel?: string
   status: InspectionStatus
-  finalGapMm: number
+  finalGapMm: number | null
   measurementSource?: MeasurementSource
   overrideApplied?: boolean
   note?: string

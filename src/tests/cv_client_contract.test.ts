@@ -15,6 +15,7 @@ describe('authoritative cloud response mapper', () => {
   it('preserves semantic, geometry, pixel gap, classifier and explanation evidence', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       joint_type: 'VERTICAL_SEAM',
+      confidence_breakdown: { overall_confidence: 0.78 },
       mean_gap_px: 0,
       min_gap_px: 0,
       max_gap_px: 2,
@@ -44,10 +45,39 @@ describe('authoritative cloud response mapper', () => {
     expect(result.cvDebug?.gapPixels).toBe(0)
     expect(result.cvDebug?.maxGapPixels).toBe(2)
     expect(result.authoritativeGapMm).toBeNull()
+    expect(result.originalGapMm).toBeNull()
+    expect(result.confidence).toBe(0.78)
     expect(result.semanticGate).toMatchObject({ domainStatus: 'PIPE_JOINT_INSPECTION', processingAllowed: true, confidence: 0.91 })
     expect(result.classifierEvidence?.mapping_status).toBe('UNMAPPED_OR_AMBIGUOUS')
     expect(result.aiExplanation).toBe('Backend composed explanation.')
     expect((fetchMock.mock.calls[0][1]?.body as FormData).get('joint_type')).toBe('VERTICAL_SEAM')
+  })
+
+  it('preserves a genuine zero-millimetre authoritative measurement', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      authoritative_gap_mm: 0,
+      overall_status: 'PASS',
+      result_status: 'ACCEPTED_MEASUREMENT',
+      confidence_breakdown: { overall_confidence: 0.81 },
+    }), { status: 200 })))
+    const result = await measureWithFastApi(request)
+    expect(result.originalGapMm).toBe(0)
+    expect(result.authoritativeGapMm).toBe(0)
+  })
+
+  it('rejects missing or invalid confidence instead of manufacturing 90 percent', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      authoritative_gap_mm: 3.5,
+      overall_status: 'PASS',
+      result_status: 'ACCEPTED_MEASUREMENT',
+    }), { status: 200 })))
+    await expect(measureWithFastApi(request)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      authoritative_gap_mm: 3.5,
+      confidence_breakdown: { overall_confidence: 1.5 },
+    }), { status: 200 })))
+    await expect(measureWithFastApi(request)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
   })
 
   it.each([

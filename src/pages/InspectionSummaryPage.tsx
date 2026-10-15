@@ -138,7 +138,7 @@ export const InspectionSummaryPage = ({
                       <span className={`mini-status-pill is-${item.status.toLowerCase()}`}>{item.status}</span>
                     </div>
                     <p>
-                      {item.finalGapMm.toFixed(1)} mm gap
+                      {item.finalGapMm == null ? 'Physical gap unavailable' : `${item.finalGapMm.toFixed(1)} mm gap`}
                       {item.note ? ` • ${item.note}` : ''}
                     </p>
                     <div className="flagged-anomaly-meta">

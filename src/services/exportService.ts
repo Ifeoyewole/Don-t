@@ -32,7 +32,7 @@ interface ExportResultRecord {
   pipeType: string
   pipeDiameterMm: number | null
   numberOfJointsCaptured: number
-  gapValueMm: number
+  gapValueMm: number | null
   gapStatus: string
   userNotes?: string
 }
