@@ -88,6 +88,21 @@ def sha256(path):
     return h.hexdigest()
 
 
+def upload_checkpoint(path, prefix):
+    """Publish resumable state only when running under the cloud wrapper."""
+    if not prefix:
+        return
+    if not prefix.startswith('gs://'):
+        raise ValueError('Checkpoint prefix must be a gs:// URI')
+    bucket_name, _, object_prefix = prefix[5:].partition('/')
+    if not bucket_name or not object_prefix or '..' in Path(object_prefix).parts:
+        raise ValueError('Unsafe checkpoint prefix')
+    from google.cloud import storage
+    blob=storage.Client().bucket(bucket_name).blob(f'{object_prefix.rstrip("/")}/{Path(path).name}')
+    blob.metadata={'sha256':sha256(path),'config_id':'resumable-training-state'}
+    blob.upload_from_filename(str(path))
+
+
 def run(args):
     if args.epochs<1 or args.batch_size<1:raise ValueError('Invalid training configuration')
     if not args.smoke_cpu:
@@ -145,6 +160,8 @@ def run(args):
                     'scheduler':scheduler.state_dict(),'scaler':scaler.state_dict(),
                     'best_f1':best_f1,'wait':wait,
                     'config_id':args.config_id},state_path)
+        upload_checkpoint(state_path,args.checkpoint_prefix)
+        if best_path.exists(): upload_checkpoint(best_path,args.checkpoint_prefix)
         if wait>=args.patience:break
     if not best_path.exists():raise RuntimeError('No best checkpoint available')
     model.load_state_dict(torch.load(best_path,map_location=device,weights_only=True))
@@ -201,6 +218,7 @@ def main():
     p.add_argument('--patience',type=int,default=5)
     p.add_argument('--seed',type=int,default=42)
     p.add_argument('--resume',action='store_true')
+    p.add_argument('--checkpoint-prefix')
     p.add_argument('--smoke-cpu',action='store_true')
     run(p.parse_args())
 if __name__=='__main__':main()

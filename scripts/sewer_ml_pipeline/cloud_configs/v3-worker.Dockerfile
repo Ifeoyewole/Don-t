@@ -6,4 +6,5 @@ RUN python -m pip install --no-cache-dir torchvision==0.20.1 \
     google-cloud-storage requests 'pillow>=10,<14' numpy==1.26.4
 COPY scripts/sewer_ml_pipeline/ /workspace/scripts/sewer_ml_pipeline/
 ENV PYTHONUNBUFFERED=1
-ENTRYPOINT ["python", "scripts/sewer_ml_pipeline/train_v3.py"]
+RUN mkdir -p /workspace/tmp && chmod 1777 /workspace/tmp
+ENTRYPOINT ["python", "scripts/sewer_ml_pipeline/cloud_train_v3.py"]
