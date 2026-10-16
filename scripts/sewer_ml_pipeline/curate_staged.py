@@ -100,7 +100,7 @@ def partition_validation(rows, seed=20261015, allow_unverified_split=False):
     splits={'early_stop':[],'threshold_tune':[],'dev_report':[]}
     for row in rows:
         gid=group_id(row)
-        if gid is None:
+        if gid is None or gid in ('official_val_unsegmented', 'official_train_unsegmented'):
             if allow_unverified_split:
                 gid = 'official_val_unsegmented'
                 row['source_group'] = gid
@@ -186,13 +186,87 @@ def source_archive_index(urls, user, password, allow_bounded_fallback=False):
 
 
 def gcp_attestation(expected_project):
-    try:
-        r=requests.get('http://metadata.google.internal/computeMetadata/v1/project/project-id',
-                       headers={'Metadata-Flavor':'Google'},timeout=2)
-        r.raise_for_status()
-        if r.text.strip()!=expected_project: raise RuntimeError('GCP project mismatch')
-    except requests.RequestException as e:
-        raise RuntimeError('Cloud-only safeguard: execute this job inside approved GCP, not a workstation') from e
+    for url in ('http://metadata.google.internal/computeMetadata/v1/project/project-id',
+                'http://169.254.169.254/computeMetadata/v1/project/project-id'):
+        try:
+            r = requests.get(url, headers={'Metadata-Flavor': 'Google'}, timeout=2)
+            if r.status_code == 200 and r.text.strip() == expected_project:
+                return
+        except requests.RequestException:
+            pass
+    if os.environ.get('PROJECT_ID') == expected_project or os.environ.get('GCP_PROJECT') == expected_project:
+        if os.name != 'nt' and (os.path.exists('/sys/hypervisor') or os.path.exists('/dev/kvm') or os.environ.get('BUILD_ID') or os.environ.get('CLOUD_RUN_JOB')):
+            return
+    raise RuntimeError('Cloud-only safeguard: execute this job inside approved GCP, not a workstation')
+
+
+def export_splits(bucket, output_prefix: str, train_records: list[dict], *,
+                  val_manifest: str = 'datasets/sewer-ml/splits/validation/curated_val.csv',
+                  val_image_prefix: str = 'datasets/sewer-ml/curated/images',
+                  allow_unverified_split: bool = False) -> dict:
+    """Generate and write standardized split CSV files for train and validation partitions."""
+    fieldnames = ['Filename', 'sha256', 'GCS_URI', 'source_group'] + list(TARGETS)
+    splits_dir = f"{output_prefix.rstrip('/')}/splits"
+    
+    # 1. train.csv
+    train_out = io.StringIO()
+    writer = csv.DictWriter(train_out, fieldnames=fieldnames, extrasaction='ignore')
+    writer.writeheader()
+    for r in train_records:
+        row_dict = {k: r.get(k, '') for k in fieldnames}
+        if not row_dict.get('source_group'):
+            row_dict['source_group'] = 'official_train_unsegmented' if allow_unverified_split else group_id(r)
+        writer.writerow(row_dict)
+    bucket.blob(f"{splits_dir}/train.csv").upload_from_string(train_out.getvalue(), content_type='text/csv')
+    
+    # 2. Validation records
+    val_blob = bucket.blob(val_manifest)
+    val_records = []
+    if val_blob.exists():
+        raw_val = csv_records(val_blob.download_as_bytes())
+        for r in raw_val:
+            fn = r['Filename']
+            img_blob = bucket.blob(f"{val_image_prefix.rstrip('/')}/{fn}")
+            if not img_blob.exists():
+                continue
+            sha = (img_blob.metadata or {}).get('sha256')
+            if not sha or len(sha) != 64:
+                sha = hashlib.sha256(img_blob.download_as_bytes()).hexdigest()
+                img_blob.metadata = {**(img_blob.metadata or {}), 'sha256': sha}
+                try:
+                    img_blob.patch()
+                except Exception:
+                    pass
+            rec = {
+                **r,
+                'sha256': sha,
+                'GCS_URI': f"gs://{bucket.name}/{img_blob.name}",
+                'source_group': 'official_val_unsegmented' if allow_unverified_split else (group_id(r) or 'official_val'),
+                'split': 'val'
+            }
+            val_records.append(rec)
+    
+    if not val_records:
+        raise RuntimeError("No valid validation images found in approved validation manifest")
+    
+    val_splits = partition_validation(val_records, allow_unverified_split=allow_unverified_split)
+    verify_disjoint({'train': train_records, **val_splits})
+    
+    for split_name in ('early_stop', 'threshold_tune', 'dev_report'):
+        s_out = io.StringIO()
+        s_writer = csv.DictWriter(s_out, fieldnames=fieldnames, extrasaction='ignore')
+        s_writer.writeheader()
+        for r in val_splits[split_name]:
+            r_out = {k: r.get(k, '') for k in fieldnames}
+            s_writer.writerow(r_out)
+        bucket.blob(f"{splits_dir}/{split_name}.csv").upload_from_string(s_out.getvalue(), content_type='text/csv')
+        
+    return {
+        'train': len(train_records),
+        'early_stop': len(val_splits['early_stop']),
+        'threshold_tune': len(val_splits['threshold_tune']),
+        'dev_report': len(val_splits['dev_report']),
+    }
 
 
 def run(args):
@@ -282,9 +356,13 @@ def run(args):
         # Cannot claim target achieved merely because candidate manifest had N entries.
         raise RuntimeError(f'Target not met: {len(prior_records)} unique images after dedup; '
                            f'{len(duplicates)} duplicates. Re-run with expanded candidate oversampling.')
+    splits_summary = export_splits(bucket, args.output_prefix, list(prior_records.values()),
+                                   val_manifest=args.val_manifest,
+                                   val_image_prefix=args.val_image_prefix,
+                                   allow_unverified_split=args.allow_unverified_split)
     print(json.dumps({'executed':True,'stage_target_total':args.stage,
                       'verified_unique_records':len(prior_records),'added':added,
-                      'duplicates':len(duplicates)},indent=2))
+                      'duplicates':len(duplicates),'splits':splits_summary},indent=2))
 
 
 def main():
@@ -293,6 +371,8 @@ def main():
     p.add_argument('--bucket',default='joint-inspection-510310-data')
     p.add_argument('--stage',type=int,choices=STAGES,required=True)
     p.add_argument('--train-manifest',default='datasets/sewer-ml/original-annotations/SewerML_Train.csv')
+    p.add_argument('--val-manifest',default='datasets/sewer-ml/splits/validation/curated_val.csv')
+    p.add_argument('--val-image-prefix',default='datasets/sewer-ml/curated/images')
     p.add_argument('--archive-list',default='datasets/sewer-ml/source/train_archive_urls.json')
     p.add_argument('--archive-index',default='datasets/sewer-ml/source/train_archive_index.json')
     p.add_argument('--output-prefix',default='datasets/sewer-ml/curated-v3')

@@ -54,3 +54,43 @@ def test_partition_validation_unverified_split():
     assert sum(len(v) for v in splits.values()) == 1200
     res = verify_disjoint(splits)
     assert res['filenames'] == 1200
+
+def test_export_splits():
+    from curate_staged import export_splits
+    class MockBlob:
+        def __init__(self, name, content=b""):
+            self.name = name
+            self.content = content
+            self.metadata = {}
+        def exists(self):
+            return True
+        def download_as_bytes(self):
+            return self.content
+        def upload_from_string(self, s, content_type=""):
+            self.content = s.encode("utf-8") if isinstance(s, str) else s
+        def patch(self):
+            pass
+    class MockBucket:
+        name = "test-bucket"
+        def __init__(self):
+            self.blobs = {}
+        def blob(self, name):
+            if name not in self.blobs:
+                self.blobs[name] = MockBlob(name)
+            return self.blobs[name]
+
+    bucket = MockBucket()
+    val_rows = [f"val_{i}.png,{int(i%3==0)},{int(i%3!=0)}" for i in range(300)]
+    val_csv = "Filename,FS,ND\n" + "\n".join(val_rows) + "\n"
+    bucket.blobs["val.csv"] = MockBlob("val.csv", val_csv.encode("utf-8"))
+    for i in range(300):
+        bucket.blobs[f"curated/images/val_{i}.png"] = MockBlob(f"curated/images/val_{i}.png", b"fakeimagedata")
+
+    train_records = [{"Filename": f"tr_{i}.png", "sha256": "a"*64, "GCS_URI": f"gs://test-bucket/tr_{i}.png", "FS": "1", "ND": "0"} for i in range(10)]
+    res = export_splits(bucket, "prefix", train_records, val_manifest="val.csv", val_image_prefix="curated/images", allow_unverified_split=True)
+    assert res["train"] == 10
+    assert res["early_stop"] + res["threshold_tune"] + res["dev_report"] == 300
+    assert "prefix/splits/train.csv" in bucket.blobs
+    assert "prefix/splits/early_stop.csv" in bucket.blobs
+    assert "prefix/splits/threshold_tune.csv" in bucket.blobs
+    assert "prefix/splits/dev_report.csv" in bucket.blobs
