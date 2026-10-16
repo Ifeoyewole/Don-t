@@ -6,6 +6,8 @@ workerPoolSpecs:
     acceleratorType: NVIDIA_TESLA_T4
     acceleratorCount: 1
   replicaCount: 1
+  # Reconciled storage safety: 150 GiB boot disk
+  # Allocated: 80 GiB max staging (cloud_train_v3) + 20 GiB container/OS + 5 GiB checkpoints/ONNX + 15 GiB safety margin = 120 GiB <= 150 GiB
   diskSpec:
     bootDiskType: pd-ssd
     bootDiskSizeGb: 150

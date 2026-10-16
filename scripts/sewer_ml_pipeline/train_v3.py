@@ -103,6 +103,21 @@ def upload_checkpoint(path, prefix):
     blob.upload_from_filename(str(path))
 
 
+REQUIRED_CHECKPOINT_KEYS = {'epoch', 'model', 'optimizer', 'scheduler', 'best_f1', 'wait', 'config_id'}
+
+
+def validate_checkpoint_state(ckpt: dict, expected_config_id: str) -> None:
+    if not isinstance(ckpt, dict):
+        raise RuntimeError("Checkpoint resume error: checkpoint state is not a dictionary")
+    missing = REQUIRED_CHECKPOINT_KEYS - set(ckpt.keys())
+    if missing:
+        raise RuntimeError(f"Checkpoint resume error: missing required keys {sorted(missing)}")
+    if ckpt.get('config_id') != expected_config_id:
+        raise RuntimeError(f"Checkpoint resume error: config_id mismatch (checkpoint: '{ckpt.get('config_id')}', expected: '{expected_config_id}')")
+    if not isinstance(ckpt.get('epoch'), int) or ckpt['epoch'] < 0:
+        raise RuntimeError(f"Checkpoint resume error: invalid epoch in checkpoint: {ckpt.get('epoch')}")
+
+
 def run(args):
     if args.epochs<1 or args.batch_size<1:raise ValueError('Invalid training configuration')
     if not args.smoke_cpu:
@@ -132,8 +147,11 @@ def run(args):
     state_path=out/'resume.pt';best_path=out/'best.pt'
     best_f1=-1.0;start=0;wait=0
     if args.resume and state_path.exists():
-        ckpt=torch.load(state_path,map_location=device,weights_only=False)
-        if ckpt['config_id']!=args.config_id:raise RuntimeError('Resume config mismatched current training run')
+        try:
+            ckpt=torch.load(state_path,map_location=device,weights_only=False)
+        except Exception as exc:
+            raise RuntimeError(f"Checkpoint resume error: failed to read {state_path}: {exc}") from exc
+        validate_checkpoint_state(ckpt, args.config_id)
         model.load_state_dict(ckpt['model']);optimizer.load_state_dict(ckpt['optimizer'])
         scheduler.load_state_dict(ckpt['scheduler'])
         if 'scaler' in ckpt: scaler.load_state_dict(ckpt['scaler'])
