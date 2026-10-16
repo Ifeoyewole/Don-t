@@ -40,3 +40,17 @@ def test_exact_and_near_duplicates():
 def test_valid_image_hash():
     im=Image.new('RGB',(16,16),'white'); b=io.BytesIO(); im.save(b,format='PNG')
     assert isinstance(image_dhash(b.getvalue()),int)
+
+def test_missing_groups_allowed_with_unverified_split():
+    data = [{'Filename': f'{i}.png', 'FS': str(int(i % 3 == 0)), 'ND': str(int(i % 3 != 0))} for i in range(25000)]
+    selected = staged_select(data, 20000, allow_unverified_split=True)
+    assert len(selected) == 20000
+    assert all(r['source_group'] == 'official_train_unsegmented' for r in selected)
+
+def test_partition_validation_unverified_split():
+    val_data = [{'Filename': f'val_{i}.png', 'FS': '0', 'ND': '1'} for i in range(1200)]
+    splits = partition_validation(val_data, allow_unverified_split=True)
+    assert set(splits) == {'early_stop', 'threshold_tune', 'dev_report'}
+    assert sum(len(v) for v in splits.values()) == 1200
+    res = verify_disjoint(splits)
+    assert res['filenames'] == 1200

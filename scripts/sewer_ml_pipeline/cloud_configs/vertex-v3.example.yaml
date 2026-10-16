@@ -12,7 +12,7 @@ workerPoolSpecs:
     bootDiskType: pd-ssd
     bootDiskSizeGb: 150
   containerSpec:
-    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/jointinspect-training/v3:REPLACE_WITH_VERIFIED_DIGEST
+    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/v3:REPLACE_WITH_VERIFIED_DIGEST
     args:
     - --project=joint-inspection-510310
     - --train=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v3/20k/splits/train.csv

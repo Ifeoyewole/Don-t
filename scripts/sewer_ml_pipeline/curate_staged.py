@@ -48,7 +48,7 @@ def stable_unit(seed: int, name: str) -> float:
     return (number+1)/(2**64+1)
 
 
-def staged_select(rows, target, *, seed=20261015, group_cap=300, reserve=0):
+def staged_select(rows, target, *, seed=20261015, group_cap=300, reserve=0, allow_unverified_split=False):
     """Deterministic nested ranking using inverse-frequency rarity weights.
 
     Every smaller stage is a subset of larger stages if metadata is unchanged.
@@ -64,7 +64,11 @@ def staged_select(rows, target, *, seed=20261015, group_cap=300, reserve=0):
             continue
         gid=group_id(row)
         if not gid:
-            raise ValueError(f'Missing sequence/group ID for {fn}; group-safe curation cannot be established')
+            if allow_unverified_split:
+                gid = 'official_train_unsegmented'
+                row['source_group'] = gid
+            else:
+                raise ValueError(f'Missing sequence/group ID for {fn}; group-safe curation cannot be established')
         seen.add(fn.casefold())
         valid.append(row)
     if len(valid)<target:
@@ -82,22 +86,29 @@ def staged_select(rows, target, *, seed=20261015, group_cap=300, reserve=0):
     selected=[]; groups=Counter()
     for _,_,row in scores:
         gid=group_id(row)
-        if groups[gid]>=group_cap: continue
+        if not allow_unverified_split and groups[gid]>=group_cap: continue
         selected.append(row)
         groups[gid]+=1
         if len(selected)==selection_limit: return selected
     raise ValueError(f'Group cap limits selection to {len(selected)} of {target}; revise group cap based on source statistics')
 
 
-def partition_validation(rows, seed=20261015):
+def partition_validation(rows, seed=20261015, allow_unverified_split=False):
     """Disjoint validation groups: early stopping, thresholds, development report.
     Official TEST annotations are never accepted into this function.
     """
     splits={'early_stop':[],'threshold_tune':[],'dev_report':[]}
     for row in rows:
         gid=group_id(row)
-        if gid is None: raise ValueError('Validation group identifier missing')
-        h=stable_unit(seed,gid)
+        if gid is None:
+            if allow_unverified_split:
+                gid = 'official_val_unsegmented'
+                row['source_group'] = gid
+                h = stable_unit(seed, row['Filename'])
+            else:
+                raise ValueError('Validation group identifier missing')
+        else:
+            h=stable_unit(seed,gid)
         name='early_stop' if h<0.50 else 'threshold_tune' if h<0.75 else 'dev_report'
         splits[name].append(row)
     if any(not v for v in splits.values()):
@@ -112,10 +123,13 @@ def verify_disjoint(splits):
         for row in rows:
             name=row['Filename'].casefold()
             gid=group_id(row)
-            for table,key in ((seen_filenames,name),(seen_groups,gid)):
-                if key in table and table[key]!=split:
-                    raise ValueError(f'Split leakage: {key} appears in {table[key]} and {split}')
-                table[key]=split
+            if name in seen_filenames and seen_filenames[name]!=split:
+                raise ValueError(f'Split leakage: {name} appears in {seen_filenames[name]} and {split}')
+            seen_filenames[name]=split
+            if gid and gid not in ('official_train_unsegmented', 'official_val_unsegmented'):
+                if gid in seen_groups and seen_groups[gid]!=split:
+                    raise ValueError(f'Split leakage: {gid} appears in {seen_groups[gid]} and {split}')
+                seen_groups[gid]=split
     return {'filenames':len(seen_filenames),'groups':len(seen_groups)}
 
 
@@ -190,7 +204,8 @@ def run(args):
     data=bucket.blob(args.train_manifest).download_as_bytes()
     train_rows=csv_records(data)
     selected=staged_select(train_rows,args.stage,group_cap=args.group_cap,
-                           reserve=max(2000,args.stage//5) if args.execute else 0)
+                           reserve=max(2000,args.stage//5) if args.execute else 0,
+                           allow_unverified_split=args.allow_unverified_split)
     if not args.execute:
         stats=Counter(c for row in selected for c in labels(row))
         print(json.dumps({'stage_target_total':args.stage,'metadata_selected':len(selected),
@@ -284,6 +299,8 @@ def main():
     p.add_argument('--group-cap',type=int,default=300)
     p.add_argument('--allow-bounded-full-archive',action='store_true',
                    help='Explicit cloud-only disk-bounded fallback; disabled by default')
+    p.add_argument('--allow-unverified-split',action='store_true',
+                   help='Explicitly allow unsegmented partition without sequence IDs; certifies research-only')
     p.add_argument('--execute',action='store_true')
     run(p.parse_args())
 if __name__=='__main__':main()

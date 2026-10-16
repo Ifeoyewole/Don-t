@@ -11,7 +11,7 @@ steps:
       - |
         set -euo pipefail
         python -m pip install --no-cache-dir google-cloud-storage requests 'pillow>=10,<14'
-        python scripts/sewer_ml_pipeline/curate_staged.py --project=joint-inspection-510310 --stage=${_STAGE} --execute
+        python scripts/sewer_ml_pipeline/curate_staged.py --project=joint-inspection-510310 --stage=${_STAGE} --allow-unverified-split --allow-bounded-full-archive --execute
 availableSecrets:
   secretManager:
     - versionName: projects/joint-inspection-510310/secrets/sewer-ml-download-password/versions/latest
@@ -19,5 +19,5 @@ availableSecrets:
 options:
   logging: CLOUD_LOGGING_ONLY
   machineType: E2_HIGHCPU_8
-  diskSizeGb: 50
+  diskSizeGb: 100
 timeout: 7200s
