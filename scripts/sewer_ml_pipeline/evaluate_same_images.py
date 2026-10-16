@@ -56,7 +56,7 @@ def validate_specs(specs):
             raise ValueError('Unknown prediction semantics')
         if spec['kind']=='wrc_single_softmax' and spec['preprocess']!='wrc_raw_rgb_nhwc':
             raise ValueError('WRc preprocessing mismatch')
-        if spec['kind']=='sewerml_multilabel_sigmoid' and spec['preprocess']!='imagenet_rgb_nchw':
+        if spec['kind']=='sewerml_multilabel_sigmoid' and spec['preprocess'] not in ('imagenet_rgb_nchw', 'wrc_raw_rgb_nhwc'):
             raise ValueError('Sewer-ML preprocessing mismatch')
         if len(spec['class_codes'])!=(13 if spec['kind']=='wrc_single_softmax' else 9):
             raise ValueError('Output head dimension is not verified for this model')

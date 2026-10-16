@@ -1,24 +1,57 @@
 {
   "models": [
     {
-      "name":"wrc-inceptionresnetv2-baseline-v1",
-      "model":"/workspace/models/wrc_inceptionresnetv2_baseline_v1.onnx",
-      "sha256":"8a6115e9f6f6f3a5a4f5cc749cc35420a623a4547e904174ae9a18ceab63f9f4",
-      "kind":"wrc_single_softmax",
-      "preprocess":"wrc_raw_rgb_nhwc",
-      "class_codes":["B","CN","CK","CND","D","DE","JD","F","H","J","LL","R","W"]
+      "name": "efficientnet-b0-v3-candidate",
+      "model": "/workspace/models/v3_efficientnet_b0.onnx",
+      "sha256": "REPLACE_WITH_EFFICIENTNET_ONNX_SHA256",
+      "kind": "sewerml_multilabel_sigmoid",
+      "preprocess": "imagenet_rgb_nchw",
+      "image_size": 224,
+      "class_codes": ["FS", "IS", "RB", "DE", "RO", "AF", "BE", "FO", "ND"],
+      "output_activation": "probability",
+      "thresholds": {"FS": 0.5, "IS": 0.5, "RB": 0.5, "DE": 0.5, "RO": 0.5, "AF": 0.5, "BE": 0.5, "FO": 0.5, "ND": 0.5}
     },
     {
-      "name":"sewer-condition-v1",
-      "model":"/workspace/models/v1.onnx",
-      "sha256":"f5cc05da983f95e019bb45d926e8c98fb5909cf2ae1aa2dc37a574f35b526a44",
-      "kind":"sewerml_multilabel_sigmoid",
-      "preprocess":"imagenet_rgb_nchw",
-      "image_size":128,
-      "class_codes":["FS","IS","RB","DE","RO","AF","BE","FO","ND"],
-      "output_activation":"probability",
-      "thresholds":{"FS":0.5,"IS":0.5,"RB":0.5,"DE":0.5,"RO":0.5,"AF":0.5,"BE":0.5,"FO":0.5,"ND":0.5}
+      "name": "wrc-inceptionresnetv2-v3-candidate",
+      "model": "/workspace/models/v3_wrc_adapted.onnx",
+      "sha256": "REPLACE_WITH_WRC_ADAPTED_ONNX_SHA256",
+      "kind": "sewerml_multilabel_sigmoid",
+      "preprocess": "wrc_raw_rgb_nhwc",
+      "image_size": 299,
+      "class_codes": ["FS", "IS", "RB", "DE", "RO", "AF", "BE", "FO", "ND"],
+      "output_activation": "probability",
+      "thresholds": {"FS": 0.5, "IS": 0.5, "RB": 0.5, "DE": 0.5, "RO": 0.5, "AF": 0.5, "BE": 0.5, "FO": 0.5, "ND": 0.5}
+    },
+    {
+      "name": "sewer-condition-v1",
+      "model": "/workspace/models/v1.onnx",
+      "sha256": "f5cc05da983f95e019bb45d926e8c98fb5909cf2ae1aa2dc37a574f35b526a44",
+      "kind": "sewerml_multilabel_sigmoid",
+      "preprocess": "imagenet_rgb_nchw",
+      "image_size": 128,
+      "class_codes": ["FS", "IS", "RB", "DE", "RO", "AF", "BE", "FO", "ND"],
+      "output_activation": "probability",
+      "thresholds": {"FS": 0.5, "IS": 0.5, "RB": 0.5, "DE": 0.5, "RO": 0.5, "AF": 0.5, "BE": 0.5, "FO": 0.5, "ND": 0.5}
+    },
+    {
+      "name": "sewer-condition-v2",
+      "model": "/workspace/models/v2.onnx",
+      "sha256": "REPLACE_WITH_V2_VERIFIED_SHA256",
+      "kind": "sewerml_multilabel_sigmoid",
+      "preprocess": "imagenet_rgb_nchw",
+      "image_size": 224,
+      "class_codes": ["FS", "IS", "RB", "DE", "RO", "AF", "BE", "FO", "ND"],
+      "output_activation": "probability",
+      "thresholds": {"FS": 0.5, "IS": 0.5, "RB": 0.5, "DE": 0.5, "RO": 0.5, "AF": 0.5, "BE": 0.5, "FO": 0.5, "ND": 0.5}
+    },
+    {
+      "name": "wrc-inceptionresnetv2-baseline-v1",
+      "model": "/workspace/models/wrc_inceptionresnetv2_baseline_v1.onnx",
+      "sha256": "8a6115e9f6f6f3a5a4f5cc749cc35420a623a4547e904174ae9a18ceab63f9f4",
+      "kind": "wrc_single_softmax",
+      "preprocess": "wrc_raw_rgb_nhwc",
+      "class_codes": ["B", "CN", "CK", "CND", "D", "DE", "JD", "F", "H", "J", "LL", "R", "W"]
     }
   ],
-  "note":"Only 2 verified model artifact hashes shown. Add v2/v3 using actual GCS-verified SHA and their frozen development thresholds before evaluation. Verify v1 original threshold policy. Never tune against locked test."
+  "note": "Profiles template for the 5-model comparative benchmark suite on identical images. Replace PLACEHOLDER hashes with actual GCS-verified SHA-256 digests upon cloud staging. Never evaluate or tune against the final locked test set."
 }

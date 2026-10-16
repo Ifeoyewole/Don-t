@@ -22,3 +22,42 @@ def test_unsealed_locked_data_rejected(tmp_path):
     (tmp_path/'manifest.json').write_bytes(data)
     (tmp_path/'integrity.json').write_text(json.dumps({'immutable':False,'manifest_sha256':hashlib.sha256(data).hexdigest(),'sample_count':1}))
     with pytest.raises(RuntimeError):read_locked_manifest(tmp_path/'manifest.json',tmp_path/'integrity.json')
+
+
+def test_validate_specs_supports_both_architectures_for_sewerml(tmp_path):
+    from evaluate_same_images import validate_specs
+    from curate_staged import TARGETS
+
+    m1 = tmp_path / "eff.onnx"
+    m1.write_bytes(b"eff_dummy")
+    h1 = hashlib.sha256(b"eff_dummy").hexdigest()
+
+    m2 = tmp_path / "wrc_adapted.onnx"
+    m2.write_bytes(b"wrc_dummy")
+    h2 = hashlib.sha256(b"wrc_dummy").hexdigest()
+
+    specs = [
+        {
+            "name": "eff-v3",
+            "model": str(m1),
+            "sha256": h1,
+            "kind": "sewerml_multilabel_sigmoid",
+            "preprocess": "imagenet_rgb_nchw",
+            "image_size": 224,
+            "class_codes": list(TARGETS),
+            "output_activation": "probability",
+            "thresholds": {c: 0.5 for c in TARGETS},
+        },
+        {
+            "name": "wrc-adapted-v3",
+            "model": str(m2),
+            "sha256": h2,
+            "kind": "sewerml_multilabel_sigmoid",
+            "preprocess": "wrc_raw_rgb_nhwc",
+            "class_codes": list(TARGETS),
+            "output_activation": "probability",
+            "thresholds": {c: 0.5 for c in TARGETS},
+        },
+    ]
+    validate_specs(specs)
+
