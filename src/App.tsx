@@ -19,7 +19,6 @@ import {
   summaryService,
 } from './services'
 import type {
-  CalibrationProfile,
   CreateManholeInput,
   CreateProjectInput,
   FlaggedInspectionSummary,
@@ -637,11 +636,13 @@ function App() {
             await inspectionQueue.clearManholeQueue(uploadManholeId)
             await refreshRouteData()
           }}
-          onStartInspection={async (operatorContext?: string, calibration?: CalibrationProfile) => {
+          onStartInspection={async (operatorContext, calibration, jointType) => {
             const result = await processor.processQueuedImages(uploadManholeId, {
               operatorContext,
               calibrationProfile: calibration,
               projectId: uploadProjectId,
+              jointType,
+              geometrySelectionProvenance: 'INSPECTOR_SELECTED',
             })
             console.log('PROCESS RESULT:', result)
             if (!result.success || !result.inspectionId) {

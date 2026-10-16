@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
-import type { CalibrationProfile, InspectionImage, ProcessBatchResult } from '../types/domain'
+import type { CalibrationProfile, InspectionImage, JointGeometryType, ProcessBatchResult } from '../types/domain'
 
 type Props = {
   online: boolean
@@ -14,7 +14,7 @@ type Props = {
   onLoadSample: () => Promise<void>
   onRemoveFile: (imageId: string) => Promise<void>
   onClearQueue: () => Promise<void>
-  onStartInspection: (operatorContext?: string, calibration?: CalibrationProfile) => Promise<ProcessBatchResult>
+  onStartInspection: (operatorContext?: string, calibration?: CalibrationProfile, jointType?: JointGeometryType) => Promise<ProcessBatchResult>
 }
 
 const validationTone = (image: InspectionImage) =>
@@ -85,6 +85,7 @@ export const PhotoUploadPage = ({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [operatorContext, setOperatorContext] = useState('')
+  const [jointType, setJointType] = useState<JointGeometryType>('CIRCULAR_OPENING')
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [reportedDownlink, setReportedDownlink] = useState<number | null>(null)
 
@@ -199,7 +200,7 @@ export const PhotoUploadPage = ({
     setBusy(true)
     setError('')
     try {
-      await onStartInspection(operatorContext.trim() || undefined, savedProfile ?? undefined)
+      await onStartInspection(operatorContext.trim() || undefined, savedProfile ?? undefined, jointType)
     } catch (processingError) {
       setError(processingError instanceof Error ? processingError.message : 'Processing failed.')
     } finally {
@@ -468,6 +469,19 @@ export const PhotoUploadPage = ({
               <strong>Inspection context</strong>
               <span>Optional</span>
             </div>
+            <label htmlFor="joint-geometry-type" style={{ display: 'block', marginTop: '0.5rem' }}>
+              Joint geometry
+            </label>
+            <select
+              id="joint-geometry-type"
+              value={jointType}
+              onChange={(event) => setJointType(event.target.value as JointGeometryType)}
+              style={{ width: '100%', padding: '0.55rem', marginTop: '0.25rem' }}
+            >
+              <option value="CIRCULAR_OPENING">Circular opening</option>
+              <option value="HORIZONTAL_SEAM">Horizontal seam</option>
+              <option value="VERTICAL_SEAM">Vertical seam</option>
+            </select>
             <textarea
               id="operator-context-input"
               className="operator-context-textarea"

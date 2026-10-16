@@ -6,6 +6,7 @@ import type {
   Manhole,
   Project,
 } from '../types'
+import { normalizeLegacyInspectionResult } from './migrations'
 
 export class PipeInspectionDatabase extends Dexie {
   projects!: Table<Project, string>
@@ -31,6 +32,16 @@ export class PipeInspectionDatabase extends Dexie {
       inspectionBlobs: 'id, imageId, createdAt',
       inspectionResults: 'id, imageId, projectId, manholeId, jointLabel, status, processedAt, overrideApplied',
     })
+
+    this.version(3).stores({
+      projects: 'id, name, createdAt, updatedAt',
+      manholes: 'id, projectId, manholeId, type, pipeType, createdAt, updatedAt',
+      inspectionImages: 'id, projectId, manholeId, orderIndex, jointLabel, queueStatus, createdAt',
+      inspectionBlobs: 'id, imageId, createdAt',
+      inspectionResults: 'id, imageId, projectId, manholeId, jointLabel, status, processedAt, overrideApplied',
+    }).upgrade((transaction) => transaction.table('inspectionResults').toCollection().modify((record) => {
+      Object.assign(record, normalizeLegacyInspectionResult(record))
+    }))
   }
 }
 

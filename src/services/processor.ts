@@ -7,9 +7,7 @@ import type {
   ProcessingEvent,
   ProcessOptions,
 } from '../types'
-import { fuseMeasurementWithAi, measureWithCv } from '../lib'
-import type { CvWorkerResponse } from '../lib'
-import { reviewMeasurementWithAi } from './aiMeasurement'
+import { CloudMeasurementError, fuseMeasurementWithAi, measureLocalPreview, measureWithCv } from '../lib'
 import { createId, createTimestamp } from '../utils/identity'
 
 const listeners = new Set<(event: ProcessingEvent) => void>()
@@ -75,18 +73,13 @@ function wait(ms: number): Promise<void> {
   })
 }
 
-function shouldReviewWithAi(measurement: Awaited<ReturnType<typeof measureWithCv>>): boolean {
-  return measurement.measurementSource === 'fallback' || measurement.confidence < 0.82
-}
-
 async function runAiAssistedMeasurement(
   image: InspectionImage,
   blob: Blob | undefined,
   pipeDiameterMm: number | undefined,
   options?: ProcessOptions,
 ): Promise<ReturnType<typeof fuseMeasurementWithAi>> {
-  try {
-    const cvMeasurement = await measureWithCv({
+  const request = {
       imageId: image.id,
       fileName: image.fileName,
       orderIndex: image.orderIndex,
@@ -97,56 +90,16 @@ async function runAiAssistedMeasurement(
       calibrationVerified: options?.calibrationVerified,
       calibrationReferenceId: options?.calibrationReferenceId,
       projectId: options?.projectId,
-    })
-    const aiReview = shouldReviewWithAi(cvMeasurement)
-      ? await reviewMeasurementWithAi({
-          imageId: image.id,
-          fileName: image.fileName,
-          mimeType: image.mimeType,
-          blob,
-          pipeDiameterMm,
-          gapMm: cvMeasurement.originalGapMm,
-          confidence: cvMeasurement.confidence,
-          measurementSource: cvMeasurement.measurementSource,
-          cvDebug: cvMeasurement.cvDebug,
-        })
-      : undefined
-
-    return fuseMeasurementWithAi(cvMeasurement, aiReview)
+      jointType: options?.jointType,
+    }
+  try {
+    const measurement = options?.executionMode === 'local-preview'
+      ? await measureLocalPreview(request)
+      : await measureWithCv(request)
+    return fuseMeasurementWithAi(measurement)
   } catch (error) {
-    const fallbackMeasurement: CvWorkerResponse = {
-      imageId: image.id,
-      originalGapMm: 0,
-      status: 'REVIEW',
-      confidence: 0.2,
-      measurementSource: 'fallback',
-      measurementNote: error instanceof Error ? error.message : 'OpenCV measurement failed before producing geometry.',
-      cvDebug: {
-        pipeDetected: false,
-        failureStage: 'opencv-measurement-error',
-        enhancementUsed: true,
-      },
-    }
-    const aiReview = await reviewMeasurementWithAi({
-      imageId: image.id,
-      fileName: image.fileName,
-      mimeType: image.mimeType,
-      blob,
-      pipeDiameterMm,
-      gapMm: 0,
-      confidence: 0.2,
-      measurementSource: 'fallback',
-      cvDebug: fallbackMeasurement.cvDebug,
-    })
-    const fused = fuseMeasurementWithAi(fallbackMeasurement, aiReview)
-
-    if (fused.measurementSource === 'fallback' && fused.originalGapMm <= 0 && !aiReview.jointVisible && !aiReview.pipeOpeningVisible) {
-      throw new Error(aiReview.retakeMessage ?? fallbackMeasurement.measurementNote ?? 'Retake photo before measurement.', {
-        cause: error,
-      })
-    }
-
-    return fused
+    if (error instanceof CloudMeasurementError) throw new Error(`[${error.code}] ${error.message}`, { cause: error })
+    throw error
   }
 }
 
@@ -224,6 +177,11 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
     engineeringResult: measurement.engineeringResult ?? measurement.cvDebug?.engineeringResult,
     authoritativeReason: measurement.authoritativeReason ?? measurement.cvDebug?.authoritativeReason,
     aiExplanation: measurement.aiExplanation ?? measurement.cvDebug?.aiExplanation,
+    semanticGate: measurement.semanticGate ?? measurement.cvDebug?.semanticGate,
+    executionSource: measurement.executionSource ?? (measurement.measurementSource === 'offline-preview' ? 'LOCAL_PREVIEW_UNVERIFIED' : 'CLOUD_AUTHORITATIVE'),
+    executionErrorCode: measurement.executionErrorCode,
+    jointType: measurement.jointType ?? effectiveOptions.jointType ?? 'CIRCULAR_OPENING',
+    geometrySelectionProvenance: effectiveOptions.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
   }
 
   await db.transaction('rw', db.inspectionImages, db.inspectionResults, async () => {
@@ -246,8 +204,8 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
     message:
       measurement.measurementSource === 'fastapi'
         ? 'Completed via FastAPI CV'
-        : measurement.measurementSource === 'fallback'
-          ? 'Completed with estimated fallback'
+        : measurement.measurementSource === 'offline-preview'
+          ? 'LOCAL CV PREVIEW — NOT VERIFIED'
           : 'Completed',
   })
   emit({ type: 'completed', imageId, inspectionId: resultId })
@@ -330,12 +288,18 @@ export const processor = {
     const blobRecord = await db.inspectionBlobs.get(image.blobKey)
 
     emit({ type: 'started', imageId: image.id, inspectionId })
-    let reprocessOptions: ProcessOptions | undefined = undefined
+    let reprocessOptions: ProcessOptions = {
+      projectId: image.projectId,
+      jointType: existing.jointType ?? 'CIRCULAR_OPENING',
+      geometrySelectionProvenance: existing.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
+      executionMode: existing.executionSource === 'LOCAL_PREVIEW_UNVERIFIED' ? 'local-preview' : 'cloud',
+    }
     try {
       const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(`jointinspect_cal_${image.projectId}`) : null
       if (stored) {
         const parsed = JSON.parse(stored) as CalibrationProfile
         reprocessOptions = {
+          ...reprocessOptions,
           calibrationProfile: parsed,
           pipeDiameterMm: parsed.pipe_diameter_mm ?? parsed.pipeDiameterMm ?? undefined,
           calibrationSource: parsed.source,
@@ -346,7 +310,7 @@ export const processor = {
     } catch {
       // ignore
     }
-    const calDia = reprocessOptions?.pipeDiameterMm
+    const calDia = reprocessOptions.pipeDiameterMm
     const measurement = await runAiAssistedMeasurement(image, blobRecord?.blob, calDia, reprocessOptions)
 
     const updated: InspectionResult = {
@@ -366,6 +330,19 @@ export const processor = {
       condition: measurement.condition,
       confidenceBreakdown: measurement.confidenceBreakdown,
       rejectionReason: measurement.rejectionReason,
+      classifierEvidence: measurement.classifierEvidence ?? measurement.cvDebug?.classifierEvidence,
+      calibrationProfile: measurement.calibrationProfile ?? measurement.cvDebug?.calibrationProfile,
+      geometryTier: measurement.geometryTier ?? measurement.cvDebug?.geometryTier,
+      candidateGapMm: measurement.candidateGapMm ?? measurement.cvDebug?.candidateGapMm,
+      authoritativeGapMm: measurement.authoritativeGapMm ?? measurement.cvDebug?.authoritativeGapMm,
+      engineeringResult: measurement.engineeringResult ?? measurement.cvDebug?.engineeringResult,
+      authoritativeReason: measurement.authoritativeReason ?? measurement.cvDebug?.authoritativeReason,
+      aiExplanation: measurement.aiExplanation ?? measurement.cvDebug?.aiExplanation,
+      semanticGate: measurement.semanticGate ?? measurement.cvDebug?.semanticGate,
+      executionSource: measurement.executionSource ?? (measurement.measurementSource === 'offline-preview' ? 'LOCAL_PREVIEW_UNVERIFIED' : 'CLOUD_AUTHORITATIVE'),
+      executionErrorCode: measurement.executionErrorCode,
+      jointType: measurement.jointType ?? existing.jointType ?? 'CIRCULAR_OPENING',
+      geometrySelectionProvenance: existing.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
     }
 
     await db.inspectionResults.put(updated)

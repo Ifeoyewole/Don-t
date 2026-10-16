@@ -104,6 +104,8 @@ interface FastApiMeasurementPayload {
   min_gap_mm?: number | null
   max_gap_mm?: number | null
   mean_gap_px?: number | null
+  min_gap_px?: number | null
+  max_gap_px?: number | null
   candidate_gap_mm?: number | null
   authoritative_gap_mm?: number | null
   engineering_result?: string
@@ -121,12 +123,13 @@ interface FastApiMeasurementPayload {
   result_status?: MeasurementResultStatus
   condition?: JointConditionClass
   confidence_breakdown?: {
-    total_confidence: number
-    quality_factor: number
-    geometric_consistency: number
-    model_confidence: number
-    stability_factor: number
-    failure_risk_rate: number
+    overall_confidence?: number
+    total_confidence?: number
+    quality_factor?: number
+    geometric_consistency?: number
+    model_confidence?: number
+    stability_factor?: number
+    failure_risk_rate?: number
   }
   rejection_reason?: string
   overlay_hints?: FastApiOverlayHints
@@ -134,7 +137,8 @@ interface FastApiMeasurementPayload {
   timestamp?: string
 }
 
-const FASTAPI_MEASURE_TIMEOUT_MS = 10000
+// Must remain below the 120s Vercel/Cloud Run ceiling configured for this route.
+export const FASTAPI_MEASURE_TIMEOUT_MS = 110000
 const CV_WORKER_WARMUP_TIMEOUT_MS = 30000
 const CV_WORKER_MEASURE_TIMEOUT_MS = 30000
 
@@ -247,7 +251,7 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
     if (request.projectId) {
       formData.append('project_id', request.projectId)
     }
-    formData.append('joint_type', 'CIRCULAR_OPENING')
+    formData.append('joint_type', request.jointType ?? 'CIRCULAR_OPENING')
     formData.append('return_debug_image', 'false')
 
     const response = await fetch('/api/v1/cv/measure', {
@@ -258,13 +262,21 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '')
-      throw new Error(`FastAPI measurement endpoint returned HTTP ${response.status}: ${errorText || response.statusText}`)
+      const code = response.status === 401 || response.status === 403 ? 'AUTHENTICATION_ERROR'
+        : response.status === 429 ? 'RATE_LIMITED'
+        : response.status >= 500 ? 'SERVER_ERROR'
+        : 'HTTP_ERROR'
+      throw new CloudMeasurementError(code, `Cloud measurement returned HTTP ${response.status}: ${errorText || response.statusText}`, response.status)
     }
 
     const data: FastApiMeasurementPayload = await response.json()
-    const gapMm = Number((data.authoritative_gap_mm ?? data.candidate_gap_mm ?? data.mean_gap_mm ?? data.debug_info?.raw_mean_gap_mm ?? 0).toFixed(1))
+    const reportedGapMm = data.authoritative_gap_mm
+    if (reportedGapMm != null && (!Number.isFinite(reportedGapMm) || reportedGapMm < 0)) {
+      throw new CloudMeasurementError('INVALID_RESPONSE', 'Backend returned invalid authoritative mm')
+    }
+    const gapMm = reportedGapMm == null ? null : Number(reportedGapMm.toFixed(1))
     const status: InspectionStatus =
-      data.overall_status === 'CALIBRATION_REQUIRED' || data.result_status === 'REJECTED_UNRELIABLE' || data.overall_status === 'REVIEW'
+      gapMm == null || data.overall_status === 'CALIBRATION_REQUIRED' || data.result_status === 'REJECTED_UNRELIABLE' || data.overall_status === 'REVIEW'
         ? 'REVIEW'
         : data.overall_status === 'PASS'
           ? 'PASS'
@@ -272,22 +284,22 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
             ? 'FAIL'
             : 'REVIEW'
 
-    const stdGap = data.debug_info?.std_gap_mm ?? 0
-    const rawFallbackConfidence =
-      typeof data.debug_info?.std_gap_mm === 'number'
-        ? Math.max(0.72, Math.min(0.98, Number((1 - stdGap / Math.max(1, gapMm)).toFixed(2))))
-        : 0.9
-
-    const totalConfidence = data.confidence_breakdown?.total_confidence ?? rawFallbackConfidence
-
-    const confidenceBreakdown: ConfidenceBreakdown | undefined = data.confidence_breakdown
+    const actualConfidence = data.confidence_breakdown?.overall_confidence ?? data.confidence_breakdown?.total_confidence
+    if (typeof actualConfidence !== 'number' || !Number.isFinite(actualConfidence) || actualConfidence < 0 || actualConfidence > 1) {
+      throw new CloudMeasurementError('INVALID_RESPONSE', 'Backend measurement confidence missing or invalid')
+    }
+    const totalConfidence = actualConfidence
+    const parts = data.confidence_breakdown
+    const confidenceBreakdown: ConfidenceBreakdown | undefined = parts &&
+      [parts.quality_factor, parts.geometric_consistency, parts.model_confidence,
+       parts.stability_factor, parts.failure_risk_rate].every((value) => typeof value === 'number' && Number.isFinite(value))
       ? {
-          totalConfidence: data.confidence_breakdown.total_confidence,
-          qualityFactor: data.confidence_breakdown.quality_factor,
-          geometricConsistency: data.confidence_breakdown.geometric_consistency,
-          modelConfidence: data.confidence_breakdown.model_confidence,
-          stabilityFactor: data.confidence_breakdown.stability_factor,
-          failureRiskRate: data.confidence_breakdown.failure_risk_rate,
+          totalConfidence,
+          qualityFactor: parts.quality_factor!,
+          geometricConsistency: parts.geometric_consistency!,
+          modelConfidence: parts.model_confidence!,
+          stabilityFactor: parts.stability_factor!,
+          failureRiskRate: parts.failure_risk_rate!,
         }
       : undefined
 
@@ -319,10 +331,9 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
       innerRadiusPx: data.debug_info?.inner_radius_px ?? data.overlay_hints?.inner_circle?.radius_px,
       outerRadiusPx: data.debug_info?.outer_radius_px ?? data.overlay_hints?.outer_circle?.radius_px,
       visibleSectors: data.debug_info?.num_samples,
-      gapPixels:
-        data.debug_info?.inner_radius_px && data.debug_info?.outer_radius_px
-          ? Number((data.debug_info.outer_radius_px - data.debug_info.inner_radius_px).toFixed(1))
-          : undefined,
+      gapPixels: data.mean_gap_px ?? undefined,
+      minGapPixels: data.min_gap_px ?? undefined,
+      maxGapPixels: data.max_gap_px ?? undefined,
       overlayHints,
       resultStatus: data.result_status,
       condition: data.condition,
@@ -338,12 +349,16 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
       calibrationProfile: data.calibration_profile,
       externalClassifier: data.external_classifier,
       modelComparison: data.model_comparison,
+      semanticGate: mapSemanticGate(data.semantic_gate),
+      jointType: (data.joint_type ?? request.jointType) as CvWorkerResponse['jointType'],
     }
 
     const note =
       data.result_status === 'REJECTED_UNRELIABLE'
         ? `Rejected: ${data.rejection_reason ?? 'Confidence below acceptable threshold'}`
-        : `AI/CV: gap ${gapMm.toFixed(1)} mm [${data.result_status ?? 'ACCEPTED_MEASUREMENT'}] (${data.debug_info?.num_samples ?? 0} samples, ${(data.debug_info?.processing_time_ms ?? 0).toFixed(0)}ms)`
+        : gapMm == null
+          ? `AI/CV: physical millimetres unavailable; pixel evidence retained [${data.result_status ?? 'REVIEW_REQUIRED'}]`
+          : `AI/CV: gap ${gapMm.toFixed(1)} mm [${data.result_status ?? 'ACCEPTED_MEASUREMENT'}] (${data.debug_info?.num_samples ?? 0} samples, ${(data.debug_info?.processing_time_ms ?? 0).toFixed(0)}ms)`
 
     return {
       imageId: request.imageId,
@@ -352,7 +367,7 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
       confidence: totalConfidence,
       measurementSource: 'fastapi',
       measurementNote: note,
-      resultStatus: data.result_status ?? (totalConfidence >= 0.7 ? 'ACCEPTED_MEASUREMENT' : 'REVIEW_REQUIRED'),
+      resultStatus: gapMm == null ? 'REVIEW_REQUIRED' : data.result_status ?? (totalConfidence >= 0.7 ? 'ACCEPTED_MEASUREMENT' : 'REVIEW_REQUIRED'),
       condition: data.condition,
       confidenceBreakdown,
       rejectionReason: data.rejection_reason,
@@ -366,7 +381,16 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
       engineeringResult: data.engineering_result,
       authoritativeReason: data.authoritative_reason,
       aiExplanation: data.ai_explanation,
+      semanticGate: mapSemanticGate(data.semantic_gate),
+      executionSource: 'CLOUD_AUTHORITATIVE',
+      jointType: (data.joint_type ?? request.jointType) as CvWorkerResponse['jointType'],
     }
+  } catch (error) {
+    if (error instanceof CloudMeasurementError) throw error
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new CloudMeasurementError('TIMEOUT', `Cloud measurement exceeded ${FASTAPI_MEASURE_TIMEOUT_MS / 1000} seconds.`)
+    }
+    throw new CloudMeasurementError('CONNECTION_ERROR', error instanceof Error ? error.message : 'Cloud measurement connection failed.')
   } finally {
     clearTimeout(timeoutId)
   }
@@ -445,10 +469,37 @@ export async function measureWithWebWorker(request: CvWorkerRequest): Promise<Cv
 }
 
 export async function measureWithCv(request: CvWorkerRequest): Promise<CvWorkerResponse> {
-  try {
-    return await measureWithFastApi(request)
-  } catch (error) {
-    console.warn('[cvClient] FastAPI unavailable, falling back to in-browser Web Worker', error)
-    return await measureWithWebWorker(request)
+  return measureWithFastApi(request)
+}
+
+export async function measureLocalPreview(request: CvWorkerRequest): Promise<CvWorkerResponse> {
+  const result = await measureWithWebWorker(request)
+  return { ...result, status: 'REVIEW', measurementSource: 'offline-preview', executionSource: 'LOCAL_PREVIEW_UNVERIFIED', authoritativeGapMm: null, engineeringResult: 'REVIEW' }
+}
+
+export type CloudMeasurementErrorCode = 'TIMEOUT' | 'CONNECTION_ERROR' | 'AUTHENTICATION_ERROR' | 'RATE_LIMITED' | 'SERVER_ERROR' | 'HTTP_ERROR' | 'INVALID_RESPONSE'
+export class CloudMeasurementError extends Error {
+  readonly code: CloudMeasurementErrorCode
+  readonly status?: number
+  constructor(code: CloudMeasurementErrorCode, message: string, status?: number) {
+    super(message)
+    this.name = 'CloudMeasurementError'
+    this.code = code
+    this.status = status
+  }
+}
+
+function mapSemanticGate(raw: Record<string, unknown> | null | undefined): CvWorkerResponse['semanticGate'] {
+  if (!raw) return undefined
+  return {
+    domainStatus: typeof raw.domain_status === 'string' ? raw.domain_status as NonNullable<CvWorkerResponse['semanticGate']>['domainStatus'] : undefined,
+    processingAllowed: typeof raw.processing_allowed === 'boolean' ? raw.processing_allowed : undefined,
+    confidence: typeof raw.confidence === 'number' ? raw.confidence : undefined,
+    provider: typeof raw.provider === 'string' ? raw.provider : undefined,
+    model: typeof raw.model === 'string' ? raw.model : undefined,
+    reason: typeof raw.reason === 'string' ? raw.reason : undefined,
+    userMessage: typeof raw.user_message === 'string' ? raw.user_message : undefined,
+    observation: typeof raw.observation === 'string' ? raw.observation : undefined,
+    error: typeof raw.error === 'string' ? raw.error : undefined,
   }
 }

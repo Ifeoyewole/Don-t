@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "functions": {
+    "api/v1/cv/[...route].js": { "maxDuration": 120 }
+  },
   "headers": [
     {
       "source": "/(.*)",

@@ -73,7 +73,9 @@ export const inspectionService = {
     }
 
     const manhole = await db.manholes.get(existing.manholeId)
-    const classification = classifyGap(existing.originalGapMm, manhole?.pipeDiameterMm)
+    const classification = existing.originalGapMm == null
+      ? { status: 'REVIEW' as const }
+      : classifyGap(existing.originalGapMm, manhole?.pipeDiameterMm)
     const updated: InspectionResult = {
       ...existing,
       finalGapMm: existing.originalGapMm,
