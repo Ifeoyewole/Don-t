@@ -1,6 +1,7 @@
 # Explicitly billable operation. Do NOT run until budget authorization is verified.
 substitutions:
   _STAGE: '20000'
+  _OUTPUT_PREFIX: 'datasets/sewer-ml/curated-v3/20k'
 steps:
   - name: 'python:3.11-slim'
     id: cloud-only-staged-curation
@@ -11,7 +12,7 @@ steps:
       - |
         set -euo pipefail
         python -m pip install --no-cache-dir google-cloud-storage requests 'pillow>=10,<14'
-        python scripts/sewer_ml_pipeline/curate_staged.py --project=joint-inspection-510310 --stage=${_STAGE} --output-prefix=datasets/sewer-ml/curated-v3/${_STAGE} --allow-unverified-split --allow-bounded-full-archive --execute
+        python scripts/sewer_ml_pipeline/curate_staged.py --project=joint-inspection-510310 --stage=${_STAGE} --output-prefix=${_OUTPUT_PREFIX} --allow-unverified-split --allow-bounded-full-archive --execute
 availableSecrets:
   secretManager:
     - versionName: projects/joint-inspection-510310/secrets/sewer-ml-download-password/versions/latest
