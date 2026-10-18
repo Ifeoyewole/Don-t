@@ -39,7 +39,7 @@ def open_authorized_archive(url,username,password,*,allow_bounded_fallback=False
     try:
         reader = RemoteZip(url, username=username, password=password)
         zipped = ZipFile(reader)
-    except RangeUnsupported:
+    except (RangeUnsupported, requests.RequestException):
         if not allow_bounded_fallback: raise
     else:
         try:
