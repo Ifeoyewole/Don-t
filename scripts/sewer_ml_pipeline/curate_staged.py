@@ -331,8 +331,9 @@ def run(args):
                                   content_type='application/json')
     root=f'{args.output_prefix.rstrip("/")}/images'
     manifest_blob=bucket.blob(f'{args.output_prefix.rstrip("/")}/manifest.json')
-    prior=json.loads(manifest_blob.download_as_text()) if manifest_blob.exists() else {'records':[]}
+    prior=json.loads(manifest_blob.download_as_text()) if manifest_blob.exists() else {'records':[],'rejections':[]}
     prior_records={x['Filename']:x for x in prior['records']}
+    rejected_names={x['Filename'] for x in prior.get('rejections',[]) if x.get('Filename')}
     hashes=NearDuplicateIndex()
     for row in prior_records.values():
         hashes.add(row['Filename'],row['sha256'],int(row['dhash'],16))
@@ -365,17 +366,19 @@ def run(args):
     entries=[]
     for row in selected:
         fn=row['Filename']
-        if fn in prior_records: continue
+        if fn in prior_records or fn in rejected_names: continue
         loc=archive_index.get(fn)
         if loc is None: raise RuntimeError(f'Expected training image {fn} not found in approved archive index')
         entries.append((row,loc))
-    added=0; duplicates=[]
-    reader=GCSRangeReader(archive_blob,generation=args.gcs_archive_generation,budget=transfer_budget)
+    added=0; examined=0; duplicates=list(prior.get('rejections',[]))
+    reader=GCSRangeReader(archive_blob,generation=args.gcs_archive_generation,
+                          budget=transfer_budget,block_size=64*1024)
     try:
         from zipfile import ZipFile
         with ZipFile(reader) as z:
             for row,loc in entries:
                 if len(prior_records)>=args.stage: break
+                examined+=1
                 fn=row['Filename']
                 member=z.getinfo(loc['member'])
                 safe_member(member)
@@ -385,33 +388,35 @@ def run(args):
                 accepted,reason=hashes.add(fn,digest,dhash)
                 if not accepted:
                     duplicates.append({'Filename':fn,'reason':reason})
-                    continue
-                object_name=f'{root}/{fn}'
-                target=bucket.blob(object_name)
-                target.metadata={'sha256':digest,'source_archive':loc['archive']}
-                # A prior worker may have completed upload but expired before
-                # writing the next manifest checkpoint. Verify and resume.
-                if target.exists():
-                    target.reload()
-                    if (target.metadata or {}).get('sha256') != digest:
-                        raise RuntimeError(f'Existing resumed object digest mismatch: {object_name}')
                 else:
-                    target.upload_from_string(content,content_type='image/png' if fn.lower().endswith('.png') else 'image/jpeg',if_generation_match=0)
-                prior_records[fn]={**row,'sha256':digest,'dhash':f'{dhash:016x}',
-                                   'source_archive':loc['archive'],'source_member':loc['member'],
-                                   'source_crc':loc['crc'],'source_generation':args.gcs_archive_generation,
-                                   'GCS_URI':f'gs://{args.bucket}/{object_name}',
-                                   'generation':target.generation,'split':'train',
-                                   'acceptance_provenance':'selected_gcs_archive_range'}
-                added+=1
+                    object_name=f'{root}/{fn}'
+                    target=bucket.blob(object_name)
+                    target.metadata={'sha256':digest,'source_archive':loc['archive']}
+                    # A prior worker may have completed upload but expired before
+                    # writing the next manifest checkpoint. Verify and resume.
+                    if target.exists():
+                        target.reload()
+                        if (target.metadata or {}).get('sha256') != digest:
+                            raise RuntimeError(f'Existing resumed object digest mismatch: {object_name}')
+                    else:
+                        target.upload_from_string(content,content_type='image/png' if fn.lower().endswith('.png') else 'image/jpeg',if_generation_match=0)
+                    prior_records[fn]={**row,'sha256':digest,'dhash':f'{dhash:016x}',
+                                       'source_archive':loc['archive'],'source_member':loc['member'],
+                                       'source_crc':loc['crc'],'source_generation':args.gcs_archive_generation,
+                                       'GCS_URI':f'gs://{args.bucket}/{object_name}',
+                                       'generation':target.generation,'split':'train',
+                                       'acceptance_provenance':'selected_gcs_archive_range'}
+                    added+=1
                 # Batch checkpoint minimizes GCS writes. Object-level generation
                 # preconditions make restart after an interrupted batch safe.
-                if added % 200 == 0:
+                if examined % 200 == 0:
                     manifest_blob.upload_from_string(json.dumps({'records':list(prior_records.values()),
+                        'rejections':duplicates,
                         'source_bytes_transferred':transfer_budget.consumed_bytes},sort_keys=True))
     finally:
         reader.close()
-    manifest_blob.upload_from_string(json.dumps({'records':list(prior_records.values())},sort_keys=True))
+    manifest_blob.upload_from_string(json.dumps({'records':list(prior_records.values()),
+        'rejections':duplicates,'source_bytes_transferred':transfer_budget.consumed_bytes},sort_keys=True))
     if len(prior_records)<args.stage:
         # Cannot claim target achieved merely because candidate manifest had N entries.
         raise RuntimeError(f'Target not met: {len(prior_records)} unique images after dedup; '
