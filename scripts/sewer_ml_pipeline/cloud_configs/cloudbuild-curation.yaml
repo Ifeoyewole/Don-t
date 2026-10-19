@@ -6,21 +6,16 @@ steps:
   - name: 'python:3.11-slim'
     id: cloud-only-staged-curation
     entrypoint: bash
-    secretEnv: ['SEWER_PASSWORD']
     args:
       - '-c'
       - |
         set -euo pipefail
         python -m pip install --no-cache-dir google-cloud-storage requests 'pillow>=10,<14'
-        python scripts/sewer_ml_pipeline/curate_staged.py --project=joint-inspection-510310 --stage=${_STAGE} --output-prefix=${_OUTPUT_PREFIX} --allow-unverified-split --execute
-availableSecrets:
-  secretManager:
-    - versionName: projects/joint-inspection-510310/secrets/sewer-ml-download-password/versions/latest
-      env: SEWER_PASSWORD
+        python scripts/sewer_ml_pipeline/curate_staged.py --project=joint-inspection-510310 --stage=${_STAGE} --output-prefix=${_OUTPUT_PREFIX} --gcs-archive-generation=1792401703914215 --max-source-bytes=17179869184 --allow-unverified-split --execute
 options:
   # LEGACY keeps Cloud Logging while also making the complete step log available
   # through the Cloud Storage-backed `gcloud builds log` path.
   logging: LEGACY
   machineType: E2_HIGHCPU_8
-  diskSizeGb: 100
+  diskSizeGb: 20
 timeout: 7200s

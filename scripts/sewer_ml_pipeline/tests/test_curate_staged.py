@@ -8,13 +8,10 @@ def rows(n):
     return [{'Filename':f'{i}.png','video_id':f'vid{i//25}','FS':str(int(i%3==0)),
              'DE':str(int(i%40==0)), 'ND':str(int(i%3!=0))} for i in range(n)]
 
-def test_stages_are_nested_not_additive():
-    data=rows(100030)
-    s20=staged_select(data,20000)
-    s30=staged_select(data,30000)
-    s100=staged_select(data,100000)
-    assert set(r['Filename'] for r in s20)<set(r['Filename'] for r in s30)
-    assert set(r['Filename'] for r in s30)<set(r['Filename'] for r in s100)
+def test_campaign_accepts_only_fixed_20k_stage():
+    data=rows(30000)
+    assert len(staged_select(data,20000)) == 20000
+    with pytest.raises(ValueError): staged_select(data,30000)
 
 def test_validation_disjoint_by_source_group():
     groups=partition_validation(rows(3000))

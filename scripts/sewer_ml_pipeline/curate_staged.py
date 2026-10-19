@@ -1,4 +1,4 @@
-"""Cloud-only incremental Sewer-ML curation (20K -> 30K -> up to 100K TOTAL).
+"""Cloud-only Sewer-ML curation for the fixed 20K research campaign.
 
 Source CSVs and archive list must be supplied from authorized metadata. This script
 never transfers images through a developer workstation and only runs --execute on
@@ -20,11 +20,13 @@ from urllib.parse import urljoin
 import requests
 from PIL import Image
 from bounded_archive import open_authorized_archive
+from gcs_zip import GCSRangeReader, TransferBudget
 
 TARGETS = ('FS','IS','RB','DE','RO','AF','BE','FO','ND')
 GROUP_KEYS = ('video_id', 'VideoID', 'VideoId', 'inspection_id', 'InspectionID', 'SequenceID', 'source_group')
-STAGES = (20000, 30000, 100000)
+STAGES = (20000,)
 MAX_IMAGE_BYTES = 32 * 1024 * 1024
+MAX_COMPRESSION_RATIO = 200
 
 
 def csv_records(content: bytes):
@@ -184,6 +186,36 @@ def source_archive_index(urls, user, password):
     return result
 
 
+def safe_member(info):
+    path = Path(info.filename)
+    if path.is_absolute() or '..' in path.parts or info.is_dir():
+        raise ValueError(f'Unsafe ZIP member path: {info.filename}')
+    if info.file_size > MAX_IMAGE_BYTES:
+        raise ValueError(f'ZIP member exceeds decompressed limit: {info.filename}')
+    if info.compress_size <= 0 or info.file_size / info.compress_size > MAX_COMPRESSION_RATIO:
+        raise ValueError(f'ZIP member compression ratio rejected: {info.filename}')
+
+
+def gcs_archive_index(blob, generation, budget):
+    result = {}
+    reader = GCSRangeReader(blob, generation=generation, budget=budget)
+    try:
+        from zipfile import ZipFile
+        with ZipFile(reader) as archive:
+            for member in archive.infolist():
+                if member.is_dir(): continue
+                filename = Path(member.filename).name
+                if not filename.lower().endswith(('.jpg', '.jpeg', '.png')): continue
+                safe_member(member)
+                if filename in result: raise ValueError(f'Ambiguous GCS archive filename: {filename}')
+                result[filename] = {'archive': Path(blob.name).name, 'member': member.filename,
+                                    'size': member.file_size, 'compressed_size': member.compress_size,
+                                    'crc': member.CRC, 'generation': int(generation)}
+    finally:
+        reader.close()
+    return result
+
+
 def gcp_attestation(expected_project):
     for url in ('http://metadata.google.internal/computeMetadata/v1/project/project-id',
                 'http://169.254.169.254/computeMetadata/v1/project/project-id'):
@@ -276,30 +308,27 @@ def run(args):
     bucket=client.bucket(args.bucket)
     data=bucket.blob(args.train_manifest).download_as_bytes()
     train_rows=csv_records(data)
-    selected=staged_select(train_rows,args.stage,group_cap=args.group_cap,
-                           reserve=max(2000,args.stage//5) if args.execute else 0,
-                           allow_unverified_split=args.allow_unverified_split)
     if not args.execute:
+        selected=staged_select(train_rows,args.stage,group_cap=args.group_cap,
+                               reserve=0,allow_unverified_split=args.allow_unverified_split)
         stats=Counter(c for row in selected for c in labels(row))
         print(json.dumps({'stage_target_total':args.stage,'metadata_selected':len(selected),
                           'class_positive_counts':stats,'executed':False},indent=2))
         return
-    user=os.environ.get('SEWER_USER','operator')
-    password=os.environ.get('SEWER_PASSWORD')
-    if not password: raise RuntimeError('Missing SEWER_PASSWORD from GCP Secret Manager')
-    url_list=json.loads(bucket.blob(args.archive_list).download_as_text())
-    # URL list references only authorized training archives, not test/validation.
-    from urllib.parse import urlsplit
-    if any(urlsplit(u).hostname != 'sciencedata.dk' for u in url_list):
-        raise ValueError('Unauthorized training archive source host')
-    if any('train' not in urlsplit(u).path.rsplit('/',1)[-1].lower() for u in url_list):
-        raise ValueError('Training archive list contains non-training ZIP')
+    transfer_budget=TransferBudget(args.max_source_bytes)
+    archive_blob=bucket.blob(args.gcs_archive)
+    archive_index=gcs_archive_index(archive_blob,args.gcs_archive_generation,transfer_budget)
+    legacy_prefix=args.reuse_image_prefix.rstrip('/')+'/'
+    legacy={Path(blob.name).name:blob for blob in client.list_blobs(bucket,prefix=legacy_prefix)}
+    eligible_names=set(archive_index)|set(legacy)
+    eligible_rows=[row for row in train_rows if row.get('Filename') in eligible_names]
+    selected=staged_select(eligible_rows,args.stage,group_cap=args.group_cap,
+                           reserve=max(2000,args.stage//5),
+                           allow_unverified_split=args.allow_unverified_split)
     index_blob=bucket.blob(args.archive_index)
-    if index_blob.exists():
-        archive_index=json.loads(index_blob.download_as_text())
-    else:
-        archive_index=source_archive_index(url_list,user,password)
-        index_blob.upload_from_string(json.dumps(archive_index,sort_keys=True),content_type='application/json')
+    index_blob.upload_from_string(json.dumps({'generation':args.gcs_archive_generation,
+                                              'members':archive_index},sort_keys=True),
+                                  content_type='application/json')
     root=f'{args.output_prefix.rstrip("/")}/images'
     manifest_blob=bucket.blob(f'{args.output_prefix.rstrip("/")}/manifest.json')
     prior=json.loads(manifest_blob.download_as_text()) if manifest_blob.exists() else {'records':[]}
@@ -307,22 +336,49 @@ def run(args):
     hashes=NearDuplicateIndex()
     for row in prior_records.values():
         hashes.add(row['Filename'],row['sha256'],int(row['dhash'],16))
-    byarchive=defaultdict(list)
+    reused=0; reuse_rejected=[]
+    for row in selected:
+        if len(prior_records)>=args.stage: break
+        fn=row['Filename']
+        if fn in prior_records or fn not in legacy: continue
+        blob=legacy[fn]
+        blob.reload()
+        if not blob.size or blob.size>MAX_IMAGE_BYTES:
+            reuse_rejected.append({'Filename':fn,'reason':'invalid_size'})
+            continue
+        content=blob.download_as_bytes(if_generation_match=blob.generation)
+        digest=hashlib.sha256(content).hexdigest()
+        dhash=image_dhash(content)
+        accepted,reason=hashes.add(fn,digest,dhash)
+        if not accepted:
+            reuse_rejected.append({'Filename':fn,'reason':reason})
+            continue
+        metadata=blob.metadata or {}
+        prior_records[fn]={**row,'sha256':digest,'dhash':f'{dhash:016x}',
+                           'source_archive':metadata.get('source_archive','legacy_curated'),
+                           'source_member':metadata.get('source_member',fn),
+                           'source_crc':metadata.get('source_crc',''),
+                           'GCS_URI':f'gs://{args.bucket}/{blob.name}',
+                           'generation':int(blob.generation),'split':'train',
+                           'acceptance_provenance':'verified_existing_gcs'}
+        reused+=1
+    entries=[]
     for row in selected:
         fn=row['Filename']
         if fn in prior_records: continue
         loc=archive_index.get(fn)
         if loc is None: raise RuntimeError(f'Expected training image {fn} not found in approved archive index')
-        byarchive[loc['url']].append((row,loc))
+        entries.append((row,loc))
     added=0; duplicates=[]
-    for url,entries in byarchive.items():
-        if len(prior_records)>=args.stage: break
-        with open_authorized_archive(url,user,password) as z:
+    reader=GCSRangeReader(archive_blob,generation=args.gcs_archive_generation,budget=transfer_budget)
+    try:
+        from zipfile import ZipFile
+        with ZipFile(reader) as z:
             for row,loc in entries:
                 if len(prior_records)>=args.stage: break
                 fn=row['Filename']
                 member=z.getinfo(loc['member'])
-                if member.file_size>MAX_IMAGE_BYTES: raise RuntimeError(f'Image exceeds cap: {fn}')
+                safe_member(member)
                 content=z.read(member)  # ZIP decompression + CRC verification
                 digest=hashlib.sha256(content).hexdigest()
                 dhash=image_dhash(content)
@@ -343,13 +399,18 @@ def run(args):
                     target.upload_from_string(content,content_type='image/png' if fn.lower().endswith('.png') else 'image/jpeg',if_generation_match=0)
                 prior_records[fn]={**row,'sha256':digest,'dhash':f'{dhash:016x}',
                                    'source_archive':loc['archive'],'source_member':loc['member'],
-                                   'source_crc':loc['crc'],'GCS_URI':f'gs://{args.bucket}/{object_name}',
-                                   'generation':target.generation,'split':'train'}
+                                   'source_crc':loc['crc'],'source_generation':args.gcs_archive_generation,
+                                   'GCS_URI':f'gs://{args.bucket}/{object_name}',
+                                   'generation':target.generation,'split':'train',
+                                   'acceptance_provenance':'selected_gcs_archive_range'}
                 added+=1
                 # Batch checkpoint minimizes GCS writes. Object-level generation
                 # preconditions make restart after an interrupted batch safe.
                 if added % 200 == 0:
-                    manifest_blob.upload_from_string(json.dumps({'records':list(prior_records.values())},sort_keys=True))
+                    manifest_blob.upload_from_string(json.dumps({'records':list(prior_records.values()),
+                        'source_bytes_transferred':transfer_budget.consumed_bytes},sort_keys=True))
+    finally:
+        reader.close()
     manifest_blob.upload_from_string(json.dumps({'records':list(prior_records.values())},sort_keys=True))
     if len(prior_records)<args.stage:
         # Cannot claim target achieved merely because candidate manifest had N entries.
@@ -361,7 +422,9 @@ def run(args):
                                    allow_unverified_split=args.allow_unverified_split)
     print(json.dumps({'executed':True,'stage_target_total':args.stage,
                       'verified_unique_records':len(prior_records),'added':added,
-                      'duplicates':len(duplicates),'splits':splits_summary},indent=2))
+                      'reused':reused,'reuse_rejected':len(reuse_rejected),
+                      'duplicates':len(duplicates),'splits':splits_summary,
+                      'source_bytes_transferred':transfer_budget.consumed_bytes},indent=2))
 
 
 def main():
@@ -372,8 +435,11 @@ def main():
     p.add_argument('--train-manifest',default='datasets/sewer-ml/original-annotations/SewerML_Train.csv')
     p.add_argument('--val-manifest',default='datasets/sewer-ml/splits/validation/curated_val.csv')
     p.add_argument('--val-image-prefix',default='datasets/sewer-ml/curated/images')
-    p.add_argument('--archive-list',default='datasets/sewer-ml/source/train_archive_urls.json')
     p.add_argument('--archive-index',default='datasets/sewer-ml/source/train_archive_index.json')
+    p.add_argument('--gcs-archive',default='datasets/sewer-ml/source/archives/train00.zip')
+    p.add_argument('--reuse-image-prefix',default='datasets/sewer-ml/curated/images')
+    p.add_argument('--gcs-archive-generation',type=int,required=True)
+    p.add_argument('--max-source-bytes',type=int,default=16*1024**3)
     p.add_argument('--output-prefix',default='datasets/sewer-ml/curated-v3')
     p.add_argument('--group-cap',type=int,default=300)
     p.add_argument('--allow-unverified-split',action='store_true',
