@@ -1,0 +1,82 @@
+# Server-side handoff: wait for the authorized 20K curation build, verify its
+# immutable inputs, then submit one bounded EfficientNet-B0 Vertex job.
+# No dataset or model bytes transit a developer workstation.
+steps:
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    id: verify-curation-and-submit-vertex
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        project='joint-inspection-510310'
+        region='europe-west2'
+        prefix='gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v3/20k'
+        image='europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/v3@sha256:cf8bd2775a83395d3c6458ae2f451029b9f42f3d67bd83c2f23ac48a41d5c82f'
+
+        deadline=$$((SECONDS + 27000))
+        until gcloud storage objects describe "$${prefix}/splits/train.csv" >/dev/null 2>&1; do
+          if (( SECONDS >= deadline )); then
+            echo 'Timed out waiting for verified curation outputs; refusing GPU submission' >&2
+            exit 1
+          fi
+          sleep 120
+        done
+
+        # Reject stale outputs from any earlier attempt. The approved curation
+        # build started at 2026-10-19T02:15:08Z and creates both objects only
+        # after it has finished uploading and deduplicating the 20K corpus.
+        minimum_epoch="$(date -d '2026-10-19T02:15:08Z' +%s)"
+        for sentinel in manifest.json splits/train.csv; do
+          created="$(gcloud storage objects describe "$${prefix}/$${sentinel}" --format='value(creation_time)')"
+          created_epoch="$(date -d "$${created}" +%s)"
+          (( created_epoch >= minimum_epoch )) || { echo "Stale curation sentinel: $${sentinel}" >&2; exit 1; }
+        done
+
+        image_count="$(gcloud storage ls "$${prefix}/images/**" | wc -l | tr -d ' ')"
+        test "$${image_count}" = '20000' || { echo "Expected 20000 images, found $${image_count}" >&2; exit 1; }
+        for split in train early_stop threshold_tune dev_report; do
+          gcloud storage objects describe "$${prefix}/splits/$${split}.csv" >/dev/null
+        done
+
+        gcloud storage cat "$${prefix}/splits/train.csv" > /workspace/train.csv
+        train_hash="$(sha256sum /workspace/train.csv | cut -d' ' -f1)"
+        config_id="20k-$${train_hash:0:16}-efficientnet-b0"
+        output="gs://joint-inspection-510310-data/models/sewer-ml/v3/research-candidates/$${config_id}"
+
+        cat > /workspace/vertex-job.yaml <<EOF
+        workerPoolSpecs:
+        - machineSpec:
+            machineType: n1-standard-8
+            acceleratorType: NVIDIA_TESLA_T4
+            acceleratorCount: 1
+          replicaCount: 1
+          diskSpec:
+            bootDiskType: pd-ssd
+            bootDiskSizeGb: 150
+          containerSpec:
+            imageUri: $${image}
+            args:
+            - --project=$${project}
+            - --train=$${prefix}/splits/train.csv
+            - --early-stop=$${prefix}/splits/early_stop.csv
+            - --threshold-tune=$${prefix}/splits/threshold_tune.csv
+            - --dev-report=$${prefix}/splits/dev_report.csv
+            - --output-prefix=$${output}
+            - --config-id=$${config_id}
+            - --architecture=efficientnet_b0
+            - --epochs=20
+            - --batch-size=32
+        scheduling:
+          timeout: 21600s
+          restartJobOnWorkerRestart: false
+        EOF
+
+        gcloud ai custom-jobs create \
+          --project="$${project}" \
+          --region="$${region}" \
+          --display-name="jointinspect-$${config_id}" \
+          --config=/workspace/vertex-job.yaml
+options:
+  logging: LEGACY
+timeout: 28800s
