@@ -42,7 +42,6 @@ def run():
     password=os.environ.get('SEWER_PASSWORD')
     if not password: raise RuntimeError('Secret Manager SEWER_PASSWORD environment binding required')
     user=os.environ.get('SEWER_USER','operator')
-    allow_bounded=os.environ.get('ALLOW_BOUNDED_FULL_ARCHIVE','false').lower() == 'true'
     from google.cloud import storage
     client=storage.Client(project=PROJECT)
     bucket=client.bucket(BUCKET)
@@ -70,7 +69,7 @@ def run():
     saved=prior['rows']
     members={}
     for archive_url in archive_list:
-        with open_authorized_archive(archive_url,user,password,allow_bounded_fallback=allow_bounded) as z:
+        with open_authorized_archive(archive_url,user,password) as z:
             for info in z.infolist():
                 name=Path(info.filename).name
                 if name in selected:
@@ -84,7 +83,7 @@ def run():
         if name in saved: continue
         by_url[members[name]['url']].append(name)
     for url,filenames in by_url.items():
-        with open_authorized_archive(url,user,password,allow_bounded_fallback=allow_bounded) as z:
+        with open_authorized_archive(url,user,password) as z:
             for name in filenames:
                 info=z.getinfo(members[name]['member'])
                 if info.file_size > 32*1024*1024:

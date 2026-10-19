@@ -19,7 +19,6 @@ from pathlib import Path
 from urllib.parse import urljoin
 import requests
 from PIL import Image
-from remote_zip import RemoteZip, RangeUnsupported
 from bounded_archive import open_authorized_archive
 
 TARGETS = ('FS','IS','RB','DE','RO','AF','BE','FO','ND')
@@ -168,12 +167,12 @@ class NearDuplicateIndex:
         return True,'unique'
 
 
-def source_archive_index(urls, user, password, allow_bounded_fallback=False):
+def source_archive_index(urls, user, password):
     """ZIP central-directory-only index. Never fetches full archives."""
     result={}
     for url in urls:
         archive=url.rsplit('/',1)[-1]
-        with open_authorized_archive(url,user,password,allow_bounded_fallback=allow_bounded_fallback) as z:
+        with open_authorized_archive(url,user,password) as z:
             for member in z.infolist():
                 if member.is_dir(): continue
                 filename=Path(member.filename).name
@@ -299,7 +298,7 @@ def run(args):
     if index_blob.exists():
         archive_index=json.loads(index_blob.download_as_text())
     else:
-        archive_index=source_archive_index(url_list,user,password,args.allow_bounded_full_archive)
+        archive_index=source_archive_index(url_list,user,password)
         index_blob.upload_from_string(json.dumps(archive_index,sort_keys=True),content_type='application/json')
     root=f'{args.output_prefix.rstrip("/")}/images'
     manifest_blob=bucket.blob(f'{args.output_prefix.rstrip("/")}/manifest.json')
@@ -318,7 +317,7 @@ def run(args):
     added=0; duplicates=[]
     for url,entries in byarchive.items():
         if len(prior_records)>=args.stage: break
-        with open_authorized_archive(url,user,password,allow_bounded_fallback=args.allow_bounded_full_archive) as z:
+        with open_authorized_archive(url,user,password) as z:
             for row,loc in entries:
                 if len(prior_records)>=args.stage: break
                 fn=row['Filename']
@@ -377,8 +376,6 @@ def main():
     p.add_argument('--archive-index',default='datasets/sewer-ml/source/train_archive_index.json')
     p.add_argument('--output-prefix',default='datasets/sewer-ml/curated-v3')
     p.add_argument('--group-cap',type=int,default=300)
-    p.add_argument('--allow-bounded-full-archive',action='store_true',
-                   help='Explicit cloud-only disk-bounded fallback; disabled by default')
     p.add_argument('--allow-unverified-split',action='store_true',
                    help='Explicitly allow unsegmented partition without sequence IDs; certifies research-only')
     p.add_argument('--execute',action='store_true')
