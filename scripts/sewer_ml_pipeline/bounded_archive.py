@@ -7,6 +7,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 import os
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 from urllib.parse import urljoin,urlsplit
@@ -20,7 +21,7 @@ def safe_response(session,url,user,password,headers):
     if origin.scheme!='https':raise ValueError('HTTPS required')
     for _ in range(4):
         r=session.get(url,auth=(user,password),headers=headers,allow_redirects=False,
-                      stream=True,timeout=120)
+                      stream=True,timeout=(30,900))
         if r.status_code in (301,302,303,307,308):
             target=urljoin(url,r.headers.get('Location',''))
             nexturl=urlsplit(target)
@@ -56,7 +57,8 @@ def open_authorized_archive(url,username,password,*,allow_bounded_fallback=False
         session=requests.Session()
         limit=int(max_archive_gb*1024**3)
         last_error=None
-        for attempt in range(3):
+        attempts=5
+        for attempt in range(attempts):
             offset=target.stat().st_size if target.exists() else 0
             headers={'Accept-Encoding':'identity'}
             if offset:headers['Range']=f'bytes={offset}-'
@@ -93,5 +95,10 @@ def open_authorized_archive(url,username,password,*,allow_bounded_fallback=False
                 return
             except (requests.RequestException,IOError,BadZipFile) as error:
                 last_error=error
+                retained=target.stat().st_size if target.exists() else 0
+                print(f'Archive transfer attempt {attempt + 1}/{attempts} failed: '
+                      f'{type(error).__name__}; retained_bytes={retained}',
+                      file=sys.stderr,flush=True)
                 # Partial file retained only inside bounded GCP tempfile for next attempt.
-        raise RuntimeError(f'Archive transfer failed after 3 attempts: {type(last_error).__name__}')
+        raise RuntimeError(f'Archive transfer failed after {attempts} attempts: '
+                           f'{type(last_error).__name__}')
