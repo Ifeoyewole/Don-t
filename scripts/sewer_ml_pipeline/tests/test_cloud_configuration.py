@@ -8,6 +8,8 @@ def test_active_20k_curation_cannot_enable_full_archive_download():
     config = (ROOT / "cloud_configs/cloudbuild-curation.yaml").read_text()
     assert "--allow-bounded-full-archive" not in config
     assert "cloudbuild-stage-archive" not in config
+    assert "python -m venv /workspace/venv" in config
+    assert "/workspace/venv/bin/python -m pip install" in config
 
 
 def test_no_active_cloud_config_stages_a_complete_source_archive():

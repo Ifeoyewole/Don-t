@@ -10,8 +10,9 @@ steps:
       - '-c'
       - |
         set -euo pipefail
-        python -m pip install --no-cache-dir google-cloud-storage requests 'pillow>=10,<14'
-        python scripts/sewer_ml_pipeline/curate_staged.py --project=joint-inspection-510310 --stage=${_STAGE} --output-prefix=${_OUTPUT_PREFIX} --gcs-archive-generation=1792401703914215 --max-source-bytes=17179869184 --allow-unverified-split --execute
+        python -m venv /workspace/venv
+        /workspace/venv/bin/python -m pip install --no-cache-dir google-cloud-storage requests 'pillow>=10,<14'
+        /workspace/venv/bin/python scripts/sewer_ml_pipeline/curate_staged.py --project=joint-inspection-510310 --stage=${_STAGE} --output-prefix=${_OUTPUT_PREFIX} --gcs-archive-generation=1792401703914215 --max-source-bytes=17179869184 --allow-unverified-split --execute
 options:
   # LEGACY keeps Cloud Logging while also making the complete step log available
   # through the Cloud Storage-backed `gcloud builds log` path.
