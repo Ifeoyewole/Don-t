@@ -1,0 +1,10 @@
+steps:
+- name: python:3.11-slim
+  id: wrc-compatibility
+  entrypoint: bash
+  args: ['-c', "python -m venv /workspace/wrc-venv && /workspace/wrc-venv/bin/pip install --no-cache-dir google-cloud-storage tensorflow-cpu==2.15.1 'pillow>=10,<14' && /workspace/wrc-venv/bin/python scripts/sewer_ml_pipeline/cloud_parallel_audit.py --mode=wrc"]
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+  diskSizeGb: 30
+timeout: 3600s

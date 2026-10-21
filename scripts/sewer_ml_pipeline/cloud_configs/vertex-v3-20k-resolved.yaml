@@ -1,0 +1,26 @@
+workerPoolSpecs:
+- machineSpec:
+    machineType: n1-standard-8
+    acceleratorType: NVIDIA_TESLA_T4
+    acceleratorCount: 1
+  replicaCount: 1
+  diskSpec:
+    bootDiskType: pd-ssd
+    bootDiskSizeGb: 150
+  containerSpec:
+    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/v3@sha256:6c52ca265c587baffd26133078916fa297fc5321f7c2d6b2b787ee7a0a7c47fb
+    args:
+    - --project=joint-inspection-510310
+    - --train=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v3/20k/splits/train.csv
+    - --early-stop=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v3/20k/splits/early_stop.csv
+    - --threshold-tune=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v3/20k/splits/threshold_tune.csv
+    - --dev-report=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v3/20k/splits/dev_report.csv
+    - --output-prefix=gs://joint-inspection-510310-data/models/sewer-ml/v3/research-candidates/20k-g1792414253576052-d853dfd-effb0-v1
+    - --config-id=20k-g1792414253576052-d853dfd-effb0-v1
+    - --architecture=efficientnet_b0
+    - --epochs=20
+    - --batch-size=32
+    - --workers=4
+scheduling:
+  timeout: 14400s
+  restartJobOnWorkerRestart: true
