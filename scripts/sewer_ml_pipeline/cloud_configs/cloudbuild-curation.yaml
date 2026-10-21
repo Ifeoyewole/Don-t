@@ -1,7 +1,7 @@
 # Explicitly billable operation. Do NOT run until budget authorization is verified.
 substitutions:
   _STAGE: '20000'
-  _OUTPUT_PREFIX: 'datasets/sewer-ml/curated-v3/20k'
+  _OUTPUT_PREFIX: 'datasets/sewer-ml/curated-v4/20k'
 steps:
   - name: 'python:3.11-slim'
     id: cloud-only-staged-curation

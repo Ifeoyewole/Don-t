@@ -23,6 +23,11 @@ from bounded_archive import open_authorized_archive
 from gcs_zip import GCSRangeReader, TransferBudget
 
 TARGETS = ('FS','IS','RB','DE','RO','AF','BE','FO','ND')
+# Complete defect vocabulary present in the authorized Sewer-ML annotations.  We
+# must retain knowledge of the non-target columns while deciding whether a row
+# is truly normal; dropping those columns first can turn a real defect into ND.
+SOURCE_DEFECTS = ('VA','RB','OB','PF','DE','FS','IS','RO','IN','AF','BE','FO',
+                  'GR','PH','PB','OS','OP','OK')
 GROUP_KEYS = ('video_id', 'VideoID', 'VideoId', 'inspection_id', 'InspectionID', 'SequenceID', 'source_group')
 STAGES = (20000,)
 MAX_IMAGE_BYTES = 32 * 1024 * 1024
@@ -35,6 +40,47 @@ def csv_records(content: bytes):
 
 def labels(row):
     return [c for c in TARGETS if row.get(c) in ('1','1.0')]
+
+
+def normalize_target_row(row):
+    """Return a target-contract row, or None when it is not trainable.
+
+    A selected target defect is retained. A row is ND only when the source
+    explicitly marks ND, or its complete defect vocabulary is all zero and the
+    source-level Defect indicator explicitly says zero. Non-target-only defects
+    and rows with insufficient evidence are excluded fail-closed.
+    """
+    normalized = dict(row)
+    active_source = [c for c in SOURCE_DEFECTS if row.get(c) in ('1', '1.0')]
+    active_targets = [c for c in TARGETS[:-1] if row.get(c) in ('1', '1.0')]
+    explicit_nd = row.get('ND') in ('1', '1.0')
+    if explicit_nd and active_source:
+        return None
+    if active_targets:
+        normalized['ND'] = '0'
+    elif active_source:
+        return None
+    elif explicit_nd or row.get('Defect') in ('0', '0.0', 0, 0.0):
+        normalized['ND'] = '1'
+    else:
+        return None
+    for code in TARGETS:
+        normalized[code] = '1' if normalized.get(code) in ('1', '1.0', 1, 1.0) else '0'
+    return normalized
+
+
+def target_contract_rows(rows):
+    normalized = []
+    excluded = Counter()
+    for row in rows:
+        prepared = normalize_target_row(row)
+        if prepared is None:
+            has_defect = any(row.get(c) in ('1', '1.0') for c in SOURCE_DEFECTS)
+            reason = 'conflicting_nd' if has_defect and row.get('ND') in ('1', '1.0') else ('non_target_only' if has_defect else 'unproven_normal')
+            excluded[reason] += 1
+        else:
+            normalized.append(prepared)
+    return normalized, excluded
 
 
 def group_id(row):
@@ -57,9 +103,10 @@ def staged_select(rows, target, *, seed=20261015, group_cap=300, reserve=0, allo
     The selection is not a substitute for downstream image-hash deduplication.
     """
     if target not in STAGES:
-        raise ValueError('Stage must be 20000, 30000 or 100000 TOTAL')
+        raise ValueError('Stage must be exactly 20000 TOTAL')
+    prepared, _ = target_contract_rows(rows)
     seen=set(); valid=[]
-    for row in rows:
+    for row in prepared:
         fn=str(row.get('Filename','')).strip()
         if not fn or fn.casefold() in seen:
             continue
@@ -254,7 +301,7 @@ def export_splits(bucket, output_prefix: str, train_records: list[dict], *,
     val_blob = bucket.blob(val_manifest)
     val_records = []
     if val_blob.exists():
-        raw_val = csv_records(val_blob.download_as_bytes())
+        raw_val, val_excluded = target_contract_rows(csv_records(val_blob.download_as_bytes()))
         for r in raw_val:
             fn = r['Filename']
             img_blob = bucket.blob(f"{val_image_prefix.rstrip('/')}/{fn}")
@@ -297,6 +344,7 @@ def export_splits(bucket, output_prefix: str, train_records: list[dict], *,
         'early_stop': len(val_splits['early_stop']),
         'threshold_tune': len(val_splits['threshold_tune']),
         'dev_report': len(val_splits['dev_report']),
+        'validation_annotation_excluded': dict(val_excluded),
     }
 
 
@@ -307,13 +355,14 @@ def run(args):
     client=storage.Client(project=args.project)
     bucket=client.bucket(args.bucket)
     data=bucket.blob(args.train_manifest).download_as_bytes()
-    train_rows=csv_records(data)
+    train_rows, annotation_excluded = target_contract_rows(csv_records(data))
     if not args.execute:
         selected=staged_select(train_rows,args.stage,group_cap=args.group_cap,
                                reserve=0,allow_unverified_split=args.allow_unverified_split)
         stats=Counter(c for row in selected for c in labels(row))
         print(json.dumps({'stage_target_total':args.stage,'metadata_selected':len(selected),
-                          'class_positive_counts':stats,'executed':False},indent=2))
+                          'class_positive_counts':stats,'annotation_excluded':annotation_excluded,
+                          'executed':False},indent=2))
         return
     transfer_budget=TransferBudget(args.max_source_bytes)
     archive_blob=bucket.blob(args.gcs_archive)
@@ -429,6 +478,7 @@ def run(args):
                       'verified_unique_records':len(prior_records),'added':added,
                       'reused':reused,'reuse_rejected':len(reuse_rejected),
                       'duplicates':len(duplicates),'splits':splits_summary,
+                      'annotation_excluded':annotation_excluded,
                       'source_bytes_transferred':transfer_budget.consumed_bytes},indent=2))
 
 

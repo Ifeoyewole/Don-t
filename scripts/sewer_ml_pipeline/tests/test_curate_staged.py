@@ -2,11 +2,34 @@ from pathlib import Path
 import io,sys
 import pytest
 from PIL import Image
-from curate_staged import staged_select, partition_validation, verify_disjoint, NearDuplicateIndex, image_dhash
+from curate_staged import (staged_select, partition_validation, verify_disjoint,
+                           NearDuplicateIndex, image_dhash, normalize_target_row,
+                           target_contract_rows)
+
+def test_true_normal_is_derived_only_from_authoritative_zero_defect():
+    row = {'Filename': 'normal.png', 'Defect': '0', **{c: '0' for c in ('VA','RB','OB','PF','DE','FS','IS','RO','IN','AF','BE','FO','GR','PH','PB','OS','OP','OK')}}
+    assert normalize_target_row(row)['ND'] == '1'
+
+def test_non_target_only_defect_is_not_relabelled_normal():
+    row = {'Filename': 'other.png', 'OB': '1', 'Defect': '1', 'ND': '0'}
+    assert normalize_target_row(row) is None
+
+def test_unknown_unlabelled_row_fails_closed():
+    assert normalize_target_row({'Filename': 'unknown.png'}) is None
+
+def test_every_admitted_row_has_a_target_label():
+    admitted, excluded = target_contract_rows([
+        {'Filename': 'target.png', 'FS': '1', 'Defect': '1'},
+        {'Filename': 'normal.png', 'ND': '1'},
+        {'Filename': 'other.png', 'OB': '1', 'Defect': '1'},
+    ])
+    assert len(admitted) == 2
+    assert excluded['non_target_only'] == 1
+    assert all(any(row[c] == '1' for c in ('FS','IS','RB','DE','RO','AF','BE','FO','ND')) for row in admitted)
 
 def rows(n):
     return [{'Filename':f'{i}.png','video_id':f'vid{i//25}','FS':str(int(i%3==0)),
-             'DE':str(int(i%40==0)), 'ND':str(int(i%3!=0))} for i in range(n)]
+             'DE':str(int(i%40==0)), 'ND':str(int(i%3!=0 and i%40!=0))} for i in range(n)]
 
 def test_campaign_accepts_only_fixed_20k_stage():
     data=rows(30000)
