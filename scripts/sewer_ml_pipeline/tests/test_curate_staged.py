@@ -36,6 +36,11 @@ def test_campaign_accepts_only_fixed_20k_stage():
     assert len(staged_select(data,20000)) == 20000
     with pytest.raises(ValueError): staged_select(data,30000)
 
+def test_candidate_reserve_extends_pool_without_changing_target_contract():
+    selected = staged_select(rows(30000), 20000, reserve=6000)
+    assert len(selected) == 26000
+    assert all(any(r.get(c) in ('1', '1.0') for c in ('FS','IS','RB','DE','RO','AF','BE','FO','ND')) for r in selected)
+
 def test_validation_disjoint_by_source_group():
     groups=partition_validation(rows(3000))
     assert verify_disjoint(groups)['filenames']==3000

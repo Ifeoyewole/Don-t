@@ -372,7 +372,7 @@ def run(args):
     eligible_names=set(archive_index)|set(legacy)
     eligible_rows=[row for row in train_rows if row.get('Filename') in eligible_names]
     selected=staged_select(eligible_rows,args.stage,group_cap=args.group_cap,
-                           reserve=max(2000,args.stage//5),
+                           reserve=args.reserve,
                            allow_unverified_split=args.allow_unverified_split)
     index_blob=bucket.blob(args.archive_index)
     index_blob.upload_from_string(json.dumps({'generation':args.gcs_archive_generation,
@@ -497,6 +497,8 @@ def main():
     p.add_argument('--max-source-bytes',type=int,default=16*1024**3)
     p.add_argument('--output-prefix',default='datasets/sewer-ml/curated-v3')
     p.add_argument('--group-cap',type=int,default=300)
+    p.add_argument('--reserve',type=int,default=4000,
+                   help='Extra ranked candidates available to replace duplicates/rejections')
     p.add_argument('--allow-unverified-split',action='store_true',
                    help='Explicitly allow unsegmented partition without sequence IDs; certifies research-only')
     p.add_argument('--execute',action='store_true')
