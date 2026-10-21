@@ -9,6 +9,7 @@ public/
 MultiLabel_SewerDefect_SSL/
 training/
 .pytest_cache/
+.tmp/
 __pycache__/
 *.pyc
 *.gstmp

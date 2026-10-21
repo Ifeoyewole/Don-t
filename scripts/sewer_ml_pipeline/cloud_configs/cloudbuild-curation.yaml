@@ -17,6 +17,8 @@ options:
   # LEGACY keeps Cloud Logging while also making the complete step log available
   # through the Cloud Storage-backed `gcloud builds log` path.
   logging: LEGACY
-  machineType: E2_HIGHCPU_8
+  # The curator is sequential and GCS-bound; the standard worker is cheaper
+  # than high-CPU while preserving the same 8 GiB memory envelope.
+  machineType: E2_STANDARD_2
   diskSizeGb: 20
-timeout: 7200s
+timeout: 14400s
