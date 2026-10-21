@@ -8,6 +8,7 @@
           {
             "container": {
               "imageUri": "europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/v3@sha256:6c52ca265c587baffd26133078916fa297fc5321f7c2d6b2b787ee7a0a7c47fb",
+              "options": "--shm-size=8g",
               "entrypoint": "python",
               "commands": [
                 "scripts/sewer_ml_pipeline/cloud_train_v3.py",
@@ -30,7 +31,7 @@
           "cpuMilli": 8000,
           "memoryMib": 28672
         },
-        "maxRunDuration": "14400s",
+        "maxRunDuration": "28800s",
         "maxRetryCount": 0
       }
     }
