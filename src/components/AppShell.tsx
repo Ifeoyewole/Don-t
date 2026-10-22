@@ -356,14 +356,6 @@ export const AppShell = ({
             <div className="sidebar-section-title">Engine & Specs</div>
             <nav className="sidebar-nav">
               <button
-                className={navKey === 'code' ? 'sidebar-item is-active' : 'sidebar-item'}
-                type="button"
-                onClick={() => handleSidebarClick('code')}
-              >
-                <CloudIcon />
-                <span>Control room</span>
-              </button>
-              <button
                 className={navKey === 'calibration' ? 'sidebar-item is-active' : 'sidebar-item'}
                 type="button"
                 onClick={() => handleSidebarClick('calibration')}

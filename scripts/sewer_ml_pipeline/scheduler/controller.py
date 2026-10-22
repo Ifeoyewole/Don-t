@@ -127,7 +127,14 @@ def read_status() -> dict[str, Any]:
     blob = _json_blob("status.json")
     if not blob.exists():
         return {"state": "DISCOVERING", "reason": "Controller inventory has not run yet.", "submission_enabled": SUBMISSION_ENABLED, "jobs": []}
-    return json.loads(blob.download_as_text())
+    status = json.loads(blob.download_as_text())
+    pipeline_blob = _json_blob("pipeline-status.json")
+    if pipeline_blob.exists():
+        status["pipeline"] = json.loads(pipeline_blob.download_as_text())
+    status["max_active_gpu_jobs"] = int(os.getenv("MAX_ACTIVE_GPU_JOBS", "1"))
+    status["required_global_gpu_quota"] = float(os.getenv("REQUIRED_GLOBAL_GPU_QUOTA", "1"))
+    status["scheduler_interval_minutes"] = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "15"))
+    return status
 
 
 def run_controller() -> dict[str, Any]:
