@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 import os
 import socket
+import base64
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from flask import Flask, jsonify
-from google.cloud import batch_v1, compute_v1, storage
+from flask import Flask, jsonify, request
+from google.cloud import batch_v1, compute_v1, storage, logging_v2
 from google.api_core.exceptions import PreconditionFailed
 
 try:
@@ -21,6 +23,8 @@ STATE_BUCKET = os.getenv("STATE_BUCKET", "joint-inspection-510310-orchestration"
 STATE_PREFIX = os.getenv("STATE_PREFIX", "orchestration/gpu-scheduler/v1")
 SUBMISSION_ENABLED = os.getenv("SUBMISSION_ENABLED", "false").lower() == "true"
 LOCK_TTL_SECONDS = int(os.getenv("LOCK_TTL_SECONDS", "840"))
+UPLOAD_PREFIX = os.getenv("UPLOAD_PREFIX", "operator-uploads")
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(2 * 1024 * 1024)))
 app = Flask(__name__)
 
 
@@ -137,6 +141,47 @@ def read_status() -> dict[str, Any]:
     return status
 
 
+def recent_logs(source: str, limit: int) -> list[dict[str, Any]]:
+    filters = {
+        "build": 'resource.type="build"',
+        "batch": '(resource.type="batch_task" OR resource.type="batch_job")',
+        "run": 'resource.type="cloud_run_revision" AND resource.labels.service_name="jointinspect-gpu-controller"',
+    }
+    if source not in filters:
+        raise ValueError("Unsupported log source")
+    entries = logging_v2.Client(project=PROJECT).list_entries(
+        filter_=filters[source], order_by=logging_v2.DESCENDING, max_results=min(max(limit, 1), 300)
+    )
+    result = []
+    for entry in entries:
+        payload = entry.payload
+        if isinstance(payload, dict):
+            message = json.dumps(payload, sort_keys=True, default=str)
+        else:
+            message = str(payload)
+        result.append({"timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
+                       "severity": str(entry.severity or "DEFAULT"), "message": message[:12000]})
+    return result
+
+
+def diagnostics() -> dict[str, Any]:
+    status = read_status()
+    return {
+        "generated_at": utcnow().isoformat(), "project": PROJECT,
+        "controller_revision": os.getenv("K_REVISION"), "service": os.getenv("K_SERVICE"),
+        "region": os.getenv("GOOGLE_CLOUD_REGION", "europe-west2"),
+        "global_gpu_quota": global_gpu_quota(), "status": status,
+        "storage": {"bucket": STATE_BUCKET, "state_prefix": STATE_PREFIX, "upload_prefix": UPLOAD_PREFIX},
+        "commands": [
+            {"id":"refresh","label":"Refresh all GCP status","mutates":False},
+            {"id":"preflight","label":"Run guarded quota and budget preflight","mutates":True},
+            {"id":"build-logs","label":"Read Cloud Build logs","mutates":False},
+            {"id":"batch-logs","label":"Read Batch logs","mutates":False},
+            {"id":"run-logs","label":"Read controller logs","mutates":False},
+        ],
+    }
+
+
 def run_controller() -> dict[str, Any]:
     now = utcnow()
     lock, _ = acquire_lock(now)
@@ -199,6 +244,41 @@ def report_endpoint():
         "status": read_status(),
         "security": {"submission_enabled": SUBMISSION_ENABLED, "credentials_included": False, "arbitrary_commands_allowed": False},
     })
+
+
+@app.get("/diagnostics")
+def diagnostics_endpoint():
+    return jsonify(diagnostics())
+
+
+@app.get("/logs")
+def logs_endpoint():
+    try:
+        source = request.args.get("source", "build")
+        limit = int(request.args.get("limit", "100"))
+        return jsonify({"source": source, "generated_at": utcnow().isoformat(), "entries": recent_logs(source, limit)})
+    except (ValueError, TypeError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.post("/upload")
+def upload_endpoint():
+    payload = request.get_json(silent=True) or {}
+    filename = re.sub(r"[^A-Za-z0-9._-]", "_", str(payload.get("filename", "")))[:160]
+    if not filename or filename in {".", ".."}:
+        return jsonify({"error": "A safe filename is required"}), 400
+    try:
+        content = base64.b64decode(str(payload.get("content_base64", "")), validate=True)
+    except Exception:
+        return jsonify({"error": "Invalid base64 upload"}), 400
+    if not content or len(content) > MAX_UPLOAD_BYTES:
+        return jsonify({"error": f"Upload must be between 1 and {MAX_UPLOAD_BYTES} bytes"}), 413
+    stamp = utcnow().strftime("%Y%m%dT%H%M%SZ")
+    object_name = f"{STATE_PREFIX}/{UPLOAD_PREFIX}/{stamp}-{filename}"
+    blob = storage.Client(project=PROJECT).bucket(STATE_BUCKET).blob(object_name)
+    blob.metadata = {"execution_allowed": "false", "uploaded_via": "jointinspect-code-console"}
+    blob.upload_from_string(content, content_type=str(payload.get("content_type") or "application/octet-stream"), if_generation_match=0)
+    return jsonify({"uploaded": True, "gcs_uri": f"gs://{STATE_BUCKET}/{object_name}", "bytes": len(content), "execution_allowed": False})
 
 
 @app.get("/healthz")

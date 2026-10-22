@@ -17,13 +17,13 @@ function send(res: ServerResponse, status: number, body: Payload) {
   res.end(data)
 }
 
-async function body(req: IncomingMessage): Promise<Payload> {
+async function body(req: IncomingMessage, maxBytes = 8192): Promise<Payload> {
   const chunks: Buffer[] = []
   let size = 0
   for await (const chunk of req) {
     const value = Buffer.from(chunk)
     size += value.length
-    if (size > 8192) throw new Error('Request too large')
+    if (size > maxBytes) throw new Error('Request too large')
     chunks.push(value)
   }
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) as Payload : {}
@@ -53,7 +53,7 @@ function sameOrigin(req: IncomingMessage) {
   try { return new URL(req.headers.origin).host === req.headers.host } catch { return false }
 }
 
-async function callController(path: '/status' | '/report' | '/run', method: 'GET' | 'POST') {
+async function callController(path: string, method: 'GET' | 'POST', requestBody?: Payload) {
   if (!CONTROLLER_URL) throw new Error('GPU_CONTROLLER_URL is not configured')
   const oidcToken = await getVercelOidcToken()
   const audience = `//iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}/providers/${PROVIDER_ID}`
@@ -79,7 +79,7 @@ async function callController(path: '/status' | '/report' | '/run', method: 'GET
   if (!tokenResponse.ok) throw new Error(`Cloud Run identity token generation failed (${tokenResponse.status})`)
   const token = ((await tokenResponse.json()) as { token: string }).token
   if (!token) throw new Error('Vercel workload identity is unavailable')
-  const response = await fetch(`${CONTROLLER_URL}${path}`, { method, headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: AbortSignal.timeout(25_000) })
+  const response = await fetch(`${CONTROLLER_URL}${path}`, { method, headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...(requestBody ? { 'Content-Type': 'application/json' } : {}) }, body: requestBody ? JSON.stringify(requestBody) : undefined, signal: AbortSignal.timeout(25_000) })
   const text = await response.text()
   let payload: Payload
   try { payload = JSON.parse(text) as Payload } catch { payload = { error: 'Controller returned an invalid response' } }
@@ -89,7 +89,8 @@ async function callController(path: '/status' | '/report' | '/run', method: 'GET
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   res.setHeader('Vary', 'Cookie')
   if (!sameOrigin(req)) return send(res, 403, { error: 'Cross-origin request rejected' })
-  const action = new URL(req.url || '/api/code', `https://${req.headers.host || 'localhost'}`).searchParams.get('action') || 'status'
+  const requestUrl = new URL(req.url || '/api/code', `https://${req.headers.host || 'localhost'}`)
+  const action = requestUrl.searchParams.get('action') || 'status'
 
   if (action === 'login' && req.method === 'POST') {
     if (!process.env.CODE_ACCESS_PASSWORD || !process.env.CODE_SESSION_SECRET) return send(res, 503, { error: 'Operator authentication is not configured' })
@@ -109,11 +110,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   }
   if (!authenticated(req)) return send(res, 401, { authenticated: false, error: 'Operator authentication required' })
 
-  const allowed = { status: ['/status', 'GET'], report: ['/report', 'GET'], run: ['/run', 'POST'] } as const
+  const source = requestUrl.searchParams.get('source') || 'build'
+  if (!['build', 'batch', 'run'].includes(source)) return send(res, 400, { error: 'Unsupported log source' })
+  const allowed = { status: ['/status', 'GET'], report: ['/report', 'GET'], diagnostics: ['/diagnostics', 'GET'], logs: [`/logs?source=${source}&limit=150`, 'GET'], run: ['/run', 'POST'], upload: ['/upload', 'POST'] } as const
   const target = allowed[action as keyof typeof allowed]
   if (!target || req.method !== target[1]) return send(res, 405, { error: 'Operation is not allowed' })
   try {
-    const result = await callController(target[0], target[1])
+    const requestBody = action === 'upload' ? await body(req, 3 * 1024 * 1024) : undefined
+    const result = await callController(target[0], target[1], requestBody)
     return send(res, result.status, result.payload)
   } catch (error) {
     return send(res, 502, { error: error instanceof Error ? error.message : 'Controller request failed' })
