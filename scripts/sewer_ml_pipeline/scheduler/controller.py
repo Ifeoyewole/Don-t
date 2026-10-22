@@ -123,6 +123,13 @@ def save_status(status: dict[str, Any]) -> None:
     _json_blob("status.json").upload_from_string(json.dumps(status, indent=2), content_type="application/json")
 
 
+def read_status() -> dict[str, Any]:
+    blob = _json_blob("status.json")
+    if not blob.exists():
+        return {"state": "DISCOVERING", "reason": "Controller inventory has not run yet.", "submission_enabled": SUBMISSION_ENABLED, "jobs": []}
+    return json.loads(blob.download_as_text())
+
+
 def run_controller() -> dict[str, Any]:
     now = utcnow()
     lock, _ = acquire_lock(now)
@@ -168,6 +175,23 @@ def run_endpoint():
         return jsonify(run_controller())
     except RuntimeError as exc:
         return jsonify({"state": "MANUAL_REVIEW_REQUIRED", "reason": str(exc)}), 409
+
+
+@app.get("/status")
+def status_endpoint():
+    return jsonify(read_status())
+
+
+@app.get("/report")
+def report_endpoint():
+    return jsonify({
+        "schema_version": 1,
+        "generated_at": utcnow().isoformat(),
+        "project": PROJECT,
+        "controller": "jointinspect-gpu-controller",
+        "status": read_status(),
+        "security": {"submission_enabled": SUBMISSION_ENABLED, "credentials_included": False, "arbitrary_commands_allowed": False},
+    })
 
 
 @app.get("/healthz")

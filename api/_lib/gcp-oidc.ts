@@ -18,7 +18,7 @@ let cachedIdToken: CachedIdToken | null = null
 /**
  * Exchange Vercel OIDC token for Google Cloud Run ID token via Workload Identity Federation.
  */
-export async function getCloudRunIdToken(): Promise<string | null> {
+export async function getCloudRunIdToken(audience = GATEWAY_CONFIG.CLOUD_RUN_URL): Promise<string | null> {
   const now = Date.now()
 
   // Return valid cached token if within validity window (with 5-minute safety buffer)
@@ -86,7 +86,7 @@ export async function getCloudRunIdToken(): Promise<string | null> {
         Accept: 'application/json',
       },
       body: JSON.stringify({
-        audience: GATEWAY_CONFIG.CLOUD_RUN_URL,
+        audience,
         includeEmail: true,
       }),
     })

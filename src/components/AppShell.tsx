@@ -9,6 +9,7 @@ export type NavKey =
   | 'models'
   | 'reports'
   | 'settings'
+  | 'code'
 
 interface InspectorProfile {
   name: string
@@ -32,6 +33,7 @@ type Props = {
   onNavigateProjects: () => void
   onNavigateInspections?: () => void
   onNavigateReports?: () => void
+  onNavigateCode?: () => void
   globalSearchQuery?: string
   onGlobalSearchChange?: (query: string) => void
 }
@@ -141,6 +143,7 @@ export const AppShell = ({
   onNavigateProjects,
   onNavigateInspections,
   onNavigateReports,
+  onNavigateCode,
   globalSearchQuery = '',
   onGlobalSearchChange,
 }: Props) => {
@@ -228,6 +231,10 @@ export const AppShell = ({
       } else {
         onNavigateProjects()
       }
+      return
+    }
+    if (key === 'code') {
+      onNavigateCode?.()
       return
     }
     if (key === 'calibration' || key === 'models' || key === 'settings') {
@@ -348,6 +355,14 @@ export const AppShell = ({
 
             <div className="sidebar-section-title">Engine & Specs</div>
             <nav className="sidebar-nav">
+              <button
+                className={navKey === 'code' ? 'sidebar-item is-active' : 'sidebar-item'}
+                type="button"
+                onClick={() => handleSidebarClick('code')}
+              >
+                <CloudIcon />
+                <span>Control room</span>
+              </button>
               <button
                 className={navKey === 'calibration' ? 'sidebar-item is-active' : 'sidebar-item'}
                 type="button"

@@ -20,6 +20,9 @@ gcloud projects add-iam-policy-binding $project --member="serviceAccount:$servic
 gcloud projects add-iam-policy-binding $project --member="serviceAccount:$serviceAccount" --role="roles/compute.viewer" --quiet
 gcloud storage buckets add-iam-policy-binding $stateBucket --member="serviceAccount:$serviceAccount" --role="roles/storage.objectAdmin"
 
-gcloud run deploy $service --project=$project --region=$region --source=. --service-account=$serviceAccount --no-allow-unauthenticated --ingress=internal-and-cloud-load-balancing --min=0 --max=1 --cpu=1 --memory=512Mi --concurrency=1 --timeout=60 --set-env-vars="STATE_BUCKET=joint-inspection-510310-orchestration,SUBMISSION_ENABLED=false,CAMPAIGN_CAP_USD=100,CREDIT_RESERVE_USD=50"
+gcloud run deploy $service --project=$project --region=$region --source=. --service-account=$serviceAccount --no-allow-unauthenticated --ingress=all --min=0 --max=1 --cpu=1 --memory=512Mi --concurrency=1 --timeout=60 --set-env-vars="STATE_BUCKET=joint-inspection-510310-orchestration,SUBMISSION_ENABLED=false,CAMPAIGN_CAP_USD=100,CREDIT_RESERVE_USD=50"
+
+# Public network reachability is required for Vercel, but IAM authentication remains mandatory.
+gcloud run services add-iam-policy-binding $service --project=$project --region=$region --member="serviceAccount:joint-inspect-vercel-invoker@$project.iam.gserviceaccount.com" --role="roles/run.invoker" --quiet
 
 Write-Host "Controller deployed in dry-run mode. Do not create the Scheduler trigger until quota and financial preflights are verified."

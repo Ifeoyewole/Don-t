@@ -4,6 +4,11 @@ This is a separate, CPU-only Cloud Run controller. It is fail-closed and default
 to `SUBMISSION_ENABLED=false`. It must never be deployed into the production API
 service.
 
+The operator dashboard uses Vercel Workload Identity Federation to call this
+service. Cloud Run therefore permits external ingress but remains IAM-protected;
+only the scheduler service account and the dedicated Vercel invoker service
+account receive `roles/run.invoker`.
+
 The current project cannot submit a GPU VM because the global Compute Engine
 `GPUS_ALL_REGIONS` quota is zero. Regional `NVIDIA_L4_GPUS=1` quotas do not
 override that global limit. Promotional-credit balances are not treated as

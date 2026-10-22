@@ -8,6 +8,7 @@ import { InspectionResultsPage } from './pages/InspectionResultsPage'
 import { InspectionSummaryPage } from './pages/InspectionSummaryPage'
 import { ManholeSetupPage } from './pages/ManholeSetupPage'
 import { PhotoUploadPage } from './pages/PhotoUploadPage'
+import { CodeOperationsPage } from './pages/CodeOperationsPage'
 import {
   estimatorService,
   exportService,
@@ -34,6 +35,7 @@ import type {
 
 type Route =
   | { key: 'dashboard' }
+  | { key: 'code' }
   | { key: 'projects' }
   | { key: 'create-project' }
   | { key: 'edit-project'; projectId: string }
@@ -54,6 +56,7 @@ type UiProjectSummary = ProjectSummary & {
 const parseRoute = (pathname: string): Route => {
   const segments = pathname.split('/').filter(Boolean)
   if (!segments.length) return { key: 'dashboard' }
+  if (segments[0] === 'code') return { key: 'code' }
   if (segments[0] === 'projects' && segments.length === 1) return { key: 'projects' }
   if (segments[0] === 'dashboard') return { key: 'dashboard' }
   if (segments[0] === 'projects' && segments[1] === 'new') return { key: 'create-project' }
@@ -375,7 +378,7 @@ function App() {
     try {
       await refreshProjects()
 
-      if (route.key === 'dashboard' || route.key === 'projects' || route.key === 'create-project') {
+      if (route.key === 'dashboard' || route.key === 'projects' || route.key === 'create-project' || route.key === 'code') {
         clearVisualState()
         setCurrentProject(null)
         setProjectManholes([])
@@ -518,6 +521,7 @@ function App() {
   const currentProjectDetail = currentProject as (Project & { manholes?: Manhole[] }) | null
 
   const page = (() => {
+    if (route.key === 'code') return <CodeOperationsPage />
     if (loading) {
       return (
         <div className="page-grid">
@@ -807,7 +811,9 @@ function App() {
   })()
 
   const currentNavKey: NavKey =
-    route.key === 'dashboard'
+    route.key === 'code'
+      ? 'code'
+      : route.key === 'dashboard'
       ? 'dashboard'
       : route.key === 'projects' ||
           route.key === 'create-project' ||
@@ -844,6 +850,7 @@ function App() {
         }
         navigate('/projects')
       }}
+      onNavigateCode={() => navigate('/code')}
       globalSearchQuery={globalSearch}
       onGlobalSearchChange={setGlobalSearch}
     >
