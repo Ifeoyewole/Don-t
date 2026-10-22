@@ -1,10 +1,14 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { getCloudRunIdToken } from './_lib/gcp-oidc'
+import { getVercelOidcToken } from '@vercel/oidc'
 
 const COOKIE = '__Host-jointinspect-code'
 const SESSION_SECONDS = 8 * 60 * 60
 const CONTROLLER_URL = (process.env.GPU_CONTROLLER_URL || '').replace(/\/$/, '')
+const PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || '567370443508'
+const POOL_ID = process.env.GCP_WORKLOAD_IDENTITY_POOL_ID || 'vercel'
+const PROVIDER_ID = process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID || 'vercel-production'
+const SERVICE_ACCOUNT = process.env.GCP_SERVICE_ACCOUNT_EMAIL || 'joint-inspect-vercel-invoker@joint-inspection-510310.iam.gserviceaccount.com'
 type Payload = Record<string, unknown>
 
 function send(res: ServerResponse, status: number, body: Payload) {
@@ -51,7 +55,29 @@ function sameOrigin(req: IncomingMessage) {
 
 async function callController(path: '/status' | '/report' | '/run', method: 'GET' | 'POST') {
   if (!CONTROLLER_URL) throw new Error('GPU_CONTROLLER_URL is not configured')
-  const token = await getCloudRunIdToken(CONTROLLER_URL)
+  const oidcToken = await getVercelOidcToken()
+  const audience = `//iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}/providers/${PROVIDER_ID}`
+  const stsResponse = await fetch('https://sts.googleapis.com/v1/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+      audience,
+      scope: 'https://www.googleapis.com/auth/cloud-platform',
+      requested_token_type: 'urn:ietf:params:oauth:token-type:access_token',
+      subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+      subject_token: oidcToken,
+    }),
+  })
+  if (!stsResponse.ok) throw new Error(`Google identity exchange failed (${stsResponse.status})`)
+  const sts = await stsResponse.json() as { access_token: string }
+  const tokenResponse = await fetch(`https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${encodeURIComponent(SERVICE_ACCOUNT)}:generateIdToken`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${sts.access_token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ audience: CONTROLLER_URL, includeEmail: true }),
+  })
+  if (!tokenResponse.ok) throw new Error(`Cloud Run identity token generation failed (${tokenResponse.status})`)
+  const token = ((await tokenResponse.json()) as { token: string }).token
   if (!token) throw new Error('Vercel workload identity is unavailable')
   const response = await fetch(`${CONTROLLER_URL}${path}`, { method, headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: AbortSignal.timeout(25_000) })
   const text = await response.text()
