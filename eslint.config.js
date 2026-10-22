@@ -13,6 +13,11 @@ export default defineConfig([
     'scripts/**',
     'scratch/**',
     'node_modules/**',
+    '.pytest_cache/**',
+    'pytest-cache-files-*/**',
+    '.ci-pytest-*/**',
+    '.validation-*/**',
+    '.backend-validation-*/**',
   ]),
   {
     files: ['src/**/*.{ts,tsx}'],

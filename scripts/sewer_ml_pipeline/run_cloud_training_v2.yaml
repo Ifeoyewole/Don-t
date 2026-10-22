@@ -1,0 +1,33 @@
+steps:
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        mkdir -p /workspace/images /workspace/output
+        gcloud storage cp gs://joint-inspection-510310-data/datasets/sewer-ml/splits/train/curated_train.csv /workspace/curated_train.csv
+        gcloud storage cp gs://joint-inspection-510310-data/datasets/sewer-ml/splits/validation/curated_val.csv /workspace/curated_val.csv
+        gcloud storage cp -r 'gs://joint-inspection-510310-data/datasets/sewer-ml/curated/images/*' /workspace/images/
+  - name: 'python:3.10'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        apt-get update && apt-get install -y libgl1 libglib2.0-0
+        pip install --no-cache-dir torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
+        pip install --no-cache-dir opencv-python-headless numpy onnx onnxruntime onnxscript google-cloud-storage
+        python scripts/sewer_ml_pipeline/train_sewer_condition_classifier.py --images-dir /workspace/images --train-csv /workspace/curated_train.csv --val-csv /workspace/curated_val.csv --output-dir /workspace/output --epochs 12 --batch-size 32 --lr 0.0003 --img-size 224 --architecture efficientnet_b0 --version sewer-condition-v2.0.0-candidate
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        gcloud storage cp -r /workspace/output/* gs://joint-inspection-510310-data/models/candidates/sewer-condition-v2/
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: 75
+timeout: '7200s'

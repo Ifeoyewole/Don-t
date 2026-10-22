@@ -63,7 +63,38 @@ jobs:
         run: npm ci
 
       - name: Run security audit
-        run: npm audit --audit-level=moderate || true
+        run: npm audit --audit-level=moderate
+
+  backend-tests:
+    runs-on: ubuntu-latest
+    name: Backend Tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -r backend/requirements.txt
+      - run: python -m pytest backend/tests -q
+
+  ml-pipeline-tests:
+    runs-on: ubuntu-latest
+    name: ML Pipeline Contract Tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install CPU-only ML test dependencies
+        run: |
+          python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+            pytest requests pillow numpy==1.26.4 pyyaml google-cloud-storage \
+            torch==2.5.1 torchvision==0.20.1
+      - name: Python syntax validation
+        run: python -m compileall -q scripts/sewer_ml_pipeline
+      - name: Import and ML contract tests
+        run: python -m pytest scripts/sewer_ml_pipeline/tests -q
 
   pr-validation:
     runs-on: ubuntu-latest

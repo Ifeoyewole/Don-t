@@ -17,6 +17,60 @@
   }
 }
 
+/* Authenticated cloud operations control room */
+.code-page, .code-auth-shell { min-height: 100%; padding: clamp(20px, 4vw, 48px); background: radial-gradient(circle at 90% 0%, rgba(43, 111, 92, .13), transparent 34%), #f5f7f4; color: #14231e; }
+.code-auth-shell { display: grid; place-items: center; }
+.code-auth-card { width: min(100%, 460px); display: grid; gap: 18px; padding: clamp(24px, 5vw, 42px); border: 1px solid #dce5df; border-radius: 24px; background: rgba(255,255,255,.96); box-shadow: 0 24px 70px rgba(23,54,44,.12); }
+.code-auth-card h1, .code-hero h1 { margin: 0; letter-spacing: -.04em; font-size: clamp(30px, 5vw, 52px); line-height: 1.04; }
+.code-auth-card p, .code-hero p, .code-panel p { margin: 0; color: #607069; line-height: 1.6; }
+.code-eyebrow { color: #2d755f; font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.code-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+.code-hero > div:first-child { display: grid; gap: 10px; max-width: 720px; }
+.code-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.code-alert { display: flex; gap: 12px; align-items: center; margin: 0 0 18px; padding: 14px 16px; border-radius: 13px; border: 1px solid; }
+.code-alert span { color: inherit; opacity: .86; }
+.code-alert-error { color: #8b2929; border-color: #f1c3c3; background: #fff1f1; }
+.code-alert-warning { color: #744d0b; border-color: #ecd49c; background: #fff8e7; }
+.code-alert-info { color: #1f5d4c; border-color: #b9dccf; background: #eef9f5; }
+.code-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.code-metrics article, .code-panel { border: 1px solid #dce5df; border-radius: 18px; background: rgba(255,255,255,.92); box-shadow: 0 10px 35px rgba(30,56,48,.055); }
+.code-metrics article { display: grid; gap: 5px; padding: 18px; }
+.code-metrics span, .code-panel small { color: #73817b; font-size: 12px; }
+.code-metrics strong { overflow-wrap: anywhere; font-size: clamp(20px, 2vw, 28px); }
+.code-grid { display: grid; grid-template-columns: 1.3fr .7fr; gap: 12px; }
+.code-panel { padding: clamp(18px, 3vw, 26px); }
+.code-panel-wide { grid-column: 1 / -1; }
+.code-panel h2 { margin: 5px 0 12px; font-size: 20px; }
+.code-panel .button { margin-top: 20px; }
+.code-panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
+.code-panel-heading h2 { margin-bottom: 0; }
+.code-live { color: #277a5e; font-size: 12px; font-weight: 700; }
+.code-live::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #36a67e; box-shadow: 0 0 0 4px rgba(54,166,126,.13); }
+.code-job-list { display: grid; gap: 8px; }
+.code-job-list article { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border-radius: 12px; background: #f6f8f6; }
+.code-job-list article div { min-width: 0; display: grid; gap: 4px; }
+.code-job-list article strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.code-job-list article div span { color: #728079; font-size: 12px; }
+.code-state { flex: 0 0 auto; padding: 5px 9px; border-radius: 999px; background: #e9efec; color: #40534c; font-size: 10px; font-weight: 800; letter-spacing: .05em; }
+.code-state-running, .code-state-succeeded { background: #dff5eb; color: #166046; }
+.code-state-failed { background: #ffe4e4; color: #8b2929; }
+.code-empty { display: grid; place-items: center; gap: 6px; min-height: 120px; text-align: center; color: #718079; }
+.code-mono { padding: 12px; border-radius: 10px; background: #17231f; color: #d9eee7 !important; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+
+@media (max-width: 900px) {
+  .code-hero { align-items: flex-start; flex-direction: column; }
+  .code-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .code-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .code-page, .code-auth-shell { padding: 16px; }
+  .code-metrics { grid-template-columns: 1fr; }
+  .code-actions { width: 100%; }
+  .code-actions .button { flex: 1 1 auto; }
+  .code-alert { align-items: flex-start; flex-direction: column; }
+  .code-job-list article { align-items: flex-start; }
+}
+
 .hero {
   position: relative;
 

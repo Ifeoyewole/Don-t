@@ -1,0 +1,9 @@
+{
+  "wrc_retrained": false,
+  "wrc_finetuned": false,
+  "research_finetune_ready": true,
+  "production_approved": false,
+  "blockers": [
+    "Commercial release rights are pending or expressly excluded"
+  ]
+}

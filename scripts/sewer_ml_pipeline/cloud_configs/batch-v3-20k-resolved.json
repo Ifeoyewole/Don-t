@@ -1,0 +1,58 @@
+{
+  "taskGroups": [
+    {
+      "taskCount": 1,
+      "parallelism": 1,
+      "taskSpec": {
+        "runnables": [
+          {
+            "container": {
+              "imageUri": "europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/v3@sha256:6c52ca265c587baffd26133078916fa297fc5321f7c2d6b2b787ee7a0a7c47fb",
+              "options": "--shm-size=8g",
+              "entrypoint": "python",
+              "commands": [
+                "scripts/sewer_ml_pipeline/cloud_train_v3.py",
+                "--project=joint-inspection-510310",
+                "--train=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v4/20k/splits/train.csv",
+                "--early-stop=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v4/20k/splits/early_stop.csv",
+                "--threshold-tune=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v4/20k/splits/threshold_tune.csv",
+                "--dev-report=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v4/20k/splits/dev_report.csv",
+                "--output-prefix=gs://joint-inspection-510310-data/models/sewer-ml/v4/research-candidates/20k-effb0-l4-usc1-r1",
+                "--config-id=20k-v4-effb0-l4-usc1-r1",
+                "--architecture=efficientnet_b0",
+                "--epochs=20",
+                "--batch-size=32",
+                "--workers=2"
+              ]
+            }
+          }
+        ],
+        "computeResource": {
+          "cpuMilli": 8000,
+          "memoryMib": 28672
+        },
+        "maxRunDuration": "43200s",
+        "maxRetryCount": 0
+      }
+    }
+  ],
+  "allocationPolicy": {
+    "location": {
+      "allowedLocations": ["regions/us-central1"]
+    },
+    "instances": [
+      {
+        "installGpuDrivers": true,
+        "policy": {
+          "machineType": "g2-standard-8",
+          "bootDisk": {"type": "pd-ssd", "sizeGb": 150},
+          "provisioningModel": "STANDARD"
+        }
+      }
+    ],
+    "serviceAccount": {
+      "email": "joint-inspection-trainer@joint-inspection-510310.iam.gserviceaccount.com"
+    }
+  },
+  "logsPolicy": {"destination": "CLOUD_LOGGING"}
+}

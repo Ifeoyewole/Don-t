@@ -1,0 +1,26 @@
+# TEMPLATE ONLY — GPU availability, quota, approval and container image must be verified.
+# Vertex AI custom-job config; do not submit without a verifiable budget approval.
+workerPoolSpecs:
+- machineSpec:
+    machineType: n1-standard-8
+    acceleratorType: NVIDIA_TESLA_T4
+    acceleratorCount: 1
+  replicaCount: 1
+  # Reconciled storage safety: 150 GiB boot disk
+  # Allocated: 80 GiB max staging (cloud_train_v3) + 20 GiB container/OS + 5 GiB checkpoints/ONNX + 15 GiB safety margin = 120 GiB <= 150 GiB
+  diskSpec:
+    bootDiskType: pd-ssd
+    bootDiskSizeGb: 150
+  containerSpec:
+    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/v3:REPLACE_WITH_VERIFIED_DIGEST
+    args:
+    - --project=joint-inspection-510310
+    - --train=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v3/20k/splits/train.csv
+    - --early-stop=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v3/20k/splits/early_stop.csv
+    - --threshold-tune=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v3/20k/splits/threshold_tune.csv
+    - --dev-report=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v3/20k/splits/dev_report.csv
+    - --output-prefix=gs://joint-inspection-510310-data/models/sewer-ml/v3/research-candidates/REPLACE_WITH_CONFIG_ID
+    - --config-id=REPLACE_WITH_DATASET_HASH_AND_CONFIG_ID
+    - --architecture=efficientnet_b0
+    - --epochs=20
+    - --batch-size=32
