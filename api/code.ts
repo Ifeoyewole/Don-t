@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { getCloudRunIdToken } from './_lib/gcp-oidc.ts'
+import { getCloudRunIdToken } from './_lib/gcp-oidc'
 
 const COOKIE = '__Host-jointinspect-code'
 const SESSION_SECONDS = 8 * 60 * 60
