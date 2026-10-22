@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.15.1-gpu
+FROM tensorflow/tensorflow:2.15.0-gpu
 WORKDIR /workspace
 RUN python -m pip install --no-cache-dir google-cloud-storage 'pillow>=10,<14'
 COPY scripts/sewer_ml_pipeline/ /workspace/scripts/sewer_ml_pipeline/
