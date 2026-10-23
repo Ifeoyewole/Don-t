@@ -69,6 +69,8 @@ const save = (name: string, content: string, type = "text/plain") => {
   link.click();
   URL.revokeObjectURL(url);
 };
+const downloadName = (prefix: string, extension: string) =>
+  `${prefix}-${new Date().toISOString().replace(/[:.]/g, "-")}.${extension}`;
 
 export function CodeOperationsPage() {
   const [authorized, setAuthorized] = useState<boolean | null>(null),
@@ -115,15 +117,21 @@ export function CodeOperationsPage() {
     [source],
   );
   useEffect(() => {
-    void refresh();
+    const initial = window.setTimeout(() => void refresh(), 0);
     const timer = window.setInterval(() => void refresh(), 30000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+    };
   }, [refresh]);
   useEffect(() => {
     if (authorized && view === "logs") {
-      void loadLogs();
+      const initial = window.setTimeout(() => void loadLogs(), 0);
       const timer = window.setInterval(() => void loadLogs(), 15000);
-      return () => window.clearInterval(timer);
+      return () => {
+        window.clearTimeout(initial);
+        window.clearInterval(timer);
+      };
     }
   }, [authorized, view, loadLogs]);
   const inventory = async () => {
@@ -224,7 +232,7 @@ export function CodeOperationsPage() {
     try {
       const data = await api<Record<string, unknown>>("report");
       save(
-        `jointinspect-gcp-report-${Date.now()}.json`,
+        downloadName("jointinspect-gcp-report", "json"),
         JSON.stringify(data, null, 2),
         "application/json",
       );
@@ -577,7 +585,7 @@ export function CodeOperationsPage() {
             <button
               className="button button-secondary"
               onClick={() =>
-                save(`jointinspect-${source}-logs-${Date.now()}.txt`, logText)
+                save(downloadName(`jointinspect-${source}-logs`, "txt"), logText)
               }
               disabled={!logs.length}
             >
@@ -601,7 +609,7 @@ export function CodeOperationsPage() {
             onClick={() =>
               diagnostic &&
               save(
-                `jointinspect-diagnostics-${Date.now()}.txt`,
+                downloadName("jointinspect-diagnostics", "txt"),
                 JSON.stringify(diagnostic, null, 2),
               )
             }
