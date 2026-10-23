@@ -39,6 +39,7 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.ENABLE_DOCS else None,
 )
 
+# Configure CORS - Explicit origins only (wildcard strictly disallowed)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
