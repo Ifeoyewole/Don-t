@@ -827,6 +827,10 @@ function App() {
             ? 'reports'
             : 'dashboard'
 
+  if (route.key === 'code') {
+    return <CodeOperationsPage />
+  }
+
   return (
     <AppShell
       online={health.online}

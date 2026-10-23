@@ -1,0 +1,17 @@
+{
+  "campaign": "JointInspect five-model WRc campaign",
+  "state": "PREPARING",
+  "approval_gate": "AWAITING_YOUR_APPROVAL",
+  "updated_at": "2026-10-22T01:20:00Z",
+  "steps": [
+    {"id":"prepare-wrc","label":"Prepare adapted WRc trainer","state":"RUNNING","kind":"CLOUD_BUILD"},
+    {"id":"smoke-wrc","label":"Run WRc smoke test","state":"QUEUED","kind":"CLOUD_BUILD"},
+    {"id":"train-wrc","label":"Train adapted WRc on one L4","state":"QUEUED","kind":"BATCH_L4"},
+    {"id":"validate-models","label":"Validate four existing models","state":"QUEUED","kind":"CPU"},
+    {"id":"diversity-audit","label":"Perform diversity audit","state":"QUEUED","kind":"CPU"},
+    {"id":"benchmark-data","label":"Prepare benchmark dataset","state":"QUEUED","kind":"CPU"},
+    {"id":"cpu-inference","label":"Run four CPU inference jobs","state":"QUEUED","kind":"CPU"},
+    {"id":"wrc-inference","label":"Run adapted-WRc inference","state":"BLOCKED","detail":"Waits for L4 training"},
+    {"id":"aggregate","label":"Aggregate five-model results","state":"BLOCKED","detail":"Waits for all inference"}
+  ]
+}
