@@ -27,7 +27,7 @@ async function callGitHub(path: string, method: 'GET' | 'POST', requestBody?: Pa
     signal: AbortSignal.timeout(20_000),
   })
   const text = await response.text()
-  let payload: Payload = {}
+  let payload: Payload
   try { payload = text ? JSON.parse(text) as Payload : {} } catch { payload = { error: 'GitHub returned an invalid response' } }
   return { status: response.status, payload }
 }
