@@ -139,6 +139,32 @@ export function CodeOperationsPage() {
       setBusy(false);
     }
   };
+  const github = async (kind: "inventory" | "dispatch" | "issue") => {
+    setBusy(true);
+    try {
+      if (kind === "inventory") {
+        setDiagnostic(await api<Record<string, unknown>>("github_inventory"));
+      } else if (kind === "dispatch") {
+        const workflow_id = window.prompt("Workflow filename or numeric workflow ID");
+        const ref = window.prompt("Approved branch or commit SHA");
+        if (!workflow_id || !ref) return;
+        const confirmation = window.prompt(`Type exactly to confirm:\ngithub_dispatch:${workflow_id}:${ref}`) || "";
+        setDiagnostic(await api<Record<string, unknown>>("github_dispatch", "POST", { workflow_id, ref, confirmation }));
+      } else {
+        const title = window.prompt("Issue title");
+        if (!title) return;
+        const body = window.prompt("Issue description") || "";
+        const confirmation = window.prompt(`Type exactly to confirm:\ngithub_issue:${title}`) || "";
+        setDiagnostic(await api<Record<string, unknown>>("github_issue", "POST", { title, body, confirmation }));
+      }
+      setView("diagnostics");
+      setError("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "GitHub operation failed");
+    } finally {
+      setBusy(false);
+    }
+  };
   const operate = async (action: string) => {
     const target = window.prompt(`Target for ${action} (provider ID, service, job, or object path)`);
     if (!target) return;
@@ -421,6 +447,9 @@ export function CodeOperationsPage() {
     if (id === "refresh") void refresh();
     else if (id === "inventory") void inventory();
     else if (id === "preflight") void run();
+    else if (id === "github.inventory") void github("inventory");
+    else if (id === "github.dispatch") void github("dispatch");
+    else if (id === "github.issue") void github("issue");
     else if (id.includes(".")) void operate(id);
     else if (id.endsWith("-logs")) {
       const next = id.split("-")[0] as typeof source;
@@ -452,6 +481,9 @@ export function CodeOperationsPage() {
     ["batch.cancel", "Cancel Batch job", "Cancel an exact job in an allow-listed region"],
     ["storage.download", "Download GCS artifact", "Download an exact object up to 2 MiB"],
     ["storage.delete", "Delete GCS object", "Generation-matched deletion with exact confirmation"],
+    ["github.inventory", "Review GitHub deployment inputs", "List open PRs and available Actions workflows"],
+    ["github.dispatch", "Deploy approved Git ref", "Dispatch a selected workflow for an explicit branch or commit"],
+    ["github.issue", "Create GitHub issue", "Record a reviewed operational problem in the repository"],
     [
       "build-logs",
       "Open Cloud Build logs",
