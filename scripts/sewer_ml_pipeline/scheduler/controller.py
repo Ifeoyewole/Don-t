@@ -13,6 +13,11 @@ from google.cloud import batch_v1, compute_v1, storage, logging_v2
 from google.api_core.exceptions import PreconditionFailed
 
 try:
+    from .pipeline_truth import mark_stored_pipeline_unverified
+except ImportError:  # Cloud Run source root
+    from pipeline_truth import mark_stored_pipeline_unverified
+
+try:
     from .engine import FinancialPolicy, Snapshot, decide
 except ImportError:  # Cloud Run source root
     from engine import FinancialPolicy, Snapshot, decide
@@ -134,7 +139,7 @@ def read_status() -> dict[str, Any]:
     status = json.loads(blob.download_as_text())
     pipeline_blob = _json_blob("pipeline-status.json")
     if pipeline_blob.exists():
-        status["pipeline"] = json.loads(pipeline_blob.download_as_text())
+        status["pipeline"] = mark_stored_pipeline_unverified(json.loads(pipeline_blob.download_as_text()))
     status["max_active_gpu_jobs"] = int(os.getenv("MAX_ACTIVE_GPU_JOBS", "1"))
     status["required_global_gpu_quota"] = float(os.getenv("REQUIRED_GLOBAL_GPU_QUOTA", "1"))
     status["scheduler_interval_minutes"] = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "15"))
