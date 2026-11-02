@@ -60,6 +60,8 @@ The fusion therefore remains a development prototype with `production_approved=f
 2. Do not retry Sewer-ML downloads while the provider returns HTTP 503. Retain `train00.zip`, curated-v3, and curated-v4 as immutable source material.
 3. Monitor SRuibo quarantine import build `5864ab81-80d1-4404-a555-084d8bda7e5a`. On success, verify the final registry count, split counts, hashes, and duplicate report before any evaluation.
 4. Resolve SRuibo class-code semantics and primary provenance before allowing training. Preserve every original annotation and keep unapproved weights isolated from production promotion.
+5. Audit the 333 unique Robotic Pipe Defect Detection v7 candidates, then promote only accepted records into a new versioned joint-focused training manifest. Do not add all 1,917 exports to the effective dataset count.
+6. Import PVC Pipe Defect v2 next. Keep Pipe Defects v1 quarantined because its generated class metadata appears corrupted, and generate a downloadable version for Pipeline Defect Detection Segmentation before attempting that import.
 
 ## External source preflight
 
@@ -71,3 +73,14 @@ The fusion therefore remains a development prototype with `production_approved=f
 - HTTP-only retry `c70fa84e-ef87-4ed1-b1fa-1921996afb5c` succeeded. The immutable quarantine prefix contains 3,907 objects (2,376,131,463 bytes) and a publish-last registry with 1,952 paired YOLO records: 1,561 train, 193 validation, and 198 test.
 - Deduplication against Sewer-ML v4 found 357 exact SHA-256 matches, 144 near-dHash matches, and 1,451 unique candidates. The source itself contains 1,947 unique SHA-256 values, so five exact intra-source duplicates must be excluded before evaluation or training.
 - All records remain `QUARANTINED_PENDING_PROVENANCE_AND_LABEL_REVIEW`; none are eligible for training yet.
+
+## Roboflow expansion
+
+- The `roboflow-api-key` exists in Secret Manager and is never written to source or build arguments. The Cloud Build service account has accessor permission scoped to that secret.
+- All five requested Roboflow projects are reachable and declare CC BY 4.0 through the authenticated project API.
+- Four projects have generated versions. `pipeline-defect-detection-segmentation` has 4,000 annotated source images but zero generated versions, so no versioned download is currently available.
+- Robotic Pipe Defect Detection version 7 was imported by successful Cloud Build `ceac29b7-4e89-4ccd-ae63-4b3f8f02f0dc` to `gs://joint-inspection-510310-data/datasets/quarantine/roboflow/hatim-husaini/pipe-defect-detection/v7/`.
+- The quarantine prefix occupies 82,834,196 bytes and preserves the source YOLOv8 ZIP, extracted media, annotations, and publish-last registry.
+- The registry contains 1,917 records: 1,728 train, 126 validation, and 63 test. Original classes are Deformation, Misalignment, Obstacle, and Rupture, with canonical mappings preserved alongside them.
+- Strict deduplication against Sewer-ML v4, SRuibo, and earlier records within this export found 1 exact baseline dHash match, 445 exact intra-source dHash duplicates, 1,138 near duplicates, and 333 unique candidates. All remain `QUARANTINED_PENDING_ANNOTATION_AUDIT` until human annotation and primary provenance review.
+- PVC Pipe Defect v2 is the next useful downloadable joint-focused source: 3,066 generated images across Defective, L Joint, and T Joint. Pipe Defects v1 reports malformed generated class metadata and must remain lower priority. Pipeline Defect Detection v8 contains 38,400 heavily tiled/augmented generated images and requires a source-level deduplication plan before import.
