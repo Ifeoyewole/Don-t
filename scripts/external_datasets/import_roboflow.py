@@ -15,14 +15,6 @@ from google.cloud import secretmanager, storage
 from PIL import Image
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-LABEL_MAP = {
-    "Deformation": "DEFORMATION",
-    "Misalignment": "JOINT_MISALIGNMENT",
-    "Obstacle": "OBSTACLE",
-    "Rupture": "RUPTURE",
-}
-
-
 def dhash(path: Path, size: int = 8) -> str:
     with Image.open(path) as image:
         gray = image.convert("L").resize((size + 1, size), Image.Resampling.LANCZOS)
@@ -44,6 +36,47 @@ def nearest_hamming(value: str, candidates: set[str], maximum: int = 4) -> int |
             if best == 0:
                 break
     return best
+
+
+class HammingIndex:
+    """BK-tree index for bounded Hamming searches over 64-bit perceptual hashes."""
+
+    def __init__(self, values: set[str] = frozenset()):
+        self.root: list | None = None
+        for value in values:
+            self.add(value)
+
+    def add(self, value: str) -> None:
+        number = int(value, 16)
+        if self.root is None:
+            self.root = [number, {}]
+            return
+        node = self.root
+        while True:
+            distance = (number ^ node[0]).bit_count()
+            if distance == 0:
+                return
+            child = node[1].get(distance)
+            if child is None:
+                node[1][distance] = [number, {}]
+                return
+            node = child
+
+    def nearest(self, value: str, maximum: int = 4) -> int | None:
+        if self.root is None:
+            return None
+        number, best, stack = int(value, 16), None, [self.root]
+        while stack:
+            node = stack.pop()
+            distance = (number ^ node[0]).bit_count()
+            if distance <= maximum and (best is None or distance < best):
+                best = distance
+                if best == 0:
+                    return 0
+            radius = maximum if best is None else min(maximum, best - 1)
+            stack.extend(child for edge, child in node[1].items()
+                         if distance - radius <= edge <= distance + radius)
+        return best
 
 
 def read_baselines(client: storage.Client, uris: list[str]) -> tuple[set[str], set[str]]:
@@ -102,11 +135,13 @@ def class_names(config: dict) -> list[str]:
     return names
 
 
-def build_manifest(root: Path, workspace: str, project: str, version: int,
-                   license_name: str, baseline_sha: set[str], baseline_dhash: set[str]) -> dict:
+def build_manifest(root: Path, dataset_name: str, workspace: str, project: str, version: int,
+                   license_name: str, label_map: dict[str, str], baseline_sha: set[str],
+                   baseline_dhash: set[str]) -> dict:
     config = yaml.safe_load((root / "data.yaml").read_text(encoding="utf-8"))
     classes = class_names(config)
     records, local_sha, local_dhash = [], set(), set()
+    similarity_index = HammingIndex(baseline_dhash)
     for split in ("train", "valid", "test"):
         image_root = root / split / "images"
         label_root = root / split / "labels"
@@ -125,16 +160,17 @@ def build_manifest(root: Path, workspace: str, project: str, version: int,
             elif perceptual in baseline_dhash:
                 status, distance = "EXACT_DHASH_BASELINE", 0
             else:
-                distance = nearest_hamming(perceptual, baseline_dhash | local_dhash)
+                distance = similarity_index.nearest(perceptual)
                 status = "NEAR_DHASH_EXISTING" if distance is not None else "UNIQUE_TO_BASELINE"
             local_sha.add(digest)
             local_dhash.add(perceptual)
+            similarity_index.add(perceptual)
             source_labels = sorted({classes[int(line.split()[0])] for line in label_path.read_text().splitlines() if line.strip()})
-            canonical = sorted({LABEL_MAP.get(label, "GEOMETRY_UNCERTAIN") for label in source_labels})
+            canonical = sorted({label_map.get(label, "GEOMETRY_UNCERTAIN") for label in source_labels})
             with Image.open(image_path) as image:
                 width, height = image.size
             records.append({
-                "dataset_name": "Robotic Pipe Defect Detection",
+                "dataset_name": dataset_name,
                 "dataset_version": str(version),
                 "source": f"https://universe.roboflow.com/{workspace}/{project}",
                 "license": license_name,
@@ -157,7 +193,7 @@ def build_manifest(root: Path, workspace: str, project: str, version: int,
             })
     return {
         "schema_version": 1,
-        "dataset_name": "Robotic Pipe Defect Detection",
+        "dataset_name": dataset_name,
         "dataset_version": str(version),
         "source": f"https://universe.roboflow.com/{workspace}/{project}",
         "license": license_name,
@@ -175,10 +211,13 @@ def main() -> None:
     parser.add_argument("--gcp-project", required=True)
     parser.add_argument("--workspace", required=True)
     parser.add_argument("--roboflow-project", required=True)
+    parser.add_argument("--dataset-name", required=True)
     parser.add_argument("--version", type=int, required=True)
     parser.add_argument("--secret", default="roboflow-api-key")
     parser.add_argument("--license", default="CC BY 4.0")
     parser.add_argument("--baseline-manifest", action="append", required=True)
+    parser.add_argument("--label-map-file", type=Path, required=True)
+    parser.add_argument("--mapping-name", required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--manifest-output", type=Path, required=True)
     args = parser.parse_args()
@@ -196,8 +235,10 @@ def main() -> None:
     root = find_dataset_root(extracted)
     client = storage.Client(project=args.gcp_project)
     baseline_sha, baseline_dhash = read_baselines(client, args.baseline_manifest)
-    manifest = build_manifest(root, args.workspace, args.roboflow_project, args.version,
-                              args.license, baseline_sha, baseline_dhash)
+    mappings = json.loads(args.label_map_file.read_text(encoding="utf-8"))["dataset_mappings"]
+    label_map = mappings[args.mapping_name]
+    manifest = build_manifest(root, args.dataset_name, args.workspace, args.roboflow_project,
+                              args.version, args.license, label_map, baseline_sha, baseline_dhash)
     manifest["export"] = export
     args.manifest_output.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     print(json.dumps({key: manifest[key] for key in ("record_count", "split_counts", "duplicate_counts")}, indent=2))

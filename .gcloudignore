@@ -8,6 +8,11 @@ models/
 public/
 MultiLabel_SewerDefect_SSL/
 training/
+!training/
+training/*
+!training/data_sources/
+training/data_sources/*
+!training/data_sources/canonical_labels.json
 .pytest_cache/
 .tmp/
 __pycache__/

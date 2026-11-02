@@ -67,6 +67,16 @@
       "Misalignment": "JOINT_MISALIGNMENT",
       "Rupture": "RUPTURE"
     },
+    "PVC Pipe Defect": {
+      "Defective": "FAULTY_JOINT",
+      "L Joint": "GEOMETRY_UNCERTAIN",
+      "T Joint": "GEOMETRY_UNCERTAIN"
+    },
+    "Pipeline Defect Detection": {
+      "corrosion": "CORROSION",
+      "pipe": "GEOMETRY_UNCERTAIN"
+    },
+    "Pipe Defects Roboflow": {},
     "Pipe Defects": {
       "Joint displacement": "JOINT_DISPLACEMENT",
       "Blockage": "BLOCKAGE",
