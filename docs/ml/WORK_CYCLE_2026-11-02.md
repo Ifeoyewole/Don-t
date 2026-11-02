@@ -93,3 +93,11 @@ The fusion therefore remains a development prototype with `production_approved=f
 - The official VideoPipe site remains online at `https://videopipe.github.io/`. QV-Pipe and CCTV-Pipe downloads route through CodaLab competitions 2232 and 2284 and require CodaLab access.
 - The official Co-UDlabs release is Zenodo record `8193032` and `github.com/Co-UDlabs/sewer_defects`. Its documented 1,577-image Google Drive source currently rejects anonymous folder enumeration, while the alternate public sample folder resolves but is empty. No count is claimed in GCS.
 - IPD Zenodo record `17398156` contains only its licence agreement. The 357-image, pixel-mask dataset requires a signed one-year, research-only agreement returned to Aristotle University before the download is issued; it cannot be imported from Zenodo without that completed access step.
+
+## Frozen Inspect View dataset scope
+
+- The owner elected to skip VideoPipe, CCTV-Pipe, IPD, and the inaccessible Co-UDlabs media for this phase and proceed with the material already in GCS.
+- `training/configs/inspect_view_scope_v1.json` freezes the current inputs, exclusions, candidate counts, promotion requirements, staged training order, and fusion acceptance gate.
+- Pipe Defects v1 remains excluded. Records from the other external sources remain candidates until record-level annotation and provenance review produces a versioned promoted manifest.
+- Do not launch a nominal final model from quarantine paths. The existing `training/train_classifier.py` uses a legacy six-class synthetic-data contract and cannot correctly train the fifteen-class canonical dataset without a new source-aware loader and evaluation contract.
+- Exact next action: build the promoted, family-grouped manifests from accepted records, add the canonical multi-task loader, run a CPU data-loader smoke evaluation, then submit the first bounded representation-learning job.
