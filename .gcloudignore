@@ -11,6 +11,7 @@ training/
 !training/
 training/*
 !training/inspect_view_loader.py
+!training/inspect_view_representation.py
 !training/data_sources/
 training/data_sources/*
 !training/data_sources/canonical_labels.json

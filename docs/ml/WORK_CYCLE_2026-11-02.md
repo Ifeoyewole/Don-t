@@ -112,3 +112,12 @@ The fusion therefore remains a development prototype with `production_approved=f
 - The first loader smoke build correctly rejected an annotation labelled as a bounding box that actually contained a segmentation polygon. The canonical loader now preserves and validates both normalized YOLO boxes and segmentation polygons.
 - Corrected loader smoke build `44f1b562-ca95-4e01-a90b-82b8222dc3f8` passed all three manifests, verified sampled image SHA-256 values, dimensions, annotation syntax, and GCS paths, and published `loader_smoke_report.json` beside the manifests.
 - The next action is to implement the bounded representation-learning worker against `representation.jsonl`. Do not reuse the legacy random-update six-class classifier as the final Inspect View trainer.
+
+## Representation worker
+
+- A real PyTorch canonical multi-label worker now trains EfficientNet-B0 or ConvNeXt-Tiny using BCE-with-logits, checksum-verified GCS images, fixed sample caps, and create-only versioned artifact uploads.
+- The first CPU smoke build `72da3057-10d0-4586-92fa-8ef419fca282` correctly stopped on an empty-label record. Empty annotations are now excluded from supervised learning rather than guessed as `NORMAL`; 6,529 such records remain available only for a future self-supervised objective.
+- Corrected CPU smoke build `b51287e8-d45c-4ad0-bf02-375a4b434651` succeeded with 24 train and 12 validation records for one epoch. Its macro-F1 and macro-F2 were both 0.333333 across the three classes present in that tiny sample. These are pipeline-smoke metrics, not model-selection evidence.
+- Immutable worker image build `9874acdb-bf3f-48c2-9ae2-9de43675f6f0` published digest `sha256:83c6908e7e3215a85b4e27edb52723739c574457fbd1b9076eae13ba8afc6599`.
+- Compute Engine reports unused T4 and L4 quota in europe-west2, but Vertex AI has separate accelerator quotas. Standard Vertex T4 submission was rejected before job creation because its quota is zero. Vertex exposes one preemptible T4 in europe-west2.
+- Spot Vertex Custom Job `9121805612311642112` was submitted with one T4, 1,000 training records, 200 validation records, two epochs, and a one-hour hard timeout. Its output prefix is `gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-v1.0.0-t4-r1-20261102/`. At handoff it is pending Spot capacity; no standard T4 job was created or charged.
