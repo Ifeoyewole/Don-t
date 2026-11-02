@@ -2,15 +2,41 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
+import re
 from urllib.parse import urlsplit
 
+import google.auth
 import requests
 from google.cloud import storage
+from google.auth.transport.requests import AuthorizedSession
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+
+SECRET_NAME = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def access_secret(project: str, secret: str, version: str = "latest") -> str:
+    """Read a Secret Manager value without putting it in Batch environment data."""
+    if not SECRET_NAME.fullmatch(secret) or not SECRET_NAME.fullmatch(version):
+        raise ValueError("Secret and version must be simple Secret Manager identifiers")
+    credentials, _ = google.auth.default(
+        scopes=["https://www.googleapis.com/auth/cloud-platform"]
+    )
+    endpoint = (
+        f"https://secretmanager.googleapis.com/v1/projects/{project}/secrets/"
+        f"{secret}/versions/{version}:access"
+    )
+    response = AuthorizedSession(credentials).get(endpoint, timeout=30)
+    response.raise_for_status()
+    encoded = response.json().get("payload", {}).get("data")
+    if not encoded:
+        raise RuntimeError(f"Secret Manager returned no payload for {secret}")
+    return base64.b64decode(encoded, validate=True).decode("utf-8")
 
 
 def stage(url: str, project: str, bucket: str, object_name: str, max_bytes: int,
@@ -73,11 +99,14 @@ def main() -> None:
     parser.add_argument("--reuse-existing", action="store_true")
     parser.add_argument("--username", default="sewer-ml")
     parser.add_argument("--password-env", default="SEWER_ML_DOWNLOAD_PASSWORD")
+    parser.add_argument("--password-secret")
+    parser.add_argument("--password-secret-version", default="latest")
     parser.add_argument("--output", default="/workspace/staged-archive.json")
     args = parser.parse_args()
-    password = os.environ.get(args.password_env)
+    password = (access_secret(args.project, args.password_secret, args.password_secret_version)
+                if args.password_secret else os.environ.get(args.password_env))
     if not password:
-        raise RuntimeError(f"Required archive credential is missing from environment: {args.password_env}")
+        raise RuntimeError("Required archive credential is unavailable")
     result = stage(args.url, args.project, args.bucket, args.object, args.max_bytes,
                    reuse_existing=args.reuse_existing, username=args.username, password=password)
     with open(args.output, "w", encoding="utf-8") as handle:

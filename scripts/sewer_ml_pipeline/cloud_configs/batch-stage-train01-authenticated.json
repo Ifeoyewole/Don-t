@@ -5,22 +5,18 @@
     "taskSpec": {
       "runnables": [{
         "container": {
-          "imageUri": "europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/manifest-selector@sha256:ac33ca0da73894dd8c66a00592007a089fa320338f1e3368161c3d7a1143f4e9",
+          "imageUri": "europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/manifest-selector@sha256:f373137543b75a51d61490998dfdad377db0b9a3bcac2b11ecaca6cddc444be9",
           "entrypoint": "python",
           "commands": [
             "scripts/sewer_ml_pipeline/stage_remote_archive.py",
             "--reuse-existing",
+            "--password-secret=sewer-ml-download-password",
             "--url=https://sciencedata.dk/public/Large%20AAU%20files/Sewer_ML/train01.zip",
             "--project=joint-inspection-510310",
             "--bucket=joint-inspection-510310-data",
             "--object=datasets/sewer-ml/source/archives/train01.zip",
             "--output=/tmp/train01.json"
           ]
-        },
-        "environment": {
-          "secretVariables": {
-            "SEWER_ML_DOWNLOAD_PASSWORD": "projects/joint-inspection-510310/secrets/sewer-ml-download-password/versions/latest"
-          }
         }
       }],
       "computeResource": {"cpuMilli": 4000, "memoryMib": 15360},

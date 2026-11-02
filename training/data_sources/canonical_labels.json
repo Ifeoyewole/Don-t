@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0.0",
+  "canonical_labels": [
+    "NORMAL",
+    "OPEN_JOINT",
+    "FAULTY_JOINT",
+    "JOINT_DISPLACEMENT",
+    "JOINT_MISALIGNMENT",
+    "DEFORMATION",
+    "RUPTURE",
+    "BROKEN_PIPE",
+    "BLOCKAGE",
+    "OBSTACLE",
+    "INFILTRATION",
+    "SURFACE_DAMAGE",
+    "CORROSION",
+    "PROTRUDING_LATERAL",
+    "GEOMETRY_UNCERTAIN"
+  ],
+  "aliases": {
+    "normal": "NORMAL",
+    "normal_joint": "NORMAL",
+    "no_defect": "NORMAL",
+    "open_joint": "OPEN_JOINT",
+    "faulty_joint": "FAULTY_JOINT",
+    "displaced_joint": "JOINT_DISPLACEMENT",
+    "joint_displacement": "JOINT_DISPLACEMENT",
+    "misaligned": "JOINT_MISALIGNMENT",
+    "misalignment": "JOINT_MISALIGNMENT",
+    "joint_misalignment": "JOINT_MISALIGNMENT",
+    "deformation": "DEFORMATION",
+    "dent": "DEFORMATION",
+    "rupture": "RUPTURE",
+    "broken_pipe": "BROKEN_PIPE",
+    "collapsed_pipe": "BROKEN_PIPE",
+    "blockage": "BLOCKAGE",
+    "obstacle": "OBSTACLE",
+    "infiltration": "INFILTRATION",
+    "surface_damage": "SURFACE_DAMAGE",
+    "corrosion": "CORROSION",
+    "protruding_lateral": "PROTRUDING_LATERAL",
+    "geometry_uncertain": "GEOMETRY_UNCERTAIN",
+    "difficult_condition": "GEOMETRY_UNCERTAIN"
+  },
+  "dataset_mappings": {
+    "Sewer-ML": {
+      "ND": "NORMAL",
+      "FS": "JOINT_DISPLACEMENT",
+      "IS": "OBSTACLE",
+      "RB": "BROKEN_PIPE",
+      "DE": "DEFORMATION",
+      "RO": "BLOCKAGE",
+      "AF": "SURFACE_DAMAGE",
+      "BE": "SURFACE_DAMAGE",
+      "FO": "GEOMETRY_UNCERTAIN"
+    },
+    "Pipe-SOLO": {
+      "Open joint": "OPEN_JOINT",
+      "Faulty joint": "FAULTY_JOINT",
+      "Protruding lateral": "PROTRUDING_LATERAL",
+      "Broken pipe": "BROKEN_PIPE",
+      "Surface damage": "SURFACE_DAMAGE"
+    },
+    "Robotic Pipe Defect Detection": {
+      "Obstacle": "OBSTACLE",
+      "Deformation": "DEFORMATION",
+      "Misalignment": "JOINT_MISALIGNMENT",
+      "Rupture": "RUPTURE"
+    },
+    "Pipe Defects": {
+      "Joint displacement": "JOINT_DISPLACEMENT",
+      "Blockage": "BLOCKAGE",
+      "Collapsed pipe": "BROKEN_PIPE",
+      "Infiltration": "INFILTRATION",
+      "Deformation": "DEFORMATION",
+      "Structural damage": "SURFACE_DAMAGE"
+    },
+    "SRuibo/Sewer-pipe-defects": {
+      "CK": "GEOMETRY_UNCERTAIN",
+      "PL": "GEOMETRY_UNCERTAIN",
+      "SG": "GEOMETRY_UNCERTAIN",
+      "SL": "GEOMETRY_UNCERTAIN",
+      "TL": "GEOMETRY_UNCERTAIN",
+      "ZW": "GEOMETRY_UNCERTAIN"
+    }
+  },
+  "fallback": "GEOMETRY_UNCERTAIN"
+}

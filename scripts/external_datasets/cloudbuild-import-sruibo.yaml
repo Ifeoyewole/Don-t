@@ -1,0 +1,42 @@
+steps:
+- name: python:3.12-slim
+  id: download-and-inventory
+  entrypoint: bash
+  args:
+  - -c
+  - |
+    set -eu
+    export HF_HUB_DISABLE_XET=1
+    export HF_HUB_DOWNLOAD_TIMEOUT=300
+    python -m pip install --no-cache-dir --target=/workspace/import-deps \
+      google-cloud-storage==3.4.1 huggingface-hub==0.36.0 pillow==12.0.0
+    PYTHONPATH=/workspace/import-deps python scripts/external_datasets/import_sruibo.py \
+      --project="$PROJECT_ID" \
+      --revision=7fafcbe676aad60f38d8fe39cde93cf599f8362e \
+      --baseline-manifest=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v4/20k/manifest.json \
+      --output-root=/workspace/sruibo \
+      --manifest-output=/workspace/sruibo-registry.json
+- name: gcr.io/cloud-builders/gcloud
+  id: upload-quarantine-media
+  waitFor: [download-and-inventory]
+  entrypoint: bash
+  args:
+  - -c
+  - |
+    set -eu
+    gcloud storage cp --recursive --no-clobber /workspace/sruibo/README.md '/workspace/sruibo/Sewer pipe defects' \
+      gs://joint-inspection-510310-data/datasets/quarantine/sruibo-sewer-pipe-defects/7fafcbe676aad60f38d8fe39cde93cf599f8362e/
+- name: gcr.io/cloud-builders/gcloud
+  id: publish-registry-last
+  waitFor: [upload-quarantine-media]
+  args:
+  - storage
+  - cp
+  - --no-clobber
+  - /workspace/sruibo-registry.json
+  - gs://joint-inspection-510310-data/datasets/quarantine/sruibo-sewer-pipe-defects/7fafcbe676aad60f38d8fe39cde93cf599f8362e/dataset_registry.json
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+  diskSizeGb: 30
+timeout: 7200s

@@ -1,6 +1,6 @@
 {
   "registry_version": "1.0.0",
-  "last_updated": "2026-10-02T12:22:00Z",
+  "last_updated": "2026-11-02T10:50:00Z",
   "sources": [
     {
       "source_id": "SRC-SYN-001",
@@ -97,8 +97,32 @@
       "reviewed_by": "JointInspect AI Compliance Lead",
       "reviewed_at": "2026-10-14T00:45:00Z",
       "gcs_uri": "gs://joint-inspection-510310-data/datasets/sewer-ml/",
-      "curated_samples": 8147,
-      "notes": "Authorized Sewer-ML dataset access granted for candidate AI model training & evaluation. Ingested 8,147 curated images directly into GCS. Models trained under this license are candidate research models and gated with production_approved=false."
+      "curated_samples": 20000,
+      "notes": "Authorized Sewer-ML research access. GCS curated-v3 and curated-v4 each contain 20,000 SHA-256-unique and dHash-unique training records. Curated-v3 preserves the recorded 4,315 reused plus 15,685 extracted checkpoint; curated-v4 currently contains 4,726 reused plus 15,274 extracted records after revised curation. The v4 held-out splits contain 819 early-stop, 380 threshold-tuning, and 388 development-report images. Models trained under this noncommercial license remain research candidates with production_approved=false."
+    },
+    {
+      "source_id": "SRC-SRUIBO-001",
+      "name": "SRuibo/Sewer-pipe-defects",
+      "source_type": "PUBLIC_LICENSED",
+      "source_url": "https://huggingface.co/datasets/SRuibo/Sewer-pipe-defects",
+      "provider": "SRuibo via Hugging Face",
+      "license_name": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_text_reference": "Hugging Face dataset card declares license: cc-by-4.0.",
+      "commercial_training_allowed": false,
+      "commercial_deployment_allowed": false,
+      "modification_allowed": true,
+      "redistribution_allowed": true,
+      "attribution_required": true,
+      "share_alike_required": false,
+      "provenance_verified": false,
+      "production_eligible": false,
+      "benchmark_only": false,
+      "rights_document_reference": "PENDING_PRIMARY_PROVENANCE_REVIEW",
+      "approval_status": "PENDING_REVIEW",
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "notes": "Imported to immutable GCS quarantine from source revision 7fafcbe676aad60f38d8fe39cde93cf599f8362e. Registry contains paired YOLO images/labels: train 1,561, val 193, test 198. Deduplication against Sewer-ML v4 found 357 exact SHA-256 matches, 144 near-dHash matches, and 1,451 unique candidates; five exact duplicates also exist within the 1,952 SRuibo records. Original classes are CK, PL, SG, SL, TL, and ZW. Class semantics and primary provenance are not documented in the dataset card, so all records remain quarantined and mappings fail closed to GEOMETRY_UNCERTAIN until verified."
     },
     {
       "source_id": "SRC-QUARANTINE-DEFAULT",
