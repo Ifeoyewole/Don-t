@@ -10,9 +10,13 @@ MultiLabel_SewerDefect_SSL/
 training/
 !training/
 training/*
+!training/inspect_view_loader.py
 !training/data_sources/
 training/data_sources/*
 !training/data_sources/canonical_labels.json
+!training/configs/
+training/configs/*
+!training/configs/inspect_view_scope_v1.json
 .pytest_cache/
 .tmp/
 __pycache__/

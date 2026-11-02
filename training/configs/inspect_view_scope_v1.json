@@ -13,6 +13,7 @@
     {
       "name": "SRuibo/Sewer-pipe-defects",
       "gcs_registry": "gs://joint-inspection-510310-data/datasets/quarantine/sruibo-sewer-pipe-defects/7fafcbe676aad60f38d8fe39cde93cf599f8362e/dataset_registry.json",
+      "gcs_media_root": "gs://joint-inspection-510310-data/datasets/quarantine/sruibo-sewer-pipe-defects/7fafcbe676aad60f38d8fe39cde93cf599f8362e/",
       "unique_candidates": 1451,
       "supervised_eligible": false,
       "reason": "Original class semantics and primary provenance remain unresolved"
@@ -20,6 +21,7 @@
     {
       "name": "Robotic Pipe Defect Detection v7",
       "gcs_registry": "gs://joint-inspection-510310-data/datasets/quarantine/roboflow/hatim-husaini/pipe-defect-detection/v7/dataset_registry.json",
+      "gcs_media_root": "gs://joint-inspection-510310-data/datasets/quarantine/roboflow/hatim-husaini/pipe-defect-detection/v7/roboflow-robotic-pipe/extracted/",
       "unique_candidates": 333,
       "target_stage": "JOINT_FOCUSED_DETECTION",
       "supervised_eligible": false,
@@ -28,6 +30,7 @@
     {
       "name": "PVC Pipe Defect v2",
       "gcs_registry": "gs://joint-inspection-510310-data/datasets/quarantine/roboflow/esha-gupta-jfldf/pvc-pipe-defect/v2/dataset_registry.json",
+      "gcs_media_root": "gs://joint-inspection-510310-data/datasets/quarantine/roboflow/esha-gupta-jfldf/pvc-pipe-defect/v2/roboflow-pvc-pipe/extracted/",
       "unique_candidates": 2817,
       "target_stage": "JOINT_FOCUSED_DETECTION",
       "supervised_eligible": false,
@@ -36,6 +39,7 @@
     {
       "name": "Pipeline Defect Detection v8",
       "gcs_registry": "gs://joint-inspection-510310-data/datasets/quarantine/roboflow/fyp-5vqpk/pipeline-defect-detection/v8/dataset_registry.json",
+      "gcs_media_root": "gs://joint-inspection-510310-data/datasets/quarantine/roboflow/fyp-5vqpk/pipeline-defect-detection/v8/pipeline-defect/extracted/",
       "unique_candidates": 34089,
       "target_stage": "REPRESENTATION_AND_SURFACE_CONDITION",
       "supervised_eligible": false,

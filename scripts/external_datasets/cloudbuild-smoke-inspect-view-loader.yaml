@@ -1,0 +1,29 @@
+steps:
+- name: python:3.12-slim
+  id: validate-manifests-and-media
+  entrypoint: bash
+  args:
+  - -c
+  - |
+    set -eu
+    python -m pip install --no-cache-dir --target=/workspace/loader-deps google-cloud-storage==3.4.1 pillow==12.0.0
+    PYTHONPATH=/workspace/loader-deps:/workspace python training/inspect_view_loader.py \
+      --project="$PROJECT_ID" \
+      --manifest=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/inspect-view-manifests/representation.jsonl \
+      --manifest=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/inspect-view-manifests/joint_detection.jsonl \
+      --manifest=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/inspect-view-manifests/surface_condition.jsonl \
+      --samples-per-split=5 \
+      --output=/workspace/inspect-view-loader-smoke.json
+- name: gcr.io/cloud-builders/gcloud
+  id: publish-smoke-report
+  waitFor: [validate-manifests-and-media]
+  args:
+  - storage
+  - cp
+  - --no-clobber
+  - /workspace/inspect-view-loader-smoke.json
+  - gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/loader_smoke_report.json
+options:
+  logging: GCS_ONLY
+  machineType: E2_HIGHCPU_8
+timeout: 1800s

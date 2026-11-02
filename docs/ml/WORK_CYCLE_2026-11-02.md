@@ -101,3 +101,14 @@ The fusion therefore remains a development prototype with `production_approved=f
 - Pipe Defects v1 remains excluded. Records from the other external sources remain candidates until record-level annotation and provenance review produces a versioned promoted manifest.
 - Do not launch a nominal final model from quarantine paths. The existing `training/train_classifier.py` uses a legacy six-class synthetic-data contract and cannot correctly train the fifteen-class canonical dataset without a new source-aware loader and evaluation contract.
 - Exact next action: build the promoted, family-grouped manifests from accepted records, add the canonical multi-task loader, run a CPU data-loader smoke evaluation, then submit the first bounded representation-learning job.
+
+## Family-grouped Inspect View manifests
+
+- Cloud Build `21d5905f-3cb6-4e72-b387-d72951845992` created immutable research-candidate manifests under `gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/inspect-view-manifests/`.
+- Global SHA-256 enforcement removed four additional cross-source duplicates, leaving 38,686 external representation candidates in 6,704 source-media families.
+- The joint-detection stage contains 2,066 records from 972 families: 1,675 train, 198 validation, and 193 test.
+- The surface-condition stage contains 7,953 records from 1,494 families: 6,267 train, 754 validation, and 932 test.
+- Every family is assigned deterministically to exactly one split. Full-manifest validation confirmed unique SHA-256 values and no family leakage across train, validation, or test.
+- The first loader smoke build correctly rejected an annotation labelled as a bounding box that actually contained a segmentation polygon. The canonical loader now preserves and validates both normalized YOLO boxes and segmentation polygons.
+- Corrected loader smoke build `44f1b562-ca95-4e01-a90b-82b8222dc3f8` passed all three manifests, verified sampled image SHA-256 values, dimensions, annotation syntax, and GCS paths, and published `loader_smoke_report.json` beside the manifests.
+- The next action is to implement the bounded representation-learning worker against `representation.jsonl`. Do not reuse the legacy random-update six-class classifier as the final Inspect View trainer.
