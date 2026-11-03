@@ -78,19 +78,21 @@ describe('Vercel Secure API Gateway Security Controls', () => {
     expect(lastResult?.resetSeconds).toBeGreaterThan(0)
   })
 
-  it('provides neutral user auth abstraction for disabled and provider modes', async () => {
+  it('keeps public mode open and fails closed for unconfigured provider mode', async () => {
     const disabledProvider = new DisabledUserAuthProvider()
     const userDisabled = await disabledProvider.verifyRequest({})
     expect(userDisabled).not.toBeNull()
     expect(userDisabled?.roles).toContain('INSPECTOR')
 
     const pluggableProvider = new PluggableUserAuthProvider()
-    const userNoToken = await pluggableProvider.verifyRequest({ headers: {} })
-    expect(userNoToken).toBeNull()
+    const expectedError = 'USER_AUTH_MODE=provider is not configured with a trusted token verifier.'
 
-    const userWithToken = await pluggableProvider.verifyRequest({
-      headers: { authorization: 'Bearer valid.jwt.token' },
-    })
-    expect(userWithToken?.id).toBe('authenticated-user')
+    await expect(pluggableProvider.verifyRequest({ headers: {} })).rejects.toThrow(expectedError)
+
+    await expect(
+      pluggableProvider.verifyRequest({
+        headers: { authorization: 'Bearer valid.jwt.token' },
+      }),
+    ).rejects.toThrow(expectedError)
   })
 })
