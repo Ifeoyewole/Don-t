@@ -1,7 +1,4 @@
-from pathlib import Path
-
-path = Path('backend/app/core/cv/geometry_evidence.py')
-path.write_text('''"""Geometry confidence derived from observable geometry evidence.
+"""Geometry confidence derived from observable geometry evidence.
 
 Tolerance PASS/FAIL is intentionally excluded. A joint can be out of tolerance
 while still being measured with high confidence. Geometry tiers are produced by
@@ -60,5 +57,3 @@ def derive_geometry_confidence(response: Any) -> float:
         return round(min(0.84, 0.68 + (0.16 * strength)), 3)
 
     return round(max(0.20, min(0.65, valid_fraction * 0.65)), 3)
-''', encoding='utf-8')
-print('geometry confidence mapping updated')

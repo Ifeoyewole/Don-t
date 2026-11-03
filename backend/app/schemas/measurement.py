@@ -180,7 +180,7 @@ class VertexSemanticGateResult(BaseModel):
     user_message: str = Field(..., description="Operator guidance message")
     observation: str = Field(..., description="Detailed semantic visual observation")
     model: str = Field(default="gemini-2.5-flash", description="Underlying multimodal model ID")
-    confidence: float = Field(default=1.0, description="Semantic confidence score")
+    confidence: Optional[float] = Field(default=None, description="Semantic confidence when supplied by the provider; None when unavailable")
 
 
 class MeasurementResponse(BaseModel):
