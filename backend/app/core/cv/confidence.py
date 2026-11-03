@@ -53,7 +53,7 @@ class ConfidenceEngine:
     def fuse_measurement_confidence(
         self,
         quality_score: float,
-        segmentation_score: float,
+        segmentation_score: Optional[float],
         geometry_score: float,
         temporal_score: Optional[float] = None,
         condition_score: Optional[float] = None,
@@ -70,36 +70,33 @@ class ConfidenceEngine:
         authority over physical geometry acceptance or rejection.
         """
         q = min(1.0, max(0.0, quality_score))
-        s = min(1.0, max(0.0, segmentation_score))
+        s = min(1.0, max(0.0, segmentation_score)) if segmentation_score is not None else None
         g = min(1.0, max(0.0, geometry_score))
         c = min(1.0, max(0.0, condition_score)) if condition_score is not None else 0.0
 
         if temporal_score is not None:
             t = min(1.0, max(0.0, temporal_score))
-            sum_weights = (
-                self.weights.weight_quality
-                + self.weights.weight_segmentation
-                + self.weights.weight_geometry
-                + self.weights.weight_temporal
-            )
+            sum_weights = self.weights.weight_quality + self.weights.weight_geometry + self.weights.weight_temporal
             fused = (
                 (self.weights.weight_quality * q)
-                + (self.weights.weight_segmentation * s)
                 + (self.weights.weight_geometry * g)
                 + (self.weights.weight_temporal * t)
-            ) / max(1e-4, sum_weights)
+            )
+            if s is not None:
+                sum_weights += self.weights.weight_segmentation
+                fused += self.weights.weight_segmentation * s
+            fused = fused / max(1e-4, sum_weights)
         else:
             t = None
-            sum_weights = (
-                self.weights.weight_quality
-                + self.weights.weight_segmentation
-                + self.weights.weight_geometry
-            )
+            sum_weights = self.weights.weight_quality + self.weights.weight_geometry
             fused = (
                 (self.weights.weight_quality * q)
-                + (self.weights.weight_segmentation * s)
                 + (self.weights.weight_geometry * g)
-            ) / max(1e-4, sum_weights)
+            )
+            if s is not None:
+                sum_weights += self.weights.weight_segmentation
+                fused += self.weights.weight_segmentation * s
+            fused = fused / max(1e-4, sum_weights)
 
         meas_conf = round(float(min(1.0, max(0.0, fused))), 3)
 
@@ -115,7 +112,7 @@ class ConfidenceEngine:
 
         return ConfidenceBreakdown(
             quality_score=round(q, 3),
-            segmentation_score=round(s, 3),
+            segmentation_score=round(s, 3) if s is not None else 0.0,
             condition_score=round(c, 3),
             geometry_score=round(g, 3),
             temporal_score=round(t, 3) if t is not None else None,

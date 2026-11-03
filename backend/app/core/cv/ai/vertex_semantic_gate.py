@@ -387,7 +387,7 @@ Return ONLY a valid JSON object matching this structure:
                 user_message=str(parsed.get("user_message", "Semantic evaluation complete.")),
                 observation=str(parsed.get("observation", "")),
                 model=self.model,
-                confidence=0.95,
+                confidence=None,
             )
 
             # Cache successful non-failure evaluations

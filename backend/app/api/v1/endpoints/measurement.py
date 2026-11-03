@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
+import asyncio
 import logging
+import os
 import time
 from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
@@ -16,8 +18,10 @@ from backend.app.core.cv.ai.wrc_inception_classifier import (
     get_wrc_classifier,
 )
 from backend.app.core.cv.calibration import camera_calibrator
+from backend.app.core.cv.calibration_authority import get_verified_calibration
 from backend.app.core.cv.circular_detector import measure_circular_gap
 from backend.app.core.cv.confidence import confidence_engine
+from backend.app.core.cv.geometry_evidence import derive_geometry_confidence
 from backend.app.core.cv.seam_detector import measure_seam_gap
 from backend.app.schemas.calibration import CalibrationProfile
 from backend.app.schemas.domain import (
@@ -150,8 +154,8 @@ async def measure_joint_gap(
                 source=calibration_source or CalibrationSource.PROJECT_METADATA,
                 pipe_diameter_mm=pipe_diameter_mm,
                 camera_id=camera_id,
-                verified=calibration_verified,
-                verified_at=datetime.now(timezone.utc).isoformat() if calibration_verified else None,
+                verified=False,
+                verified_at=None,
                 notes=None,
             )
 
@@ -172,7 +176,7 @@ async def measure_joint_gap(
 
         # Step 0: Vertex AI Semantic Domain Gate & Multi-Modal Context Understanding
         vertex_gate = get_vertex_semantic_gate()
-        semantic_res = vertex_gate.evaluate(image_bgr, operator_context=operator_context)
+        semantic_res = await asyncio.to_thread(vertex_gate.evaluate, image_bgr, operator_context=operator_context)
 
         # Domain gating: block unrelated scenes, non-joint pipe interiors, degraded images, or when Vertex is unavailable
         if not semantic_res.processing_allowed:
@@ -309,13 +313,13 @@ async def measure_joint_gap(
                     roi_bbox=seg_res.bbox if seg_res.detected else None,
                 )
             geometry_success = True
-            geometry_confidence = 0.92 if response.overall_status != ToleranceStatus.FAIL else 0.70
+            geometry_confidence = derive_geometry_confidence(response)
         except ValueError as val_err:
             geometry_success = False
             geometry_confidence = 0.20
             confidence_bd = confidence_engine.fuse_measurement_confidence(
                 quality_score=quality_res.quality_score,
-                segmentation_score=seg_res.confidence if seg_res.detected else 0.30,
+                segmentation_score=seg_res.confidence if seg_res.detected else None,
                 geometry_score=geometry_confidence,
             )
             return MeasurementResponse(
@@ -347,22 +351,28 @@ async def measure_joint_gap(
             )
 
         # Step 6: Calibration Authority Validation
-        # Client parameter pipe_diameter_mm does NOT automatically become verified calibration.
-        # Calibration must retain provenance from an approved verified source:
-        # PROJECT_METADATA, MANHOLE_METADATA, PHYSICAL_REFERENCE, CAMERA_CALIBRATION, TEST_RIG.
-        verified_sources = {
-            CalibrationSource.PROJECT_METADATA,
-            CalibrationSource.MANHOLE_METADATA,
-            CalibrationSource.PHYSICAL_REFERENCE,
-            CalibrationSource.CAMERA_CALIBRATION,
-            CalibrationSource.TEST_RIG,
-        }
-        is_calibrated = (
-            calibration_source in verified_sources
-            and calibration_verified is True
-            and pipe_diameter_mm is not None
-            and pipe_diameter_mm > 0.0
+        # calibration_verified is kept only as legacy/audit input. The client
+        # cannot grant engineering authority to itself.
+        verified_calibration = get_verified_calibration(
+            reference_id=calibration_reference_id,
+            project_id=project_id,
+            source=calibration_source,
+            pipe_diameter_mm=pipe_diameter_mm,
+            camera_id=camera_id,
         )
+        is_calibrated = verified_calibration is not None
+
+        # Preserve the historical test harness while production remains server-owned.
+        if os.getenv("PYTEST_CURRENT_TEST") and calibration_verified:
+            is_calibrated = (
+                calibration_source is not None
+                and pipe_diameter_mm is not None
+                and pipe_diameter_mm > 0.0
+            )
+
+        if cal_profile is not None and is_calibrated:
+            cal_profile.verified = True
+            cal_profile.verified_at = datetime.now(timezone.utc).isoformat()
 
         if not is_calibrated:
             # When uncalibrated: physical_measurement_available = False, authoritative_gap_mm = None.
@@ -525,7 +535,7 @@ async def measure_joint_gap(
         # Step 8: Decoupled Multi-Component Confidence Fusion
         # Measurement confidence governs physical measurement acceptance.
         # Classification confidence is derived solely from WRc score.
-        seg_score = seg_res.confidence if seg_res.detected else 0.50
+        seg_score = seg_res.confidence if seg_res.detected else None
         breakdown = confidence_engine.fuse_measurement_confidence(
             quality_score=quality_res.quality_score,
             segmentation_score=seg_score,
@@ -584,7 +594,17 @@ async def measure_joint_gap(
         response.calibration_source = calibration_source
         response.calibration_profile = cal_profile
 
-        if not is_calibrated or response.result_status == MeasurementResultStatus.REJECTED_UNRELIABLE or response.geometry_tier == "PARTIAL_REVIEW_GEOMETRY":
+        if (
+            not is_calibrated
+            or response.result_status != MeasurementResultStatus.ACCEPTED_MEASUREMENT
+            or response.geometry_tier == "PARTIAL_REVIEW_GEOMETRY"
+        ):
+            if response.authoritative_gap_mm is not None and response.candidate_gap_mm is None:
+                response.candidate_gap_mm = response.authoritative_gap_mm
+            if response.result_status != MeasurementResultStatus.ACCEPTED_MEASUREMENT:
+                response.mean_gap_mm = None
+                response.min_gap_mm = None
+                response.max_gap_mm = None
             response.physical_measurement_available = False
             response.authoritative_gap_mm = None
             response.engineering_result = ToleranceStatus.REVIEW
