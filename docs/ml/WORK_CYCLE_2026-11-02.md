@@ -56,6 +56,8 @@ The fusion therefore remains a development prototype with `production_approved=f
 - Immutable ConvNeXt artifact: `gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-balanced-r2-20261103/best.pt`; SHA-256 `74ae2a12569ef4927ca83eecdd8d09b46ec53da263138d8e0a2c7c16abe8d81c`.
 - Evaluation-only retries `4657964325401526272` (EfficientNet) and `1802682161648631808` (ConvNeXt) succeeded and published raw probabilities under `models/inspect-view/evaluations/pilot-balanced-r2-20261103/`.
 - The candidate outputs align exactly: 205 threshold-tuning records with ordered identity hash `f93901928df38f70158e7b69684a8056d97e1a81dddac6965efa559c1d7d91bb`, and 195 development-report records with ordered identity hash `ef8a3578a6e471765f0360da4e3ce5c793bc32a9829b3199c18b294d380a9296`.
+- Corrected legacy evaluation jobs `626679708951511040` and `4186212264434466816` succeeded on the same 205/195 pilot split. Sewer Condition v1 scored macro-F1/F2 `0.082704/0.079367`, Sewer Condition v2 `0.090605/0.093076`, and adapted WRc `0.111213/0.122506` under the sparse nine-code compatibility contract. Original WRc emitted no displaced-joint top-1 predictions and remains comparable only for its directly mapped output.
+- These low legacy scores reflect severe domain/taxonomy mismatch on this pilot population. The fusion must be allowed to assign zero weight to a candidate per class; no model is included merely because its predictions are available.
 - Production WRc remains the primary classifier. Candidate promotion requires same-image comparison and the final locked-test metrics, calibration, latency, memory, and failure-rate checks described in the production plan.
 
 ## Dataset expansion continuation
