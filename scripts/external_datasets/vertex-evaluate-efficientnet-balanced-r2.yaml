@@ -1,0 +1,25 @@
+workerPoolSpecs:
+- machineSpec:
+    machineType: n1-standard-4
+  replicaCount: 1
+  diskSpec:
+    bootDiskType: pd-standard
+    bootDiskSizeGb: 100
+  containerSpec:
+    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/inspect-view-representation@sha256:36c31ed4d8b63fefdd1cef7a997999155b3dac25e7c323b903ae8f8d4f0f7001
+    command:
+    - python
+    - training/evaluate_inspect_view_candidate.py
+    args:
+    - --project=joint-inspection-510310
+    - --manifest=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/inspect-view-manifests/representation.jsonl
+    - --labels=training/data_sources/canonical_labels.json
+    - --checkpoint=gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-efficientnet-balanced-r2-20261103/best.pt
+    - --output-prefix=gs://joint-inspection-510310-data/models/inspect-view/evaluations/pilot-balanced-r2-20261103/efficientnet-b0
+    - --config-id=eval-efficientnet-balanced-r2-20261103
+    - --max-val=400
+    - --batch-size=32
+    - --cpu-only
+scheduling:
+  timeout: 3600s
+  restartJobOnWorkerRestart: false
