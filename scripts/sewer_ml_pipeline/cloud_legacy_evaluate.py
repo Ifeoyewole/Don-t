@@ -163,12 +163,13 @@ def run(args) -> None:
                 download(client, spec["data_uri"], directory / "model.onnx.data", spec["data_sha"])
             session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
             if spec["kind"] == "sewerml_multilabel_sigmoid":
-                tune_values, _ = infer(session, splits["threshold_tune"], images, spec)
+                tune_values, tune_timing = infer(session, splits["threshold_tune"], images, spec)
                 thresholds = tune_thresholds(truth(splits["threshold_tune"]), tune_values)
                 dev_values, timing = infer(session, splits["dev_report"], images, spec)
                 report = complete_report(dev_truth, dev_values, TARGETS, thresholds)
                 report["thresholds"] = {code: float(value) for code, value in zip(TARGETS, thresholds)}
             else:
+                tune_values, tune_timing = infer(session, splits["threshold_tune"], images, spec)
                 dev_values, timing = infer(session, splits["dev_report"], images, spec)
                 top1 = dev_values.argmax(axis=1)
                 fs_true = dev_truth[:, 0].astype(bool)
@@ -188,9 +189,14 @@ def run(args) -> None:
                 "locked_test_evaluated": False, "production_approved": False,
             })
             reports[spec["name"]] = report
-            predictions = root / f"{spec['name']}_predictions.jsonl"
-            write_predictions(predictions, splits["dev_report"], dev_values, spec["class_codes"])
-            upload_create_only(client, predictions, f"{args.output_prefix.rstrip('/')}/{predictions.name}")
+            report["threshold_tune_latency"] = tune_timing
+            for split_name, split_rows, values in (
+                ("threshold_tune", splits["threshold_tune"], tune_values),
+                ("development_report", splits["dev_report"], dev_values),
+            ):
+                predictions = root / f"{spec['name']}_{split_name}_predictions.jsonl"
+                write_predictions(predictions, split_rows, values, spec["class_codes"])
+                upload_create_only(client, predictions, f"{args.output_prefix.rstrip('/')}/{predictions.name}")
         combined = root / "same_image_report.json"
         combined.write_text(json.dumps({
             "models": reports, "identical_ordered_images": True,

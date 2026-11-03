@@ -18,7 +18,7 @@ workerPoolSpecs:
     - --early-stop=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/pilot-legacy-r2/early_stop.csv
     - --threshold-tune=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/pilot-legacy-r2/threshold_tune.csv
     - --dev-report=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/pilot-legacy-r2/dev_report.csv
-    - --output-prefix=gs://joint-inspection-510310-data/models/inspect-view/evaluations/pilot-balanced-r2-20261103/legacy-onnx
+    - --output-prefix=gs://joint-inspection-510310-data/models/inspect-view/evaluations/pilot-balanced-r2-20261103/legacy-onnx-r2
     - --v1-model=gs://joint-inspection-510310-data/models/candidates/sewer-condition-v1/model.onnx
     - --v1-sha=f5cc05da983f95e019bb45d926e8c98fb5909cf2ae1aa2dc37a574f35b526a44
     - --v1-data=gs://joint-inspection-510310-data/models/candidates/sewer-condition-v1/model.onnx.data
