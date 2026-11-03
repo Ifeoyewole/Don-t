@@ -46,23 +46,12 @@ export class DisabledUserAuthProvider implements UserAuthProvider {
 export class PluggableUserAuthProvider implements UserAuthProvider {
   readonly providerName = 'provider'
 
-  async verifyRequest(request: RequestLike): Promise<AuthenticatedUser | null> {
-    const authHeader = request.headers['authorization'] || request.headers['Authorization']
-    if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
-      return null
-    }
-
-    const token = authHeader.substring(7).trim()
-    if (!token) {
-      return null
-    }
-
-    // Provider token verification hook (e.g. Firebase Admin / Auth0 JWT / Supabase JWT)
-    // NOTE: This will be bound to the chosen vendor's verification SDK once approved in USER_AUTH_DECISION.md
-    return {
-      id: 'authenticated-user',
-      roles: ['INSPECTOR'],
-    }
+  async verifyRequest(_request: RequestLike): Promise<AuthenticatedUser | null> {
+    // Fail closed until a real provider verifier is installed.
+    // USER_AUTH_MODE=disabled remains the intentional public-product mode.
+    throw new Error(
+      'USER_AUTH_MODE=provider is not configured with a trusted token verifier.'
+    )
   }
 }
 
