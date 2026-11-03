@@ -186,6 +186,18 @@ def run(args) -> dict:
     labels = labels_config["canonical_labels"]
     device = torch.device("cuda" if torch.cuda.is_available() and not args.cpu_only else "cpu")
     model = create_model(args.architecture, len(labels), args.pretrained).to(device)
+    initialized_from = None
+    if args.init_checkpoint:
+        checkpoint_payload = read_bytes(client, args.init_checkpoint)
+        checkpoint_sha256 = hashlib.sha256(checkpoint_payload).hexdigest()
+        checkpoint = torch.load(io.BytesIO(checkpoint_payload), map_location=device, weights_only=True)
+        if checkpoint.get("labels") != labels:
+            raise ValueError("Initial checkpoint canonical label contract does not match")
+        prior_architecture = checkpoint.get("metrics", {}).get("architecture")
+        if prior_architecture and prior_architecture != args.architecture:
+            raise ValueError(f"Initial checkpoint architecture mismatch: {prior_architecture}")
+        model.load_state_dict(checkpoint["model"], strict=True)
+        initialized_from = {"uri": args.init_checkpoint, "sha256": checkpoint_sha256}
     train_loader = DataLoader(ManifestDataset(train_rows, labels, client), batch_size=args.batch_size,
                               shuffle=True, num_workers=0)
     tune_rows, report_rows = partition_validation(val_rows)
@@ -222,6 +234,7 @@ def run(args) -> dict:
         "train_records": len(train_rows), "val_records": len(val_rows),
         "threshold_tune_records": len(tune_rows), "development_report_records": len(report_rows),
         "thresholds": dict(zip(labels, thresholds)), "sampling": "deterministic_class_balanced_v1",
+        "initialized_from": initialized_from,
         "device": str(device), "pretrained": args.pretrained,
         "excluded_unlabeled_records": excluded_unlabeled,
         "production_approved": False, "locked_test_evaluated": False,
@@ -262,6 +275,7 @@ def main() -> None:
     parser.add_argument("--max-val", type=int, default=32)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--pretrained", action="store_true")
+    parser.add_argument("--init-checkpoint", help="Versioned gs:// checkpoint used to continue training")
     parser.add_argument("--cpu-only", action="store_true")
     run(parser.parse_args())
 
