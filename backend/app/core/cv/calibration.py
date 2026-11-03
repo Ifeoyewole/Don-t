@@ -48,8 +48,8 @@ class CameraCalibrator:
         return self._profiles.get(camera_id)
 
     def list_profiles(self) -> list[CameraProfile]:
-        """Return a snapshot of registered profiles without exposing mutable storage."""
-        return list(self._profiles.values())
+        """Return an isolated snapshot of registered profiles."""
+        return [profile.model_copy(deep=True) for profile in self._profiles.values()]
 
     def undistort_image(
         self,
@@ -123,8 +123,14 @@ class CameraCalibrator:
         Returns:
             Tuple of (pixels_per_mm, mm_per_pixel)
         """
-        if pipe_diameter_mm <= 0.0 or outer_radius_px <= 0.0:
-            raise ValueError("Calibration scale requires positive pipe diameter and measured radius.")
+        if (
+            not math.isfinite(outer_radius_px)
+            or not math.isfinite(pipe_diameter_mm)
+            or not math.isfinite(tilt_angle_deg)
+            or pipe_diameter_mm <= 0.0
+            or outer_radius_px <= 0.0
+        ):
+            raise ValueError("Calibration scale requires finite positive dimensions and a finite tilt angle.")
 
         # Major axis diameter in pixels
         detected_diameter_px = 2.0 * outer_radius_px
