@@ -11,7 +11,7 @@ import torch
 from google.cloud import storage
 from torch.utils.data import DataLoader
 
-from training.inspect_view_representation import (
+from inspect_view_representation import (
     ManifestDataset,
     balanced_cap,
     create_model,
