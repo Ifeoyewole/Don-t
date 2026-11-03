@@ -514,12 +514,11 @@ async function handler(req, res) {
     const qParams = new URLSearchParams(rawQuery || "");
     qParams.delete("...route");
     qParams.delete("route");
+    let sanitizePublicHealth = false;
     if (route.targetPath === "api/v1/cv/health") {
       const wantsDiagnostics = qParams.get("diagnostics") === "true";
       const isEngineerOrAdmin = authUser?.roles?.includes("ENGINEER") || authUser?.roles?.includes("ADMIN");
-      if (!wantsDiagnostics || !isEngineerOrAdmin) {
-        return sendJson(res, 200, { status: "ok" }, corsHeaders);
-      }
+      sanitizePublicHealth = !wantsDiagnostics || !isEngineerOrAdmin;
     }
     const maxAllowedBytes = route.routeCategory === "multi-frame" ? GATEWAY_CONFIG.MAX_MULTI_FRAME_BYTES : GATEWAY_CONFIG.MAX_UPLOAD_SIZE_BYTES;
     let bodyBuffer;
@@ -566,6 +565,34 @@ async function handler(req, res) {
         headers: forwardHeaders,
         body: bodyBuffer
       });
+      if (sanitizePublicHealth) {
+        const healthPayload = await upstreamResponse.json().catch(() => null);
+        if (!upstreamResponse.ok || !healthPayload || typeof healthPayload !== "object") {
+          return sendJson(
+            res,
+            upstreamResponse.ok ? 502 : upstreamResponse.status,
+            { status: "unavailable", request_id: requestId },
+            { ...corsHeaders, "X-Request-ID": requestId, "Cache-Control": "no-store, max-age=0" }
+          );
+        }
+        const wrc = healthPayload.external_models?.wrc_inceptionresnetv2;
+        return sendJson(
+          res,
+          200,
+          {
+            status: healthPayload.status === "ok" ? "ok" : "degraded",
+            version: typeof healthPayload.version === "string" ? healthPayload.version : undefined,
+            opencv_version: typeof healthPayload.opencv_version === "string" ? healthPayload.opencv_version : undefined,
+            external_models: {
+              wrc_inceptionresnetv2: {
+                enabled: Boolean(wrc?.enabled),
+                loaded: Boolean(wrc?.loaded)
+              }
+            }
+          },
+          { ...corsHeaders, "X-Request-ID": requestId, "Cache-Control": "no-store, max-age=0" }
+        );
+      }
       const responseBody = await upstreamResponse.arrayBuffer();
       const contentType = upstreamResponse.headers.get("content-type") || "application/json";
       res.writeHead(upstreamResponse.status, {
