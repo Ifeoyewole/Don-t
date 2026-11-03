@@ -51,6 +51,9 @@ The fusion therefore remains a development prototype with `production_approved=f
 - The locked test was not read. The candidate remains `production_approved=false`.
 - Immutable artifact: `gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-efficientnet-balanced-r2-20261103/best.pt`; SHA-256 `d10954a20b2fa36b10a9fa0098f243cc8bfeee5cebc0cbf167409bcea4141882`.
 - Balanced ConvNeXt-Tiny job `5308734471556562944` was submitted with the identical manifest, split contract, seed, sample caps, epoch count, learning rate, GPU type, and worker image.
+- Balanced ConvNeXt-Tiny job `5308734471556562944` subsequently succeeded. Development macro-F1 was `0.7319878159` and macro-F2 was `0.8289892045`, exceeding the balanced EfficientNet candidate on the same 195-record development report.
+- ConvNeXt also evaluated only seven of fifteen canonical classes; the unsupported classes include `NORMAL`, `OPEN_JOINT`, and `JOINT_DISPLACEMENT`. It therefore remains a research candidate and must not advance to the locked test or production on this result alone.
+- Immutable ConvNeXt artifact: `gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-balanced-r2-20261103/best.pt`; SHA-256 `74ae2a12569ef4927ca83eecdd8d09b46ec53da263138d8e0a2c7c16abe8d81c`.
 - Production WRc remains the primary classifier. Candidate promotion requires same-image comparison and the final locked-test metrics, calibration, latency, memory, and failure-rate checks described in the production plan.
 
 ## Dataset expansion continuation
