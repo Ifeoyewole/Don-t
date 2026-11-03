@@ -90,6 +90,25 @@ def merge(args) -> dict:
             if dhash: split_dhash[target_split].add(dhash)
 
     combined = expanded + added
+    # Deduplicate exact perceptual hashes globally. Prefer held-out evidence so a
+    # near-identical training record can never contaminate validation or test.
+    split_priority = {"test": 0, "val": 1, "train": 2}
+    grouped_dhash: dict[str, list[dict]] = {}
+    without_dhash = []
+    for row in combined:
+        if row.get("dhash"):
+            grouped_dhash.setdefault(row["dhash"], []).append(row)
+        else:
+            without_dhash.append(row)
+    deduplicated = list(without_dhash)
+    for rows in grouped_dhash.values():
+        rows.sort(key=lambda row: (
+            split_priority[row["split"]], row["dataset_name"],
+            row["media_family_id"], row["sha256"],
+        ))
+        deduplicated.append(rows[0])
+        excluded["global_exact_dhash_duplicate"] += len(rows) - 1
+    combined = deduplicated
     combined.sort(key=lambda row: (row["split"], row["dataset_name"], row["media_family_id"], row["sha256"]))
     family_splits: dict[tuple[str, str], set[str]] = {}
     for row in combined:
@@ -106,7 +125,7 @@ def merge(args) -> dict:
         label_counts[row["split"]].update(row.get("jointinspect_labels", []))
     summary = {
         "schema_version": 1,
-        "manifest_id": "inspect-view-representation-sewerml-v4-r1-20261103",
+        "manifest_id": args.manifest_id,
         "base_records": len(expanded), "sewerml_records_added": len(added),
         "total_records": len(combined),
         "split_counts": dict(Counter(row["split"] for row in combined)),
@@ -126,6 +145,7 @@ def main() -> None:
         parser.add_argument("--" + split, type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--summary", type=Path, required=True)
+    parser.add_argument("--manifest-id", required=True)
     args = parser.parse_args()
     print(json.dumps(merge(args), indent=2))
 
