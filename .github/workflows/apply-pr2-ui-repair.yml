@@ -1,0 +1,60 @@
+name: Apply PR2 truthful light-blue UI repair
+
+on:
+  push:
+    branches:
+      - feat/ui-truthful-lightblue
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/ui-truthful-lightblue
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Apply UI repair
+        run: python tools/apply_pr2_ui_repair.py
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Remove one-shot repair scaffolding
+        run: rm -f tools/apply_pr2_ui_repair.py .github/workflows/apply-pr2-ui-repair.yml
+
+      - name: Commit repaired UI
+        run: |
+          git config user.name "jointinspect-repair-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No repair changes to commit"
+            exit 0
+          fi
+          git commit -m "feat: revamp truthful light-blue inspection UI"
+          git push origin HEAD:feat/ui-truthful-lightblue
