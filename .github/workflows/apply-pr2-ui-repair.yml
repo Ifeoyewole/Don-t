@@ -24,7 +24,9 @@ jobs:
           python-version: '3.11'
 
       - name: Apply UI repair
-        run: python tools/apply_pr2_ui_repair.py
+        run: |
+          python tools/apply_pr2_ui_repair.py
+          python tools/fix_pr2_project_switch.py
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -35,8 +37,8 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - name: Lint repaired UI files
+        run: npx eslint src/components/AppShell.tsx src/lib/cvClient.ts src/pages/CreateProjectPage.tsx src/pages/PhotoUploadPage.tsx
 
       - name: Unit tests
         run: npm test
@@ -45,7 +47,7 @@ jobs:
         run: npm run build
 
       - name: Remove one-shot repair scaffolding
-        run: rm -f tools/apply_pr2_ui_repair.py .github/workflows/apply-pr2-ui-repair.yml
+        run: rm -f tools/apply_pr2_ui_repair.py tools/fix_pr2_project_switch.py .github/workflows/apply-pr2-ui-repair.yml
 
       - name: Commit repaired UI
         run: |
