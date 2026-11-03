@@ -6,7 +6,7 @@ workerPoolSpecs:
     bootDiskType: pd-standard
     bootDiskSizeGb: 100
   containerSpec:
-    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/inspect-view-representation@sha256:36c31ed4d8b63fefdd1cef7a997999155b3dac25e7c323b903ae8f8d4f0f7001
+    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/inspect-view-representation@sha256:424f47b076231add73be666e00cf74779ab1b832438033ce5989801e5d4666b9
     command:
     - python
     - training/evaluate_inspect_view_candidate.py
