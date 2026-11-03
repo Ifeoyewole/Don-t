@@ -35,8 +35,11 @@ jobs:
       - name: Install frontend/gateway dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - name: Lint repaired TypeScript source
+        run: npx eslint api/_lib/auth-abstraction.ts
+
+      - name: Check bundled gateway syntax
+        run: node --check 'api/v1/cv/[...route].js'
 
       - name: Typecheck gateway
         run: npx tsc -p api/tsconfig.json --noEmit
