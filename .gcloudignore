@@ -12,6 +12,7 @@ training/
 training/*
 !training/inspect_view_loader.py
 !training/inspect_view_representation.py
+!training/evaluate_inspect_view_candidate.py
 !training/data_sources/
 training/data_sources/*
 !training/data_sources/canonical_labels.json
