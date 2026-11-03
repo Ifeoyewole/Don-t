@@ -24,7 +24,9 @@ jobs:
           python-version: '3.11'
 
       - name: Apply cleanup
-        run: python tools/apply_pr4_frontend_cleanup.py
+        run: |
+          python tools/apply_pr4_frontend_cleanup.py
+          python tools/fix_pr4_empty_debug_blocks.py
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -48,7 +50,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Remove one-shot cleanup scaffolding
-        run: rm -f tools/apply_pr4_frontend_cleanup.py .github/workflows/apply-pr4-frontend-cleanup.yml
+        run: rm -f tools/apply_pr4_frontend_cleanup.py tools/fix_pr4_empty_debug_blocks.py .github/workflows/apply-pr4-frontend-cleanup.yml
 
       - name: Commit cleanup
         run: |
