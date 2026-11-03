@@ -7,6 +7,14 @@ workerPoolSpecs:
     bootDiskSizeGb: 100
   containerSpec:
     imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/wrc-evaluator@sha256:d78989b7c7ef95a92c69ffe28f80770e9ba759735487e1118edd8e97717fca25
+    command:
+    - python
+    - scripts/sewer_ml_pipeline/cloud_wrc_evaluate.py
+    env:
+    - name: PROJECT_ID
+      value: joint-inspection-510310
+    - name: BUILD_ID
+      value: vertex-eval-wrc-adapted-pilot-r2
     args:
     - --project=joint-inspection-510310
     - --model=gs://joint-inspection-510310-data/models/sewer-ml/v4/research-candidates/20k-wrc-checkpointed-l4-20261024-2155/model.keras

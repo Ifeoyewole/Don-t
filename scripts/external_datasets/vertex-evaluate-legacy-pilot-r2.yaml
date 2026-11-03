@@ -7,6 +7,11 @@ workerPoolSpecs:
     bootDiskSizeGb: 100
   containerSpec:
     imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/legacy-evaluator@sha256:d6d2eabe0e443c4cbada208d36282cfd6f929e2a7e0212f9388248d128fd49a5
+    env:
+    - name: PROJECT_ID
+      value: joint-inspection-510310
+    - name: BUILD_ID
+      value: vertex-eval-legacy-pilot-r2
     args:
     - --project=joint-inspection-510310
     - --train=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/pilot-legacy-r2/train.csv
