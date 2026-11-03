@@ -105,7 +105,7 @@ export const CreateProjectPage = ({ todayValue, project, onBack, onSave }: Props
             <div className="setup-guide-head">
               <span className="setup-guide-tag">Workflow</span>
               <h3>Inspection Setup</h3>
-              <p>Standardized pipeline for field capture and sub-pixel optical measurement.</p>
+              <p>Standardized pipeline for field capture and evidence-gated optical measurement.</p>
             </div>
 
             <ol className="setup-steps-list">
@@ -133,20 +133,20 @@ export const CreateProjectPage = ({ todayValue, project, onBack, onSave }: Props
               <li className="setup-step">
                 <div className="step-num">4</div>
                 <div className="step-body">
-                  <strong>Sub-Pixel Optical QA</strong>
-                  <span>Radial annular gap measurement and tolerance compliance verification.</span>
+                  <strong>Evidence-Gated Optical QA</strong>
+                  <span>Geometry measurement, calibration gating, and tolerance review.</span>
                 </div>
               </li>
             </ol>
 
             <div className="setup-spec-box">
               <div className="spec-item">
-                <span className="spec-label">Optical Accuracy</span>
-                <strong>±0.2 mm / ray</strong>
+                <span className="spec-label">Measurement Mode</span>
+                <strong>Evidence-gated CV</strong>
               </div>
               <div className="spec-item">
                 <span className="spec-label">Storage Mode</span>
-                <strong>Local-First + Sync</strong>
+                <strong>Local project data</strong>
               </div>
             </div>
           </div>

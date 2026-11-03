@@ -196,17 +196,17 @@ export const AppShell = ({
 
   const cloudLabel = isCloudOnline
     ? health?.latencyMs
-      ? `Cloud Connected (${health.latencyMs}ms)`
-      : 'Cloud Connected'
+      ? `Cloud API Available (${health.latencyMs}ms)`
+      : 'Cloud API Available'
     : health?.online
-      ? 'Local Engine'
+      ? 'Local Preview Available'
       : 'Offline'
 
   const cloudTooltip = isCloudOnline
-    ? `Real-time cloud sync active (${health?.latencyMs ?? 0}ms round-trip). Click to ping.`
+    ? `Authoritative cloud API reachable (${health?.latencyMs ?? 0}ms round-trip). Click to recheck.`
     : health?.online
-      ? 'Connected to local device engine. Click to ping cloud service.'
-      : 'Network offline. Inspections stored locally in IndexedDB.'
+      ? 'Cloud API is unavailable. Local preview may still run, but it is non-authoritative.'
+      : 'Network offline. Local project data remains on this device.'
 
   const handleSidebarClick = (key: NavKey) => {
     if (key === 'dashboard') {
@@ -285,12 +285,12 @@ export const AppShell = ({
             type="button"
             className={`status-pill ${isModelReady ? 'is-model-ready' : 'is-model-loading'} status-pill-clickable`}
             onClick={() => setActiveModal('models')}
-            title="AI/CV Optical Analysis Pipeline. Click for model telemetry."
+            title="Authoritative cloud classifier readiness. Click for model details."
           >
             <span className="status-dot-ready" aria-hidden="true">
               <CheckIcon />
             </span>
-            <span className="status-pill-text">{isModelReady ? 'Model Ready' : 'Loading Engine'}</span>
+            <span className="status-pill-text">{isModelReady ? 'Primary Model Ready' : 'Cloud Model Unavailable'}</span>
           </button>
 
           {/* Dynamic Inspector Session Profile */}
@@ -318,7 +318,7 @@ export const AppShell = ({
       {/* Offline Alert Strip */}
       <div className={`offline-banner ${isCloudOnline || (health?.online ?? online) ? 'is-hidden' : ''}`}>
         <CloudIcon />
-        <span>Connection lost. Field measurements are cached locally on IndexedDB and will sync once reconnected.</span>
+        <span>Connection lost. Local project data remains on this device; authoritative cloud processing resumes when connectivity returns.</span>
       </div>
 
       {/* Body: Slim Desktop Sidebar + Main Content */}
@@ -396,7 +396,7 @@ export const AppShell = ({
                 <span className={`live-dot ${isCloudOnline ? 'is-live' : ''}`} />
                 <strong>Inspection Engine v1.0</strong>
               </div>
-              <span className="badge-sub">{isCloudOnline ? `Live Cloud (${health?.latencyMs ?? 0}ms)` : 'Local Engine'} • Sub-pixel QA</span>
+              <span className="badge-sub">{isCloudOnline ? `Cloud CV reachable (${health?.latencyMs ?? 0}ms)` : 'Local preview only'} • Evidence-gated QA</span>
             </div>
           </div>
         </aside>
@@ -451,12 +451,12 @@ export const AppShell = ({
       {/* Inspector Profile Customization Modal */}
       {profileModalOpen && (
         <div className="modal-backdrop" onClick={() => setProfileModalOpen(false)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title-group">
                 <h3>Inspector Session Identity</h3>
               </div>
-              <button className="modal-close-btn" type="button" onClick={() => setProfileModalOpen(false)}>
+              <button className="modal-close-btn" type="button" aria-label="Close dialog" onClick={() => setProfileModalOpen(false)}>
                 ✕
               </button>
             </div>
@@ -503,45 +503,45 @@ export const AppShell = ({
       {/* Modals for Engine, Calibration, Models, Settings */}
       {activeModal === 'calibration' && (
         <div className="modal-backdrop" onClick={() => setActiveModal(null)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title-group">
                 <CalibrationIcon />
-                <h3>Sub-Pixel Geometric Calibration</h3>
+                <h3>Engineering Calibration</h3>
               </div>
-              <button className="modal-close-btn" type="button" onClick={() => setActiveModal(null)}>
+              <button className="modal-close-btn" type="button" aria-label="Close dialog" onClick={() => setActiveModal(null)}>
                 ✕
               </button>
             </div>
             <div className="modal-body">
               <p className="modal-lead">
-                Sub-pixel radial boundary tracking using annular edge estimation and adaptive contour sampling.
+                Calibration references are checked by the server before physical millimetres can be treated as authoritative.
               </p>
               <div className="spec-grid">
                 <div className="spec-card">
-                  <span className="spec-label">Radial Edge Rays</span>
-                  <strong>36 sectors</strong>
-                  <span className="spec-note">10° angular step validation</span>
+                  <span className="spec-label">Circular Sampling</span>
+                  <strong>72 rays by default</strong>
+                  <span className="spec-note">Independent radial evidence across the visible joint</span>
                 </div>
                 <div className="spec-card">
-                  <span className="spec-label">Sub-Pixel Method</span>
-                  <strong>Zernike Moments</strong>
-                  <span className="spec-note">Gaussian gradient peak interpolation</span>
+                  <span className="spec-label">Seam Sampling</span>
+                  <strong>40 scanlines by default</strong>
+                  <span className="spec-note">Horizontal or vertical seam geometry</span>
                 </div>
                 <div className="spec-card">
-                  <span className="spec-label">Nominal Joint Gap</span>
-                  <strong>12.0 mm</strong>
-                  <span className="spec-note">Design tolerance: ±4.0 mm</span>
+                  <span className="spec-label">Physical Scale</span>
+                  <strong>Server-verified reference</strong>
+                  <span className="spec-note">Unverified references remain pixel-space evidence</span>
                 </div>
                 <div className="spec-card">
-                  <span className="spec-label">Pixel Scale Target</span>
-                  <strong>1.000 mm/px</strong>
-                  <span className="spec-note">Nominal uncalibrated sensor scale</span>
+                  <span className="spec-label">Authority Gate</span>
+                  <strong>Accepted measurements only</strong>
+                  <span className="spec-note">Review/rejected results do not expose authoritative mm</span>
                 </div>
               </div>
               <div className="modal-callout">
-                <strong>Sub-Pixel Radial Edge Tracing: ACTIVE</strong>
-                <p>Calculates orthogonal gap distances across visible angular sectors while excluding shadows and debris.</p>
+                <strong>Evidence-Gated Geometry</strong>
+                <p>Joint geometry is measured from independently resolved edge evidence; tolerance status does not determine measurement confidence.</p>
               </div>
             </div>
             <div className="modal-footer">
@@ -555,40 +555,40 @@ export const AppShell = ({
 
       {activeModal === 'models' && (
         <div className="modal-backdrop" onClick={() => setActiveModal(null)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title-group">
                 <ModelsIcon />
                 <h3>AI Inspection Engine & Models</h3>
               </div>
-              <button className="modal-close-btn" type="button" onClick={() => setActiveModal(null)}>
+              <button className="modal-close-btn" type="button" aria-label="Close dialog" onClick={() => setActiveModal(null)}>
                 ✕
               </button>
             </div>
             <div className="modal-body">
               <p className="modal-lead">
-                Sub-pixel optical joint analysis and defect classification pipeline.
+                Evidence-gated geometry plus the currently loaded production classifier. Research candidates are not presented as live models.
               </p>
               <div className="spec-grid">
                 <div className="spec-card">
-                  <span className="spec-label">Joint Profile Engine</span>
-                  <strong>Sub-Pixel Profiler v1.0</strong>
-                  <span className="spec-note">Radial contour & annular gap solver</span>
+                  <span className="spec-label">Geometry Engine</span>
+                  <strong>Evidence-Gated OpenCV</strong>
+                  <span className="spec-note">Circular and seam measurement with review tiers</span>
                 </div>
                 <div className="spec-card">
-                  <span className="spec-label">Defect Classifier</span>
-                  <strong>Sewer-ML Deep Classifier</strong>
-                  <span className="spec-note">Displaced joint, cracks & intrusion detection</span>
+                  <span className="spec-label">Primary Classifier</span>
+                  <strong>{isModelReady ? 'WRc InceptionResNetV2' : 'Not ready'}</strong>
+                  <span className="spec-note">Runtime health determines whether the production model is loaded</span>
                 </div>
                 <div className="spec-card">
-                  <span className="spec-label">Measurement Precision</span>
-                  <strong>Nominal ±0.2 mm</strong>
-                  <span className="spec-note">36-ray angular sub-pixel sampling</span>
+                  <span className="spec-label">Research Candidate</span>
+                  <strong>SewerML / fusion evaluation</strong>
+                  <span className="spec-note">Not promoted until locked-test evidence and approval are complete</span>
                 </div>
                 <div className="spec-card">
                   <span className="spec-label">Processing Pipeline</span>
-                  <strong>{isCloudOnline ? 'Cloud Active' : 'Local Engine'}</strong>
-                  <span className="spec-note">{isCloudOnline ? `Live latency: ${health?.latencyMs ?? 0}ms` : 'Offline fallback active'}</span>
+                  <strong>{isCloudOnline ? 'Cloud CV available' : 'Local preview only'}</strong>
+                  <span className="spec-note">{isCloudOnline ? `API latency: ${health?.latencyMs ?? 0}ms` : 'Local preview is non-authoritative'}</span>
                 </div>
               </div>
               <div className="modal-callout">
@@ -607,13 +607,13 @@ export const AppShell = ({
 
       {activeModal === 'settings' && (
         <div className="modal-backdrop" onClick={() => setActiveModal(null)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title-group">
                 <SettingsIcon />
                 <h3>Inspection Quality & Cache Settings</h3>
               </div>
-              <button className="modal-close-btn" type="button" onClick={() => setActiveModal(null)}>
+              <button className="modal-close-btn" type="button" aria-label="Close dialog" onClick={() => setActiveModal(null)}>
                 ✕
               </button>
             </div>

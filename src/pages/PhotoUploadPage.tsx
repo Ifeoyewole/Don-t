@@ -90,27 +90,26 @@ export const PhotoUploadPage = ({
   const [reportedDownlink, setReportedDownlink] = useState<number | null>(null)
 
   // Calibration Profile Setup - Fail-Safe Defaults initialized from project storage
-  const [prevProjectId, setPrevProjectId] = useState(projectId)
   const [calPipeDiameter, setCalPipeDiameter] = useState<number | ''>(() => getInitialCalibration(projectId).pipeDiameter)
   const [calSource, setCalSource] = useState<CalibrationSourceType>(() => getInitialCalibration(projectId).source)
   const [calReferenceId, setCalReferenceId] = useState<string>(() => getInitialCalibration(projectId).referenceId)
-  const [calVerified, setCalVerified] = useState<boolean>(() => getInitialCalibration(projectId).verified)
   const [calNotes, setCalNotes] = useState<string>(() => getInitialCalibration(projectId).notes)
   const [savedProfile, setSavedProfile] = useState<CalibrationProfile | null>(() => getInitialCalibration(projectId).profile)
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('')
   const [saveErrorMsg, setSaveErrorMsg] = useState<string>('')
 
-  // Synchronize state during render if projectId changes
-  if (projectId !== prevProjectId) {
-    setPrevProjectId(projectId)
+  useEffect(() => {
     const init = getInitialCalibration(projectId)
-    setCalPipeDiameter(init.pipeDiameter)
-    setCalSource(init.source)
-    setCalReferenceId(init.referenceId)
-    setCalVerified(init.verified)
-    setCalNotes(init.notes)
-    setSavedProfile(init.profile)
-  }
+    // Defer the state reset so the effect synchronizes the selected project
+    // without triggering React's synchronous set-state-in-effect rule.
+    queueMicrotask(() => {
+      setCalPipeDiameter(init.pipeDiameter)
+      setCalSource(init.source)
+      setCalReferenceId(init.referenceId)
+      setCalNotes(init.notes)
+      setSavedProfile(init.profile ? { ...init.profile, verified: false, verified_at: null, verifiedAt: null } : null)
+    })
+  }, [projectId])
 
   const handleSaveCalibration = () => {
     setSaveErrorMsg('')
@@ -119,15 +118,11 @@ export const PhotoUploadPage = ({
     const refId = calReferenceId.trim()
     const dia = calPipeDiameter !== '' ? Number(calPipeDiameter) : null
 
-    // Enforce intentional verification requirements
-    if (calVerified) {
-      if (!dia || dia <= 0 || !refId) {
-        setSaveErrorMsg('Enter a verified pipe diameter and calibration reference before marking this profile as verified.')
-        return
-      }
+    if (dia !== null && dia <= 0) {
+      setSaveErrorMsg('Pipe diameter must be greater than zero.')
+      return
     }
 
-    const verifiedTimestamp = calVerified ? new Date().toISOString() : null
     const profile: CalibrationProfile = {
       calibration_reference_id: refId || `UNVERIFIED-${Date.now().toString(36).toUpperCase()}`,
       calibrationReferenceId: refId || `UNVERIFIED-${Date.now().toString(36).toUpperCase()}`,
@@ -136,15 +131,15 @@ export const PhotoUploadPage = ({
       source: calSource,
       pipe_diameter_mm: dia,
       pipeDiameterMm: dia,
-      verified: calVerified,
-      verified_at: verifiedTimestamp,
-      verifiedAt: verifiedTimestamp,
+      verified: false,
+      verified_at: null,
+      verifiedAt: null,
       notes: calNotes.trim() || undefined,
     }
     try {
       localStorage.setItem(`jointinspect_cal_${projectId}`, JSON.stringify(profile))
       setSavedProfile(profile)
-      setSaveSuccessMsg(calVerified ? 'Verified calibration profile saved!' : 'Unverified calibration profile saved.')
+      setSaveSuccessMsg('Calibration reference saved. The server must verify it before authoritative millimetres are available.')
       setTimeout(() => {
         setSaveSuccessMsg('')
         setSaveErrorMsg('')
@@ -269,8 +264,8 @@ export const PhotoUploadPage = ({
           <section className="network-card calibration-setup-card">
             <div className="network-head">
               <strong>Calibration</strong>
-              <span className={`status-pill ${savedProfile?.verified ? 'is-pass' : 'is-review'}`}>
-                {savedProfile?.verified ? 'VERIFIED' : 'CALIBRATION REQUIRED'}
+              <span className="status-pill is-review">
+                {savedProfile ? 'REFERENCE SAVED' : 'CALIBRATION REQUIRED'}
               </span>
             </div>
 
@@ -287,7 +282,7 @@ export const PhotoUploadPage = ({
                 }}
               >
                 <div>
-                  <strong>Calibration:</strong> {savedProfile.verified ? 'VERIFIED' : 'UNVERIFIED'}
+                  <strong>Calibration:</strong> SERVER VERIFICATION REQUIRED
                 </div>
                 <div>
                   <strong>Source:</strong> {savedProfile.source}
@@ -402,18 +397,6 @@ export const PhotoUploadPage = ({
                 />
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
-                <input
-                  type="checkbox"
-                  id="cal-verified-chk"
-                  checked={calVerified}
-                  onChange={(e) => setCalVerified(e.target.checked)}
-                />
-                <label htmlFor="cal-verified-chk" style={{ fontSize: '0.8rem', cursor: 'pointer' }}>
-                  Verified by operator / metadata
-                </label>
-              </div>
-
               <button
                 type="button"
                 className="button button-secondary"
@@ -434,7 +417,7 @@ export const PhotoUploadPage = ({
               ) : null}
             </div>
             <p style={{ fontSize: '0.72rem', opacity: 0.7, marginTop: '0.4rem' }}>
-              Calibrate once: saved profile applies automatically to all subsequent photos in this project.
+              Save the calibration reference once for this project. The backend verifies trusted references before issuing authoritative millimetres.
             </p>
           </section>
 

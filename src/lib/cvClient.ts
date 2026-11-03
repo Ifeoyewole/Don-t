@@ -200,10 +200,11 @@ export async function checkBackendHealth(): Promise<BackendHealthResult> {
     const data = await response.json()
     const latencyMs = Math.round(performance.now() - startTime)
 
+    const primaryModel = data.external_models?.wrc_inceptionresnetv2
     return {
       online: true,
       cloudConnected: true,
-      modelReady: true,
+      modelReady: Boolean(primaryModel?.enabled && primaryModel?.loaded),
       latencyMs,
       version: data.version || '1.0.0',
       opencvVersion: data.opencv_version,
@@ -214,7 +215,7 @@ export async function checkBackendHealth(): Promise<BackendHealthResult> {
     return {
       online: true,
       cloudConnected: false,
-      modelReady: hasWorker,
+      modelReady: false,
       source: hasWorker ? 'local' : 'offline',
     }
   } finally {
