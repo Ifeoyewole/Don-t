@@ -44,6 +44,15 @@ The successful `class-aware-v2-cv-r2-20261025` experiment combined ConvNeXt-Tiny
 
 The fusion therefore remains a development prototype with `production_approved=false`. ConvNeXt-Tiny remains the strongest evaluated standalone model on this held-out development split. A final frozen Inspect View model must wait until the expanded datasets are normalized, deduplicated, split without source/video leakage, and used in staged retraining. The existing acceptance gate must remain in force.
 
+## Expanded-dataset representation candidates — 2026-11-03
+
+- Balanced EfficientNet-B0 Vertex job `618868778347790336` succeeded on one Spot T4 using 2,000 training records and 400 validation records. The family-safe validation subset contained 205 threshold-tuning and 195 development-report records.
+- Development macro-F1 was `0.6291775421` and macro-F2 was `0.7051346067`. Only seven of fifteen canonical classes had positive development support, so this is a pipeline/candidate result and is not a production-promotion result.
+- The locked test was not read. The candidate remains `production_approved=false`.
+- Immutable artifact: `gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-efficientnet-balanced-r2-20261103/best.pt`; SHA-256 `d10954a20b2fa36b10a9fa0098f243cc8bfeee5cebc0cbf167409bcea4141882`.
+- Balanced ConvNeXt-Tiny job `5308734471556562944` was submitted with the identical manifest, split contract, seed, sample caps, epoch count, learning rate, GPU type, and worker image.
+- Production WRc remains the primary classifier. Candidate promotion requires same-image comparison and the final locked-test metrics, calibration, latency, memory, and failure-rate checks described in the production plan.
+
 ## Dataset expansion continuation
 
 - `train00.zip` is preserved in GCS at 18.38 GiB.
