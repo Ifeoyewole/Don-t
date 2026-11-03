@@ -52,19 +52,10 @@ var DisabledUserAuthProvider = class {
 };
 var PluggableUserAuthProvider = class {
   providerName = "provider";
-  async verifyRequest(request) {
-    const authHeader = request.headers["authorization"] || request.headers["Authorization"];
-    if (!authHeader || typeof authHeader !== "string" || !authHeader.startsWith("Bearer ")) {
-      return null;
-    }
-    const token = authHeader.substring(7).trim();
-    if (!token) {
-      return null;
-    }
-    return {
-      id: "authenticated-user",
-      roles: ["INSPECTOR"]
-    };
+  async verifyRequest(_request) {
+    throw new Error(
+      "USER_AUTH_MODE=provider is not configured with a trusted token verifier."
+    );
   }
 };
 var activeAuthProvider = GATEWAY_CONFIG.USER_AUTH_MODE === "provider" ? new PluggableUserAuthProvider() : new DisabledUserAuthProvider();
@@ -551,12 +542,22 @@ async function handler(req, res) {
       }
     }
     const idToken = await getCloudRunIdToken();
+    if (!idToken) {
+      console.error(`[GATEWAY-AUTH-${requestId}] Cloud Run identity token unavailable; refusing unauthenticated upstream invocation.`);
+      return sendJson(
+        res,
+        503,
+        {
+          detail: "Cloud inference service authentication is temporarily unavailable.",
+          request_id: requestId
+        },
+        corsHeaders
+      );
+    }
     const forwardHeaders = sanitizeForwardHeaders(req.headers);
     forwardHeaders["x-request-id"] = requestId;
-    if (idToken) {
-      forwardHeaders["x-serverless-authorization"] = `Bearer ${idToken}`;
-      forwardHeaders["authorization"] = `Bearer ${idToken}`;
-    }
+    forwardHeaders["x-serverless-authorization"] = `Bearer ${idToken}`;
+    forwardHeaders["authorization"] = `Bearer ${idToken}`;
     const forwardQuery = qParams.toString() ? `?${qParams.toString()}` : "";
     const targetUrl = `${GATEWAY_CONFIG.CLOUD_RUN_URL}/${route.targetPath}${forwardQuery}`;
     try {
