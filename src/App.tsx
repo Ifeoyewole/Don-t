@@ -451,10 +451,6 @@ function App() {
           ? (focusInspection?.manholeId ?? readInspectionRouteMap()[route.inspectionId]?.manholeId ?? null)
           : route.manholeId
 
-      if (route.key === 'results' || route.key === 'upload-inspection') {
-        console.log('ROUTE INSPECTION ID:', route.inspectionId)
-      }
-
       if (!targetManholeId) {
         setCurrentQueue((previous) => {
           revokeQueuePreviews(previous)
@@ -502,9 +498,6 @@ function App() {
       })
       setCurrentResults((previous) => {
         revokeResultPreviews(previous)
-        if (route.key === 'results') {
-          console.log('LOADED RESULTS:', enrichedResults)
-        }
         return enrichedResults
       })
       setCurrentManholeSummary({ ...manholeSummary, projectId: targetProjectId })
@@ -619,19 +612,6 @@ function App() {
             })
             await refreshRouteData()
           }}
-          onLoadSample={async () => {
-            const sampleFiles = [
-              new File(['sample-one'], 'joint_1-2.jpg', { type: 'image/jpeg' }),
-              new File(['sample-two'], 'joint_2-3.jpg', { type: 'image/jpeg' }),
-              new File(['sample-three'], 'joint_3-4.jpg', { type: 'image/jpeg' }),
-            ]
-            await inspectionQueue.addFiles({
-              projectId: uploadProjectId,
-              manholeId: uploadManholeId,
-              files: sampleFiles,
-            })
-            await refreshRouteData()
-          }}
           onRemoveFile={async (imageId) => {
             await inspectionQueue.removeFile(imageId)
             await refreshRouteData()
@@ -648,7 +628,6 @@ function App() {
               jointType,
               geometrySelectionProvenance: 'INSPECTOR_SELECTED',
             })
-            console.log('PROCESS RESULT:', result)
             if (!result.success || !result.inspectionId) {
               throw new Error(result.message || 'Inspection processing failed')
             }

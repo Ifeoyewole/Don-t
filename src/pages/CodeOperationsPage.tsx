@@ -115,15 +115,21 @@ export function CodeOperationsPage() {
     [source],
   );
   useEffect(() => {
-    void refresh();
+    const initial = window.setTimeout(() => void refresh(), 0);
     const timer = window.setInterval(() => void refresh(), 30000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+    };
   }, [refresh]);
   useEffect(() => {
     if (authorized && view === "logs") {
-      void loadLogs();
+      const initial = window.setTimeout(() => void loadLogs(), 0);
       const timer = window.setInterval(() => void loadLogs(), 15000);
-      return () => window.clearInterval(timer);
+      return () => {
+        window.clearTimeout(initial);
+        window.clearInterval(timer);
+      };
     }
   }, [authorized, view, loadLogs]);
   const run = async () => {
@@ -142,7 +148,7 @@ export function CodeOperationsPage() {
     try {
       const data = await api<Record<string, unknown>>("report");
       save(
-        `jointinspect-gcp-report-${Date.now()}.json`,
+        "jointinspect-gcp-report.json",
         JSON.stringify(data, null, 2),
         "application/json",
       );

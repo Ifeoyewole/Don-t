@@ -11,7 +11,6 @@ type Props = {
   events: string[]
   onBack: () => void
   onAddFiles: (files: File[]) => Promise<void>
-  onLoadSample: () => Promise<void>
   onRemoveFile: (imageId: string) => Promise<void>
   onClearQueue: () => Promise<void>
   onStartInspection: (operatorContext?: string, calibration?: CalibrationProfile, jointType?: JointGeometryType) => Promise<ProcessBatchResult>
@@ -77,7 +76,6 @@ export const PhotoUploadPage = ({
   events,
   onBack,
   onAddFiles,
-  onLoadSample,
   onRemoveFile,
   onClearQueue,
   onStartInspection,
@@ -455,9 +453,6 @@ export const PhotoUploadPage = ({
             </p>
             <p>{aiReviewCount ? `${aiReviewCount} photo(s) will use enhanced CV and AI review before a retake decision.` : 'All queued photos are eligible for measurement.'}</p>
             <div className="action-row">
-              <button className="button button-secondary" type="button" onClick={() => void onLoadSample()} disabled={busy}>
-                Load Sample
-              </button>
               <button className="button button-ghost" type="button" onClick={() => void onClearQueue()} disabled={!queue.length || busy}>
                 Clear All
               </button>
