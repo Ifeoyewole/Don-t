@@ -47,6 +47,10 @@ class CameraCalibrator:
         """Fetch camera profile by identifier."""
         return self._profiles.get(camera_id)
 
+    def list_profiles(self) -> list[CameraProfile]:
+        """Return a snapshot of registered profiles without exposing mutable storage."""
+        return list(self._profiles.values())
+
     def undistort_image(
         self,
         image_bgr: np.ndarray,
@@ -76,6 +80,19 @@ class CameraCalibrator:
 
         fx, fy = profile.focal_length
         cx, cy = profile.principal_point
+
+        profile_w, profile_h = profile.resolution
+        image_h, image_w = image_bgr.shape[:2]
+        if profile_w <= 0 or profile_h <= 0:
+            raise ValueError(f"Camera profile '{profile.camera_id}' has an invalid calibration resolution.")
+
+        scale_x = image_w / float(profile_w)
+        scale_y = image_h / float(profile_h)
+        fx *= scale_x
+        fy *= scale_y
+        cx *= scale_x
+        cy *= scale_y
+
         camera_matrix = np.array([
             [fx, 0.0, cx],
             [0.0, fy, cy],
@@ -107,7 +124,7 @@ class CameraCalibrator:
             Tuple of (pixels_per_mm, mm_per_pixel)
         """
         if pipe_diameter_mm <= 0.0 or outer_radius_px <= 0.0:
-            return 1.0, 1.0
+            raise ValueError("Calibration scale requires positive pipe diameter and measured radius.")
 
         # Major axis diameter in pixels
         detected_diameter_px = 2.0 * outer_radius_px

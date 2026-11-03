@@ -16,7 +16,7 @@ router = APIRouter()
 )
 async def list_camera_profiles() -> List[CameraProfile]:
     """Retrieve all pre-configured camera intrinsic and distortion profiles."""
-    return list(camera_calibrator._profiles.values())
+    return camera_calibrator.list_profiles()
 
 
 @router.get(
