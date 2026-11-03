@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 import torch
@@ -36,6 +37,47 @@ def read_bytes(client: storage.Client, uri: str) -> bytes:
 def stable_cap(rows: list[dict], maximum: int) -> list[dict]:
     rows = sorted(rows, key=lambda row: hashlib.sha256(row["sha256"].encode()).digest())
     return rows[:maximum] if maximum else rows
+
+
+def balanced_cap(rows: list[dict], maximum: int) -> list[dict]:
+    """Deterministically cap rows while prioritising the least represented labels."""
+    ordered = stable_cap(rows, 0)
+    if not maximum or len(ordered) <= maximum:
+        return ordered
+    remaining = list(ordered)
+    selected: list[dict] = []
+    counts: Counter[str] = Counter()
+    while remaining and len(selected) < maximum:
+        candidate = min(
+            remaining,
+            key=lambda row: (
+                sum(counts[label] for label in row["jointinspect_labels"])
+                / max(len(row["jointinspect_labels"]), 1),
+                max((counts[label] for label in row["jointinspect_labels"]), default=0),
+                hashlib.sha256(row["sha256"].encode()).digest(),
+            ),
+        )
+        remaining.remove(candidate)
+        selected.append(candidate)
+        counts.update(candidate["jointinspect_labels"])
+    return selected
+
+
+def partition_validation(rows: list[dict], tune_fraction: float = 0.5) -> tuple[list[dict], list[dict]]:
+    """Split validation by media family so threshold tuning cannot leak into reporting."""
+    families: dict[tuple[str, str], list[dict]] = {}
+    for row in rows:
+        key = (row["dataset_name"], row["media_family_id"])
+        families.setdefault(key, []).append(row)
+    tune, report = [], []
+    boundary = int(tune_fraction * 10_000)
+    for key, family_rows in families.items():
+        digest = hashlib.sha256("\0".join(key).encode()).digest()
+        target = tune if int.from_bytes(digest[:4], "big") % 10_000 < boundary else report
+        target.extend(family_rows)
+    if not tune or not report:
+        raise ValueError("Validation requires at least one threshold-tune and report family")
+    return tune, report
 
 
 class ManifestDataset(Dataset):
@@ -78,24 +120,48 @@ def create_model(architecture: str, classes: int, pretrained: bool) -> nn.Module
     return model
 
 
-def macro_metrics(truth: torch.Tensor, logits: torch.Tensor) -> dict:
-    predicted = torch.sigmoid(logits) >= 0.5
+def tune_thresholds(truth: torch.Tensor, logits: torch.Tensor) -> list[float]:
+    probabilities = torch.sigmoid(logits)
+    thresholds = []
+    for index in range(truth.shape[1]):
+        best = (0.5, -1.0, -1.0)
+        for threshold in (value / 100 for value in range(5, 96, 5)):
+            result = macro_metrics(truth[:, index:index + 1], logits[:, index:index + 1], [threshold])
+            score = (result["macro_f1"], result["macro_f2"])
+            if score > best[1:]:
+                best = (threshold, *score)
+        thresholds.append(best[0] if probabilities[:, index].numel() else 0.5)
+    return thresholds
+
+
+def macro_metrics(truth: torch.Tensor, logits: torch.Tensor, thresholds: list[float] | None = None,
+                  labels: list[str] | None = None) -> dict:
+    thresholds = thresholds or [0.5] * truth.shape[1]
+    predicted = torch.sigmoid(logits) >= torch.tensor(thresholds).reshape(1, -1)
     truth = truth.bool()
-    f1_values, f2_values = [], []
+    f1_values, f2_values, per_class = [], [], {}
     for index in range(truth.shape[1]):
         tp = (predicted[:, index] & truth[:, index]).sum().item()
         fp = (predicted[:, index] & ~truth[:, index]).sum().item()
         fn = (~predicted[:, index] & truth[:, index]).sum().item()
-        if tp + fn == 0:
+        support = tp + fn
+        name = labels[index] if labels else str(index)
+        if support == 0:
+            per_class[name] = {"support": 0, "threshold": thresholds[index], "evaluated": False}
             continue
         precision = tp / (tp + fp) if tp + fp else 0.0
         recall = tp / (tp + fn) if tp + fn else 0.0
-        f1_values.append(2 * precision * recall / (precision + recall) if precision + recall else 0.0)
-        f2_values.append(5 * precision * recall / (4 * precision + recall) if 4 * precision + recall else 0.0)
+        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        f2 = 5 * precision * recall / (4 * precision + recall) if 4 * precision + recall else 0.0
+        f1_values.append(f1); f2_values.append(f2)
+        per_class[name] = {"support": support, "true_positive": tp, "false_positive": fp,
+                           "false_negative": fn, "precision": precision, "recall": recall,
+                           "f1": f1, "f2": f2, "threshold": thresholds[index], "evaluated": True}
     return {
         "macro_f1": sum(f1_values) / len(f1_values) if f1_values else 0.0,
         "macro_f2": sum(f2_values) / len(f2_values) if f2_values else 0.0,
         "evaluated_classes": len(f1_values),
+        "per_class": per_class,
     }
 
 
@@ -112,8 +178,8 @@ def run(args) -> dict:
     rows = [json.loads(line) for line in read_bytes(client, args.manifest).decode().splitlines() if line.strip()]
     labeled_rows = [row for row in rows if row.get("jointinspect_labels")]
     excluded_unlabeled = len(rows) - len(labeled_rows)
-    train_rows = stable_cap([row for row in labeled_rows if row["split"] == "train"], args.max_train)
-    val_rows = stable_cap([row for row in labeled_rows if row["split"] == "val"], args.max_val)
+    train_rows = balanced_cap([row for row in labeled_rows if row["split"] == "train"], args.max_train)
+    val_rows = balanced_cap([row for row in labeled_rows if row["split"] == "val"], args.max_val)
     if not train_rows or not val_rows:
         raise ValueError("Both bounded train and validation samples are required")
     labels_config = json.loads(args.labels.read_text(encoding="utf-8"))
@@ -122,8 +188,11 @@ def run(args) -> dict:
     model = create_model(args.architecture, len(labels), args.pretrained).to(device)
     train_loader = DataLoader(ManifestDataset(train_rows, labels, client), batch_size=args.batch_size,
                               shuffle=True, num_workers=0)
-    val_loader = DataLoader(ManifestDataset(val_rows, labels, client), batch_size=args.batch_size,
-                            shuffle=False, num_workers=0)
+    tune_rows, report_rows = partition_validation(val_rows)
+    tune_loader = DataLoader(ManifestDataset(tune_rows, labels, client), batch_size=args.batch_size,
+                             shuffle=False, num_workers=0)
+    report_loader = DataLoader(ManifestDataset(report_rows, labels, client), batch_size=args.batch_size,
+                               shuffle=False, num_workers=0)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     criterion = nn.BCEWithLogitsLoss()
     history = []
@@ -136,14 +205,23 @@ def run(args) -> dict:
             loss.backward(); optimizer.step()
             total_loss += loss.item(); batches += 1
         history.append({"epoch": epoch + 1, "train_loss": total_loss / max(batches, 1)})
-    model.eval(); truth, logits = [], []
-    with torch.no_grad():
-        for images, targets in val_loader:
-            logits.append(model(images.to(device)).cpu()); truth.append(targets)
-    metrics = macro_metrics(torch.cat(truth), torch.cat(logits))
+    def infer(loader):
+        truth, logits = [], []
+        with torch.no_grad():
+            for images, targets in loader:
+                logits.append(model(images.to(device)).cpu()); truth.append(targets)
+        return torch.cat(truth), torch.cat(logits)
+
+    model.eval()
+    tune_truth, tune_logits = infer(tune_loader)
+    thresholds = tune_thresholds(tune_truth, tune_logits)
+    report_truth, report_logits = infer(report_loader)
+    metrics = macro_metrics(report_truth, report_logits, thresholds, labels)
     metrics.update({
         "architecture": args.architecture, "epochs": args.epochs,
         "train_records": len(train_rows), "val_records": len(val_rows),
+        "threshold_tune_records": len(tune_rows), "development_report_records": len(report_rows),
+        "thresholds": dict(zip(labels, thresholds)), "sampling": "deterministic_class_balanced_v1",
         "device": str(device), "pretrained": args.pretrained,
         "excluded_unlabeled_records": excluded_unlabeled,
         "production_approved": False, "locked_test_evaluated": False,
