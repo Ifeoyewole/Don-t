@@ -616,7 +616,8 @@ async def measure_joint_gap(
         wrc_pred = response.classifier_evidence.raw_prediction if response.classifier_evidence else "N/A"
         wrc_code = response.classifier_evidence.raw_code if response.classifier_evidence else "N/A"
         wrc_conf = (response.classifier_evidence.confidence * 100) if response.classifier_evidence else 0.0
-        wrc_desc = f"WRc InceptionResNetV2 condition: {wrc_pred} ({wrc_code}) at {wrc_conf:.1f}% confidence."
+        classifier_name = response.classifier_evidence.classifier if response.classifier_evidence else "Unavailable classifier"
+        wrc_desc = f"{classifier_name} condition: {wrc_pred} ({wrc_code}) at {wrc_conf:.1f}% model probability; engineer review required."
         response.ai_explanation = f"{vertex_obs} {geom_desc}. {wrc_desc}"
 
         # Final attach of semantic, calibration, and profile metadata
