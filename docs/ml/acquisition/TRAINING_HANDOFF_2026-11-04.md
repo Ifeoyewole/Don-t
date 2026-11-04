@@ -46,3 +46,7 @@ No training or deployment was started during this acquisition round. The next cy
 ## Masked trainer implementation
 
 The representation trainer now requires `observed_jointinspect_labels` on every record. Unknown targets use -1, are excluded from BCE loss and metric confusion counts, and classes without tuning positives retain threshold 0.5. Historical manifests intentionally fail this new loader contract; do not submit them using a newly built worker image. Existing immutable images/checkpoints remain preserved. New source-derived manifests and PyTorch runtime validation must pass before GPU submission. The annotation policy helper exports both positive and observed fields from explicitly present Sewer-ML annotations; absent original IN/OB fields remain unknown.
+
+## CPU validation completed
+
+11 trainer/annotation-policy tests passed in an isolated CPU environment. A backward-pass smoke check confirmed zero gradient for an unknown target. Local versions: torch 2.15.0+cpu and torchvision 0.29.2+cpu; pinned production worker uses torch 2.5.1/torchvision 0.20.1 and still requires equivalent smoke validation before submission. The r4 ancestor manifest has zero exact SHA, exact stored-dHash, or declared-family overlap with the current validation records, but this does not establish independence from every earlier ancestor or near-duplicates. External sources with positive-only masks remain unsuitable for precision/false-positive claims until negative annotations are verified. No GPU training submitted.

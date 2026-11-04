@@ -1,0 +1,67 @@
+{
+  "ancestor_manifest": "Sewer-ML r2 used by ConvNeXt r4",
+  "validation_records": 2359,
+  "exact_sha_exposure": 0,
+  "exact_dhash_exposure": 0,
+  "declared_family_exposure": 0,
+  "limitations": [
+    "Audit covers r4 declared training manifest only; earlier v3/v4 campaigns and numerical filename family proxies need separate verification",
+    "Existing dHash implementations differ; zero exact matches does not establish near-duplicate independence"
+  ],
+  "annotation_support": {
+    "CORROSION": {
+      "train_positive": 6267,
+      "val_positive": 754
+    },
+    "OBSTACLE": {
+      "train_positive": 269,
+      "train_negative": 19801,
+      "val_positive": 23,
+      "val_negative": 1575
+    },
+    "JOINT_MISALIGNMENT": {
+      "train_positive": 42,
+      "val_positive": 5
+    },
+    "RUPTURE": {
+      "train_positive": 31,
+      "val_positive": 1
+    },
+    "DEFORMATION": {
+      "train_positive": 299,
+      "train_negative": 19725,
+      "val_positive": 40,
+      "val_negative": 1548
+    },
+    "NORMAL": {
+      "train_negative": 13684,
+      "train_positive": 6316,
+      "val_positive": 400,
+      "val_negative": 1187
+    },
+    "JOINT_DISPLACEMENT": {
+      "train_negative": 8309,
+      "train_positive": 11691,
+      "val_negative": 623,
+      "val_positive": 964
+    },
+    "BROKEN_PIPE": {
+      "train_negative": 18216,
+      "train_positive": 1784,
+      "val_negative": 1308,
+      "val_positive": 279
+    },
+    "INFILTRATION": {
+      "train_negative": 19899,
+      "train_positive": 101,
+      "val_negative": 1568,
+      "val_positive": 19
+    },
+    "SURFACE_DAMAGE": {
+      "train_negative": 14717,
+      "train_positive": 5283,
+      "val_negative": 1057,
+      "val_positive": 530
+    }
+  }
+}
