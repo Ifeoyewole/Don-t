@@ -36,3 +36,9 @@ Source IDs 00022216/17/18 show pipe-wall damage and dark/orange streaks under va
 ## Before engineers use the live preview
 
 Verify R5 artifact checksum, test model loading/preprocessing and CPU latency/memory, implement response gating and explicit model selection, and test the complete preview flow. Freeze the reviewed package with versioned manifests and a rollback pointer only after these checks. This card itself does not activate a model or change infrastructure.
+
+## Preview endpoint implementation
+
+`POST /api/v1/cv/engineering-preview` is implemented, disabled by default. Enabling requires `JOINTINSPECT_PREVIEW_ENABLED=true`, a server-owned `JOINTINSPECT_PREVIEW_TOKEN`, and `JOINTINSPECT_PREVIEW_MODEL_PATH` pointing to the checksum-pinned r5 artifact. The token must be handled by the engineering gateway, never committed or exposed in a public browser bundle. Torch/torchvision must be present in the preview runtime; the existing production backend does not install them automatically.
+
+Isolated HTTP smoke passed for disabled endpoint, missing/wrong identity, malformed image, actual r5 inference and gated output. It required execution outside the restricted sandbox after local TestClient requests stalled. Full backend startup and deployed gateway-to-Cloud-Run integration are not yet verified; the local isolated environment lacks OpenCV. No service was deployed or enabled.

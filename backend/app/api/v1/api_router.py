@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 from backend.app.api.v1.endpoints import (
     calibration,
+    engineering_preview,
     health,
     measurement,
     multi_frame,
@@ -17,3 +18,5 @@ api_router.include_router(validation.router, prefix="/cv", tags=["Validation"])
 api_router.include_router(measurement.router, prefix="/cv", tags=["Measurement"])
 api_router.include_router(multi_frame.router, prefix="/cv", tags=["Multi-Frame Measurement"])
 api_router.include_router(calibration.router, prefix="/cv", tags=["Calibration"])
+
+api_router.include_router(engineering_preview.router, prefix="/cv", tags=["Engineering Preview"])
