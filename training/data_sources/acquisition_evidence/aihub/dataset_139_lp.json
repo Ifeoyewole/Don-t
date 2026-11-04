@@ -1,0 +1,43 @@
+{
+  "dataset_id": 139,
+  "source": "https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=139",
+  "evidence_sha256": "647c2745d4152c68c7be81420782db56cb66cd24f034bb52304e9628414089dd",
+  "source_class": "LP",
+  "source_description": "Lateral Protruding",
+  "canonical_class": "PROTRUDING_LATERAL",
+  "reported_images": 40000,
+  "verified_imported_images": 0,
+  "files": [
+    {
+      "role": "training_images",
+      "key": 42902,
+      "reported_size": "26.32 GB"
+    },
+    {
+      "role": "validation_images",
+      "key": 42922,
+      "reported_size": "5.15 GB"
+    },
+    {
+      "role": "training_labels_candidate",
+      "key": 42897,
+      "reported_size": "16.14 MB",
+      "annotation_scope": "Must inspect archive to confirm LP coverage"
+    },
+    {
+      "role": "validation_labels_candidate",
+      "key": 42917,
+      "reported_size": "2.19 MB",
+      "annotation_scope": "Must inspect archive to confirm LP coverage"
+    }
+  ],
+  "access_status": "DATASET_APPROVAL_AND_AUTHENTICATION_REQUIRED",
+  "approval_evidenced": false,
+  "license_status": "TERMS_REQUIRE_VERIFICATION",
+  "next_action": "Obtain dataset 139 download approval, configure AI-Hub credential securely, acquire label archives first, then LP media; verify counts and split independence",
+  "mapping_notes": [
+    "JF is faulty joint, not automatically OPEN_JOINT",
+    "IN means Inside, not INFILTRATION",
+    "File key is an identifier, not an access credential"
+  ]
+}
