@@ -1,18 +1,18 @@
-# Inspect View engineering preview v1 — preparation card
+# Inspect View engineering preview v1 — active research card
 
-Status: OFFLINE COMPARISON COMPLETE; NOT DEPLOYED; NO FUSION ACCEPTED.
+Status: DEPLOYED FOR ENGINEERING RESEARCH; NO FUSION ACCEPTED.
 
-Purpose: internal research evaluation by engineers and collection of reviewed failure cases. Existing production WRc remains primary. Sewer-ML-derived weights remain research-scoped pending suitable commercial rights.
+Purpose: internal research evaluation by engineers and collection of reviewed failure cases. Inspect View r5 is primary on the normal measurement endpoint; WRc artefacts are preserved. Sewer-ML-derived weights remain research-scoped pending suitable commercial rights.
 
 ## Candidate decision
 
-Preserve both ConvNeXt r4 and r5. On 679 identical development images with explicit annotation masks, r4 scored macro-F1/F2 0.471758/0.534945 and r5 0.473169/0.526865. Tuning-only class selection produced 0.474929/0.519951, failing the declared fusion gate. No final primary preview checkpoint is approved yet. Engineer comparison should show both identities, never claim an improved fusion.
+Preserve both ConvNeXt r4 and r5. On 679 identical development images with explicit annotation masks, r4 scored macro-F1/F2 0.471758/0.534945 and r5 0.473169/0.526865. Tuning-only class selection produced 0.474929/0.519951, failing the declared fusion gate. R5 is selected for the engineering research preview; it is not a production-approved frozen fusion. Engineer comparison should show both identities, never claim an improved fusion.
 
 R5 artifact: `gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-masked-r5-20261104/best.pt`.
 R4 checksum: `37bd3a4ea4fa64aa269391c4606cbddc442e5f3fac6dfe6d414655f1c9efd053`.
 R5 verified SHA-256: `659b56baa3e04c30b611c21de85d7ba00abeadc7e2c40dcf801a475719e74ed7`. Local load and inference smoke passed. CPU latency median 108.36 ms over 18 repeated-image runs; peak process RSS 611,152 KiB. This is not deployed latency or model-only memory.
 
-An isolated preview gate is implemented and its three tests pass. It is not connected to a live endpoint; endpoint integration and end-to-end testing remain required.
+The preview gate is connected to the normal `/api/v1/cv/measure` endpoint and existing inspection UI. Runtime loading and synthetic fail-closed rejection have been verified. See the deployment record for current revisions.
 
 ## Current evidence
 
@@ -33,12 +33,10 @@ Source IDs 00022216/17/18 show pipe-wall damage and dark/orange streaks under va
 - Record source image SHA, prediction probabilities, thresholds, device/calibration IDs when provided, engineer correction and review status.
 - Keep engineer corrections separate until reviewed; no automatic retraining from feedback.
 
-## Before engineers use the live preview
+## Active workflow and remaining validation
 
-Verify R5 artifact checksum, test model loading/preprocessing and CPU latency/memory, implement response gating and explicit model selection, and test the complete preview flow. Freeze the reviewed package with versioned manifests and a rollback pointer only after these checks. This card itself does not activate a model or change infrastructure.
+Use the normal inspection page and `/api/v1/cv/measure`. There is no separate preview page. Inspect View classifies condition; OpenCV estimates geometry only with sufficient calibrated evidence; Gemini on Vertex validates visual suitability. Gemini 3.1 Pro Preview is configured globally with a 45-second timeout. Stronger provider tier does not establish better JointInspect accuracy without evaluation.
 
-## Preview endpoint implementation
+Cloud Run revision `pipe-joint-api-00013-wel` passed model-loading and synthetic unrelated-image rejection checks. Previous revision `pipe-joint-api-00011-kod` remains available for rollback. The normal public gateway still requires final rollout verification. Field-image engineering review, locked-test evaluation and full video-family independence remain outstanding.
 
-`POST /api/v1/cv/engineering-preview` is implemented, disabled by default. Enabling requires `JOINTINSPECT_PREVIEW_ENABLED=true`, a server-owned `JOINTINSPECT_PREVIEW_TOKEN`, and `JOINTINSPECT_PREVIEW_MODEL_PATH` pointing to the checksum-pinned r5 artifact. The token must be handled by the engineering gateway, never committed or exposed in a public browser bundle. Torch/torchvision must be present in the preview runtime; the existing production backend does not install them automatically.
-
-Isolated HTTP smoke passed for disabled endpoint, missing/wrong identity, malformed image, actual r5 inference and gated output. It required execution outside the restricted sandbox after local TestClient requests stalled. Full backend startup and deployed gateway-to-Cloud-Run integration are not yet verified; the local isolated environment lacks OpenCV. No service was deployed or enabled.
+The historical isolated `/engineering-preview` implementation is retained for compatibility; it is not the main user workflow. See `ENGINEER_BRIEFING.md` for copyable guidance and institutional dataset-request links.
