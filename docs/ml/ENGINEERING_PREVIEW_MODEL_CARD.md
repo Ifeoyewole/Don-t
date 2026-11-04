@@ -10,7 +10,9 @@ Preserve both ConvNeXt r4 and r5. On 679 identical development images with expli
 
 R5 artifact: `gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-masked-r5-20261104/best.pt`.
 R4 checksum: `37bd3a4ea4fa64aa269391c4606cbddc442e5f3fac6dfe6d414655f1c9efd053`.
-R5 checksum must be verified before packaging or runtime activation.
+R5 verified SHA-256: `659b56baa3e04c30b611c21de85d7ba00abeadc7e2c40dcf801a475719e74ed7`. Local load and inference smoke passed. CPU latency median 108.36 ms over 18 repeated-image runs; peak process RSS 611,152 KiB. This is not deployed latency or model-only memory.
+
+An isolated preview gate is implemented and its three tests pass. It is not connected to a live endpoint; endpoint integration and end-to-end testing remain required.
 
 ## Current evidence
 
