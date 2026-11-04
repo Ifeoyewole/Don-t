@@ -21,3 +21,13 @@ def sewer_targets(original_annotations, labels):
         targets[index] = float(raw)
         observed[index] = 1.0
     return targets, observed
+
+
+def sewer_manifest_annotations(original_annotations, labels):
+    """Build explicit positive/observed fields from original binary annotations."""
+    targets, observed = sewer_targets(original_annotations, labels)
+    return {
+        'jointinspect_labels': [label for label, value in zip(labels, targets) if value == 1],
+        'observed_jointinspect_labels': [label for label, value in zip(labels, observed) if value == 1],
+        'annotation_policy': 'explicit_observed_labels_v1',
+    }

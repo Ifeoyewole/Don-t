@@ -42,3 +42,7 @@
 9. Preview must expose unsupported classes and limited sample support, preserve zero-guessing measurement rejection, and remain research-scoped until rights are suitable.
 
 No training or deployment was started during this acquisition round. The next cycle is training preparation with these gates, not an unqualified merge of all downloaded images.
+
+## Masked trainer implementation
+
+The representation trainer now requires `observed_jointinspect_labels` on every record. Unknown targets use -1, are excluded from BCE loss and metric confusion counts, and classes without tuning positives retain threshold 0.5. Historical manifests intentionally fail this new loader contract; do not submit them using a newly built worker image. Existing immutable images/checkpoints remain preserved. New source-derived manifests and PyTorch runtime validation must pass before GPU submission. The annotation policy helper exports both positive and observed fields from explicitly present Sewer-ML annotations; absent original IN/OB fields remain unknown.

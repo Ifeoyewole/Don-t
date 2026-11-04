@@ -100,12 +100,21 @@ class ManifestDataset(Dataset):
             raise RuntimeError(f"Image checksum mismatch: {row['image_uri']}")
         with Image.open(io.BytesIO(payload)) as image:
             tensor = self.transform(image.convert("RGB"))
-        target = torch.zeros(len(self.labels), dtype=torch.float32)
+        target = torch.full((len(self.labels),), -1.0, dtype=torch.float32)
+        observed = row.get("observed_jointinspect_labels")
+        if observed is None:
+            raise ValueError("Manifest must explicitly declare observed_jointinspect_labels")
+        for label in observed:
+            if label not in self.label_index:
+                raise ValueError(f"Unknown observed label: {label}")
+            target[self.label_index[label]] = 0.0
         for label in row["jointinspect_labels"]:
             if label not in self.label_index:
                 raise ValueError(f"Unknown canonical label: {label}")
+            if label not in observed:
+                raise ValueError(f"Positive label is not observed: {label}")
             target[self.label_index[label]] = 1.0
-        if not target.any():
+        if not (target >= 0).any():
             raise ValueError(f"Record has no canonical targets: {row['original_media_id']}")
         return tensor, target
 
@@ -124,6 +133,9 @@ def tune_thresholds(truth: torch.Tensor, logits: torch.Tensor) -> list[float]:
     probabilities = torch.sigmoid(logits)
     thresholds = []
     for index in range(truth.shape[1]):
+        if not (truth[:, index] == 1).any():
+            thresholds.append(0.5)
+            continue
         best = (0.5, -1.0, -1.0)
         for threshold in (value / 100 for value in range(5, 96, 5)):
             result = macro_metrics(truth[:, index:index + 1], logits[:, index:index + 1], [threshold])
@@ -138,12 +150,13 @@ def macro_metrics(truth: torch.Tensor, logits: torch.Tensor, thresholds: list[fl
                   labels: list[str] | None = None) -> dict:
     thresholds = thresholds or [0.5] * truth.shape[1]
     predicted = torch.sigmoid(logits) >= torch.tensor(thresholds).reshape(1, -1)
-    truth = truth.bool()
+    observed = truth >= 0
+    truth = truth == 1
     f1_values, f2_values, per_class = [], [], {}
     for index in range(truth.shape[1]):
-        tp = (predicted[:, index] & truth[:, index]).sum().item()
-        fp = (predicted[:, index] & ~truth[:, index]).sum().item()
-        fn = (~predicted[:, index] & truth[:, index]).sum().item()
+        tp = (observed[:, index] & predicted[:, index] & truth[:, index]).sum().item()
+        fp = (observed[:, index] & predicted[:, index] & ~truth[:, index]).sum().item()
+        fn = (observed[:, index] & ~predicted[:, index] & truth[:, index]).sum().item()
         support = tp + fn
         name = labels[index] if labels else str(index)
         if support == 0:
@@ -206,14 +219,18 @@ def run(args) -> dict:
     report_loader = DataLoader(ManifestDataset(report_rows, labels, client), batch_size=args.batch_size,
                                shuffle=False, num_workers=0)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.BCEWithLogitsLoss(reduction="none")
     history = []
     for epoch in range(args.epochs):
         model.train(); total_loss = 0.0; batches = 0
         for images, targets in train_loader:
             images, targets = images.to(device), targets.to(device)
             optimizer.zero_grad(set_to_none=True)
-            loss = criterion(model(images), targets)
+            observed = targets >= 0
+            if not observed.any():
+                raise ValueError("Batch contains no observed annotations")
+            element_loss = criterion(model(images), targets.clamp_min(0))
+            loss = (element_loss * observed).sum() / observed.sum()
             loss.backward(); optimizer.step()
             total_loss += loss.item(); batches += 1
         history.append({"epoch": epoch + 1, "train_loss": total_loss / max(batches, 1)})
@@ -235,6 +252,7 @@ def run(args) -> dict:
         "threshold_tune_records": len(tune_rows), "development_report_records": len(report_rows),
         "thresholds": dict(zip(labels, thresholds)), "sampling": "deterministic_class_balanced_v1",
         "initialized_from": initialized_from,
+        "annotation_policy": "explicit_observed_labels_v1",
         "device": str(device), "pretrained": args.pretrained,
         "excluded_unlabeled_records": excluded_unlabeled,
         "production_approved": False, "locked_test_evaluated": False,

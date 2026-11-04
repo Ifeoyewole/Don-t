@@ -48,3 +48,15 @@ def test_tuned_thresholds_are_applied_to_per_class_report():
     result = macro_metrics(truth, logits, thresholds, ["OPEN_JOINT"])
     assert result["macro_f1"] == 1.0
     assert result["per_class"]["OPEN_JOINT"]["threshold"] == thresholds[0]
+
+
+def test_unobserved_targets_do_not_count_as_positive_or_negative():
+    truth = torch.tensor([[1.0], [0.0], [-1.0]])
+    logits = torch.tensor([[10.0], [-10.0], [10.0]])
+    report = macro_metrics(truth, logits)
+    assert report['macro_f1'] == 1.0
+    assert report['per_class']['0']['false_positive'] == 0
+
+
+def test_missing_positive_support_retains_default_threshold():
+    assert tune_thresholds(torch.tensor([[-1.0], [0.0]]), torch.tensor([[10.0], [-10.0]])) == [0.5]
