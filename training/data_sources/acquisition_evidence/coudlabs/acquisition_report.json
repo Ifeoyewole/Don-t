@@ -1,0 +1,19 @@
+{
+  "source": "Co-UDlabs/sewer_defects",
+  "branch": "coudlabs",
+  "license_sha256": "f19295af0589a585ad7f3987107b09c11f087ec5e0b7428d4bdfcccb7f2d21ed",
+  "commercial_use": "permitted with attribution by repository license",
+  "labeled_folder": {
+    "id": "1N3M5Ud39WPRZuprVbn3ed1W-14b-XKLi",
+    "result": "HTTP_401"
+  },
+  "demo_folder": {
+    "id": "1BoLSWbCj6WimaW4-Wca3CPkpgW5HJUqH",
+    "result": "ZERO_FILES_RETURNED"
+  },
+  "repository_media": "Only unrelated Ultralytics bus/zidane examples; excluded",
+  "imported_images": 0,
+  "training_eligible_images": 0,
+  "status": "BLOCKED_SOURCE_MEDIA_ACCESS",
+  "next_action": "Continue to alternate public acquisition sources; retry Co-UDlabs only when sample access changes"
+}
