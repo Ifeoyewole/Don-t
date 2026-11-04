@@ -61,6 +61,9 @@ The fusion therefore remains a development prototype with `production_approved=f
 - Full-manifest ConvNeXt continuation job `6354132535059939328` succeeded from the balanced pilot checkpoint. It trained for one bounded epoch on 25,681 labeled training records and evaluated 3,055 validation records split into 1,676 threshold-tuning and 1,379 development-report records; 6,529 unlabeled records remained excluded.
 - The expanded development result was macro-F1 `0.8852446283` and macro-F2 `0.9135723979` across seven supported classes. The critical missing classes remain unsupported, so the result is not production-eligible and the locked test remains untouched.
 - Full continuation artifact: `gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-expanded-full-r3-20261103/best.pt`; SHA-256 `7e7711dbebcadcd8bef13d81cabed77e21f9d1df5884ec440287393fdbd76635`.
+- Sewer-ML canonical continuation job `1867702881268793344` succeeded on 45,465 labeled training records with 2,447 threshold-tuning and 2,188 development-report records. It evaluated 12 canonical classes with macro-F1 `0.6953453123` and macro-F2 `0.7605258920`; the broader class contract makes these aggregates non-comparable to the earlier seven-class score.
+- Critical development results now include `NORMAL` F1/F2 `0.886994/0.918728` (support 221) and `JOINT_DISPLACEMENT` `0.915942/0.931604` (support 503). `OPEN_JOINT`, `INFILTRATION`, and `PROTRUDING_LATERAL` remain unsupported.
+- Sewer-ML continuation artifact: `gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-sewerml-r4-20261103/best.pt`; SHA-256 `37bd3a4ea4fa64aa269391c4606cbddc442e5f3fac6dfe6d414655f1c9efd053`.
 - Production WRc remains the primary classifier. Candidate promotion requires same-image comparison and the final locked-test metrics, calibration, latency, memory, and failure-rate checks described in the production plan.
 
 ## Dataset expansion continuation
