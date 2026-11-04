@@ -31,5 +31,8 @@
     "Verify unsupported outputs cannot yield NORMAL or engineering PASS",
     "Publish engineer-facing model card and correction schema"
   ],
-  "next_action": "Acquire public Co-UDlabs metadata and available sample inventory; stage new media in quarantine with original annotations."
+  "next_action": "Build preview manifests using explicit annotation masks and corrected source semantics; audit inherited checkpoint exposure, then validate masked-loss trainer before bounded training.",
+  "deferred_sources": [
+    "AI-Hub dataset 139: download approval unavailable; proceed with existing sources"
+  ]
 }
