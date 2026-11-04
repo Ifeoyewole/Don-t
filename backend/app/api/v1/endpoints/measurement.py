@@ -425,7 +425,47 @@ async def measure_joint_gap(
         # Native Model B (JointClassifier) is NOT executed during normal live inference.
         primary_classifier = getattr(settings, "PRIMARY_CONDITION_CLASSIFIER", "wrc")
 
-        if primary_classifier == "wrc":
+        if primary_classifier == "inspect_view":
+            # Research model evidence in the existing inspection contract.
+            # Classification never changes calibrated physical measurements.
+            try:
+                import cv2
+                from backend.app.api.v1.endpoints.engineering_preview import infer
+                from backend.app.schemas.measurement import ExternalClassTopK
+                ok, encoded = cv2.imencode(".png", rectified_bgr)
+                if not ok:
+                    raise ValueError("Could not encode inspection frame")
+                preview = infer(encoded.tobytes())
+                eligible = [(label, value) for label, value in preview["classes"].items()
+                            if value["status"] == "EXPLORATORY" and value["detected"]]
+                eligible.sort(key=lambda item: item[1]["probability"], reverse=True)
+                selected = eligible[0] if eligible else None
+                response.condition = JointConditionClass.CLASSIFICATION_UNAVAILABLE
+                if selected and selected[0] == "JOINT_DISPLACEMENT":
+                    response.condition = JointConditionClass.DISPLACED_JOINT
+                response.classifier_evidence = ClassifierEvidence(
+                    classifier="Inspect View — engineering preview",
+                    model_id=preview["model_version"],
+                    raw_prediction=selected[0] if selected else "REVIEW_REQUIRED",
+                    raw_code=selected[0] if selected else "UNRESOLVED",
+                    confidence=selected[1]["probability"] if selected else 0.0,
+                    mapped_condition=response.condition.value,
+                    mapping_status="RESEARCH_PREVIEW_REVIEW_REQUIRED",
+                    classification_status="REVIEW_REQUIRED",
+                    top_k=[ExternalClassTopK(index=i, raw_class_name=label,
+                        raw_class_code=label, score=value["probability"])
+                        for i, (label, value) in enumerate(eligible[:5])],
+                )
+                response.inspect_view_evidence = preview
+            except Exception:
+                logger.exception("Inspect View inference unavailable")
+                response.condition = JointConditionClass.CLASSIFICATION_UNAVAILABLE
+                response.classifier_evidence = ClassifierEvidence(
+                    classifier="Inspect View — engineering preview", model_id="repr-convnext-masked-r5-20261104",
+                    raw_prediction="MODEL_UNAVAILABLE", raw_code="UNAVAILABLE", confidence=0.0,
+                    mapping_status="UNAVAILABLE", classification_status="CLASSIFICATION_UNAVAILABLE")
+            response.model_comparison = None
+        elif primary_classifier == "wrc":
             wrc_classifier = get_wrc_classifier()
             wrc_res = wrc_classifier.classify(image_bgr=rectified_bgr)
             response.external_classifier = wrc_res

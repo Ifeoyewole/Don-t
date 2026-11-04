@@ -14,6 +14,7 @@ interface CachedIdToken {
 }
 
 let cachedIdToken: CachedIdToken | null = null
+let cachedAudience: string | null = null
 
 /**
  * Exchange Vercel OIDC token for Google Cloud Run ID token via Workload Identity Federation.
@@ -22,7 +23,7 @@ export async function getCloudRunIdToken(audience = GATEWAY_CONFIG.CLOUD_RUN_URL
   const now = Date.now()
 
   // Return valid cached token if within validity window (with 5-minute safety buffer)
-  if (cachedIdToken && cachedIdToken.expiresAtMs > now + 300_000) {
+  if (cachedAudience === audience && cachedIdToken && cachedIdToken.expiresAtMs > now + 300_000) {
     return cachedIdToken.token
   }
 
@@ -101,6 +102,7 @@ export async function getCloudRunIdToken(audience = GATEWAY_CONFIG.CLOUD_RUN_URL
 
     // Cache ID token (default GCP ID tokens expire in 1 hour / 3600 seconds)
     const ttlMs = (stsData.expires_in || 3600) * 1000
+    cachedAudience = audience
     cachedIdToken = {
       token: idToken,
       expiresAtMs: now + ttlMs,

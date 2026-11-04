@@ -184,6 +184,7 @@ class VertexSemanticGateResult(BaseModel):
 
 
 class MeasurementResponse(BaseModel):
+    inspect_view_evidence: Optional[dict] = Field(None, description="Inspect View research evidence and unsupported class states")
     """Top-level structured response payload returned by measurement API."""
     joint_type: JointType = Field(..., description="Classified or requested joint type.")
     mean_gap_px: Optional[float] = Field(None, description="Average measured gap clearance across all sample locations in pixels.")

@@ -397,14 +397,15 @@ const ResultCard = ({
             </div>
           </div>
 
-          {/* 5. DEFECT CLASSIFICATION (WRc InceptionResNetV2) */}
+          {(item.classifierEvidence as {classifier?: string} | undefined)?.classifier?.startsWith('Inspect View') && <p role="note">Inspect View research preview. Open joint and protruding lateral are unsupported; infiltration and obstacle detection are unreliable. Engineer review required.</p>}
+          {/* Primary classifier evidence */}
           <div className="hierarchy-tier tier-classification" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', fontSize: '0.72rem' }}>
                 5. Primary Defect Classifier
               </span>
               <span style={{ fontSize: '0.72rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 600 }}>
-                WRc InceptionResNetV2
+                {(item.classifierEvidence as {classifier?: string} | undefined)?.classifier || 'Primary defect classifier'}
               </span>
             </div>
             {(() => {
@@ -439,7 +440,7 @@ const ResultCard = ({
                       <strong style={{ color: '#f8fafc' }}>{rawName} {rawCode ? `(${rawCode})` : ''}</strong>
                     </div>
                     <div>
-                      <span style={{ color: '#64748b' }}>WRc Confidence: </span>
+                      <span style={{ color: '#64748b' }}>Classifier probability: </span>
                       <strong style={{ color: '#f8fafc' }}>{conf}</strong>
                     </div>
                   </div>
@@ -450,7 +451,7 @@ const ResultCard = ({
                     </div>
                     <div>
                       <span style={{ color: '#64748b' }}>Live Authority: </span>
-                      <span style={{ color: '#38bdf8' }}>WRc advisory — {evidenceState}</span>
+                      <span style={{ color: '#38bdf8' }}>Classifier evidence — {evidenceState}</span>
                     </div>
                   </div>
                 </div>
