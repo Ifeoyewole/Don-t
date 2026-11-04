@@ -1,3 +1,4 @@
+import { InspectionReadiness } from '../components/InspectionReadiness'
 import { useEffect, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
 import { classifyWrcEvidence } from '../lib/wrcEvidence'
@@ -33,7 +34,7 @@ const sourceLabels: Record<MeasurementSource, string> = {
   'ai-assisted': 'AI assisted',
   'ai-review': 'AI review',
   manual: 'Manual override',
-  fallback: 'Estimated fallback',
+  fallback: 'Unverified estimate — review required',
 }
 
 const trustStatusLabels: Record<string, { label: string; className: string }> = {
@@ -43,7 +44,7 @@ const trustStatusLabels: Record<string, { label: string; className: string }> = 
 }
 
 const conditionLabels: Record<string, string> = {
-  NORMAL: 'Normal Joint',
+  NORMAL: 'Normal pipe condition',
   OPEN_JOINT: 'Open Joint',
   ANGULAR_DEFLECTION: 'Angular Deflection',
   SURFACE_DAMAGE: 'Surface Damage',
@@ -262,7 +263,7 @@ const ResultCard = ({
               </div>
             </div>
             <div className="risk-rate-indicator">
-              <span>Estimated Failure Risk:</span>
+              <span>Unvalidated review indicator:</span>
               <strong className={item.confidenceBreakdown.failureRiskRate > 0.05 ? 'risk-high' : 'risk-low'}>
                 {(item.confidenceBreakdown.failureRiskRate * 100).toFixed(1)}%
               </strong>
@@ -270,7 +271,7 @@ const ResultCard = ({
           </div>
         )}
 
-        {/* 6-Level Beta Inspection Hierarchy */}
+        {/* Inspection evidence hierarchy */}
         <div className="beta-inspection-hierarchy" style={{
           margin: '14px 0',
           padding: '12px 14px',
@@ -424,7 +425,7 @@ const ResultCard = ({
               const evidence = (item.classifierEvidence || item.cvDebug?.classifierEvidence || item.externalClassifier || item.cvDebug?.externalClassifier) as ClassifierEvidenceView | undefined;
               const evidenceState = classifyWrcEvidence(evidence)
               if (!evidence) {
-                return <div style={{ color: '#64748b', marginTop: '2px' }}>WRc: MISSING_RESPONSE — no classification evidence supplied.</div>;
+                return <div style={{ color: '#64748b', marginTop: '2px' }}>Classifier: MISSING_RESPONSE — no classification evidence supplied.</div>;
               }
               const rawName = evidence.raw_prediction || evidence.raw_class_name || 'NOT REPORTED';
               const rawCode = evidence.raw_code || evidence.raw_class_code || '';
@@ -594,6 +595,7 @@ export const InspectionResultsPage = ({
 
   return (
     <div className="page-grid results-page">
+      <InspectionReadiness />
       <div className="page-status-strip">
         <span>{online ? 'Online - measurements saved locally' : 'Offline - measurements stored on device'}</span>
         <span>

@@ -421,7 +421,7 @@ async def measure_joint_gap(
                 )
 
         # Step 7: Primary Defect Condition Classification (WRc InceptionResNetV2)
-        # WRc is the ONE live defect/condition classifier for beta.
+        # The configured primary classifier supplies condition evidence.
         # Native Model B (JointClassifier) is NOT executed during normal live inference.
         primary_classifier = getattr(settings, "PRIMARY_CONDITION_CLASSIFIER", "wrc")
 
@@ -542,7 +542,7 @@ async def measure_joint_gap(
                         native_result=cond_res,
                         vertex_observation=semantic_res.observation,
                         segmenter_result=seg_res,
-                        vertex_live=(semantic_res.model == "gemini-2.5-flash"),
+                        vertex_live=semantic_res.processing_allowed and semantic_res.domain_status != DomainStatus.DOMAIN_VALIDATION_UNAVAILABLE,
                     )
                 except Exception as comp_err:
                     logger.warning("Experimental model comparison failed: %s", comp_err)
@@ -564,7 +564,7 @@ async def measure_joint_gap(
 
         # Step 8: Decoupled Multi-Component Confidence Fusion
         # Measurement confidence governs physical measurement acceptance.
-        # Classification confidence is derived solely from WRc score.
+        # Classification confidence is derived from the active classifier evidence.
         seg_score = seg_res.confidence if seg_res.detected else 0.50
         breakdown = confidence_engine.fuse_measurement_confidence(
             quality_score=quality_res.quality_score,
@@ -602,7 +602,7 @@ async def measure_joint_gap(
             response.rejection_reason = f"Measurement gated for inspector review (confidence {breakdown.overall_confidence:.2f})."
 
         # Step 9: Vertex Result Explanation
-        # Vertex explains why WRc classified it that way and what geometry shows, without rewriting physical facts
+        # Combine the visual observation with measured geometry and active classifier evidence.
         vertex_obs = semantic_res.observation or "Pipe joint inspection scene validated."
         if response.authoritative_gap_mm is not None:
             geom_desc = f"Measured gap is {response.authoritative_gap_mm:.2f} mm ({response.engineering_result.value})"

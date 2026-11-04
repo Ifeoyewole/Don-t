@@ -186,7 +186,7 @@ export const AppShell = ({
 
   // Real-time status derivations
   const isCloudOnline = health ? health.cloudConnected : online
-  const isModelReady = health ? health.modelReady : true
+  const isModelReady = health ? health.modelReady : false
 
   const cloudPillClass = isCloudOnline
     ? 'is-cloud-online'

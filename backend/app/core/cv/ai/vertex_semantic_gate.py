@@ -260,7 +260,8 @@ Return ONLY a valid JSON object matching this structure:
   "observation": "Detailed technical visual observation"
 }}"""
 
-        url = f"https://{self.location}-aiplatform.googleapis.com/v1/projects/{self.project_id}/locations/{self.location}/publishers/google/models/{self.model}:generateContent"
+        host = "aiplatform.googleapis.com" if self.location == "global" else f"{self.location}-aiplatform.googleapis.com"
+        url = f"https://{host}/v1/projects/{self.project_id}/locations/{self.location}/publishers/google/models/{self.model}:generateContent"
 
         body = {
             "contents": [
@@ -275,6 +276,7 @@ Return ONLY a valid JSON object matching this structure:
             "generationConfig": {
                 "responseMimeType": "application/json",
                 "temperature": 0.1,
+                "maxOutputTokens": 4096,
             },
         }
 
