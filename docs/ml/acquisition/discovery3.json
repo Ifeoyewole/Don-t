@@ -1,0 +1,53 @@
+[
+  {
+    "source": "zenodo_corrosion_data",
+    "url": "https://zenodo.org/api/records?q=corrosion&type=dataset&size=30",
+    "error": "HTTP Error 400: Bad Request"
+  },
+  {
+    "source": "zenodo_pipe_data",
+    "url": "https://zenodo.org/api/records?q=%22pipeline%22+%22dataset%22&size=30",
+    "error": "HTTP Error 400: Bad Request"
+  },
+  {
+    "source": "github_solo_exact",
+    "url": "https://api.github.com/search/repositories?q=%22Pipe-SOLO%22",
+    "status": 200,
+    "bytes": 5805
+  },
+  {
+    "source": "github_videopipe",
+    "url": "https://api.github.com/search/repositories?q=VideoPipe",
+    "status": 200,
+    "bytes": 163754
+  },
+  {
+    "source": "hf_mmkata_original",
+    "url": "https://huggingface.co/datasets/MMKata/Sewer_pipe_defects/raw/main/README.md",
+    "status": 200,
+    "bytes": 673
+  },
+  {
+    "source": "hf_sparkk",
+    "url": "https://huggingface.co/datasets/SPARRKKK/Sewer-pipe-defects/raw/main/README.md",
+    "status": 200,
+    "bytes": 30
+  },
+  {
+    "source": "hf_abcli",
+    "url": "https://huggingface.co/datasets/abcli/Sewer-pipe-defects/raw/main/README.md",
+    "status": 200,
+    "bytes": 30
+  },
+  {
+    "source": "hf_roadeye",
+    "url": "https://huggingface.co/datasets/AkumaDachi/roadeeye-sewer-defects-v5/raw/main/README.md",
+    "error": "HTTP Error 404: Not Found"
+  },
+  {
+    "source": "aihub_info",
+    "url": "https://aihub.or.kr/aihubdata/data/view.do?aihubDataSe=data&currMenu=116&dataSetSn=139&topMenu=",
+    "status": 200,
+    "bytes": 174229
+  }
+]

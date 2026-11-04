@@ -1,0 +1,61 @@
+[
+  {
+    "source": "hf_sewer",
+    "url": "https://huggingface.co/api/datasets?search=sewer&limit=30",
+    "status": 200,
+    "bytes": 8433
+  },
+  {
+    "source": "hf_pipe",
+    "url": "https://huggingface.co/api/datasets?search=pipe%20defect&limit=30",
+    "status": 200,
+    "bytes": 2397
+  },
+  {
+    "source": "zenodo_sewer",
+    "url": "https://zenodo.org/api/records?q=sewer%20defects&size=15",
+    "status": 200,
+    "bytes": 106305
+  },
+  {
+    "source": "zenodo_corrosion",
+    "url": "https://zenodo.org/api/records?q=pipeline%20corrosion&size=10",
+    "status": 200,
+    "bytes": 157286
+  },
+  {
+    "source": "github_pipesolo",
+    "url": "https://api.github.com/search/repositories?q=Pipe-SOLO",
+    "status": 200,
+    "bytes": 179821
+  },
+  {
+    "source": "github_urbanpipe",
+    "url": "https://api.github.com/search/repositories?q=UrbanPipe",
+    "status": 200,
+    "bytes": 165598
+  },
+  {
+    "source": "github_ipd",
+    "url": "https://api.github.com/search/repositories?q=industrial+pipeline+damage+dataset",
+    "status": 200,
+    "bytes": 55
+  },
+  {
+    "source": "pipe_solo_paper",
+    "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11644997/?report=xml",
+    "status": 200,
+    "bytes": 21478
+  },
+  {
+    "source": "aihub",
+    "url": "https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=139",
+    "status": 200,
+    "bytes": 174185
+  },
+  {
+    "source": "sciencedata",
+    "url": "https://sciencedata.dk/public/Large%20AAU%20files/Sewer_ML/FILELIST.txt",
+    "error": "HTTP Error 503: Service Unavailable"
+  }
+]
