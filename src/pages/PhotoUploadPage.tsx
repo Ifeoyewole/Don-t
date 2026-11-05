@@ -508,7 +508,7 @@ export const PhotoUploadPage = ({
             </p>
             <p>{aiReviewCount ? `${aiReviewCount} photo(s) will use enhanced CV and AI review before a retake decision.` : 'All queued photos are eligible for measurement.'}</p>
             <div className="action-row">
-              <button className="button button-ghost" type="button" onClick={() => void onClearQueue()} disabled={!queue.length || busy}>
+              <button className="button button-ghost" type="button" onClick={() => { advisoryControllerRef.current?.abort(); setAdvisory(null); setAdvisoryError(''); void onClearQueue() }} disabled={!queue.length || busy}>
                 Clear All
               </button>
             </div>
@@ -519,12 +519,13 @@ export const PhotoUploadPage = ({
               <strong>Inspection context</strong>
               <span>Optional / Editable</span>
             </div>
+            {queue.length > 1 ? <p role="note" style={{ fontSize: '0.78rem' }}>One geometry is currently used for every queued photo. Use separate inspections for different joint types or camera views.</p> : null}
             {advisoryBusy ? <p role="status" style={{ fontSize: '0.8rem' }}>Gemini is suggesting context from the first uploaded photo…</p> : null}
             {advisory ? (
               <div role="status" style={{ padding: '0.75rem', marginTop: '0.5rem', border: '1px solid #8daedb', borderRadius: '8px', background: 'rgba(75, 135, 220, 0.08)', lineHeight: 1.55 }}>
                 <strong>AI suggestions — review and edit</strong>
                 <p style={{ fontSize: '0.76rem', margin: '0.4rem 0' }}>
-                  Source: {advisory.model}. Photo-only suggestions; not private history, engineering evidence, or verified calibration.
+                  Source: {advisory.model}. First uploaded photo only; not private inspection history. These are unverified hints, not physical measurements.
                 </p>
                 {advisory.suggested_joint_type ? (
                   <p style={{ fontSize: '0.8rem', margin: '0.25rem 0' }}>
@@ -542,8 +543,15 @@ export const PhotoUploadPage = ({
                 {advisory.processing_allowed ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
                     <button type="button" className="button button-secondary" onClick={() => {
-                      if (advisory.suggested_joint_type) setJointType(advisory.suggested_joint_type)
-                      if (advisory.suggested_inspection_context) setOperatorContext(advisory.suggested_inspection_context)
+                      if (advisory.suggested_joint_type) {
+                        setJointType(advisory.suggested_joint_type)
+                        setGeometryProvenance('INSPECTOR_SELECTED')
+                        inspectorEditedGeometry.current = true
+                      }
+                      if (advisory.suggested_inspection_context) {
+                        setOperatorContext(advisory.suggested_inspection_context)
+                        inspectorEditedContext.current = true
+                      }
                     }}>Apply suggestions</button>
                     <button type="button" className="button button-ghost" onClick={() => setAdvisory(null)}>Dismiss</button>
                   </div>
@@ -655,7 +663,7 @@ export const PhotoUploadPage = ({
               Showing {queue.length} of {queue.length} assets for current inspection run.
             </span>
             <div className="action-row">
-              <button className="button button-ghost" type="button" onClick={() => void onClearQueue()} disabled={!queue.length || busy}>
+              <button className="button button-ghost" type="button" onClick={() => { advisoryControllerRef.current?.abort(); setAdvisory(null); setAdvisoryError(''); void onClearQueue() }} disabled={!queue.length || busy}>
                 Clear all
               </button>
               <button
