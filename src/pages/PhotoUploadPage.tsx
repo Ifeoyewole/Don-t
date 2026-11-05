@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
+import { requestInspectionContextSuggestions, type InspectionContextSuggestion } from '../lib/contextSuggestions'
 import type { CalibrationProfile, InspectionImage, JointGeometryType, ProcessBatchResult } from '../types/domain'
 
 type Props = {
@@ -7,6 +8,7 @@ type Props = {
   projectId: string
   projectName: string
   manholeLabel: string
+  manholePipeDiameterMm?: number
   queue: InspectionImage[]
   events: string[]
   onBack: () => void
@@ -72,6 +74,7 @@ export const PhotoUploadPage = ({
   projectId,
   projectName,
   manholeLabel,
+  manholePipeDiameterMm,
   queue,
   events,
   onBack,
@@ -84,12 +87,18 @@ export const PhotoUploadPage = ({
   const [error, setError] = useState('')
   const [operatorContext, setOperatorContext] = useState('')
   const [jointType, setJointType] = useState<JointGeometryType>('CIRCULAR_OPENING')
+  const [advisory, setAdvisory] = useState<InspectionContextSuggestion | null>(null)
+  const [advisoryBusy, setAdvisoryBusy] = useState(false)
+  const [advisoryError, setAdvisoryError] = useState('')
+  const advisoryControllerRef = useRef<AbortController | null>(null)
+  const inspectorEditedContext = useRef(false)
+  const inspectorEditedGeometry = useRef(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [reportedDownlink, setReportedDownlink] = useState<number | null>(null)
 
   // Calibration Profile Setup - Fail-Safe Defaults initialized from project storage
-  const [calPipeDiameter, setCalPipeDiameter] = useState<number | ''>(() => getInitialCalibration(projectId).pipeDiameter)
-  const [calSource, setCalSource] = useState<CalibrationSourceType>(() => getInitialCalibration(projectId).source)
+  const [calPipeDiameter, setCalPipeDiameter] = useState<number | ''>(() => getInitialCalibration(projectId).pipeDiameter || manholePipeDiameterMm || '')
+  const [calSource, setCalSource] = useState<CalibrationSourceType>(() => getInitialCalibration(projectId).pipeDiameter ? getInitialCalibration(projectId).source : manholePipeDiameterMm ? 'MANHOLE_METADATA' : 'PROJECT_METADATA')
   const [calReferenceId, setCalReferenceId] = useState<string>(() => getInitialCalibration(projectId).referenceId)
   const [calNotes, setCalNotes] = useState<string>(() => getInitialCalibration(projectId).notes)
   const [savedProfile, setSavedProfile] = useState<CalibrationProfile | null>(() => getInitialCalibration(projectId).profile)
@@ -101,13 +110,21 @@ export const PhotoUploadPage = ({
     // Defer the state reset so the effect synchronizes the selected project
     // without triggering React's synchronous set-state-in-effect rule.
     queueMicrotask(() => {
-      setCalPipeDiameter(init.pipeDiameter)
-      setCalSource(init.source)
+      setCalPipeDiameter(init.pipeDiameter !== '' ? init.pipeDiameter : manholePipeDiameterMm ?? '')
+      setCalSource(init.pipeDiameter !== '' ? init.source : manholePipeDiameterMm ? 'MANHOLE_METADATA' : init.source)
       setCalReferenceId(init.referenceId)
       setCalNotes(init.notes)
       setSavedProfile(init.profile ? { ...init.profile, verified: false, verified_at: null, verifiedAt: null } : null)
+      advisoryControllerRef.current?.abort()
+      setAdvisory(null)
+      setAdvisoryError('')
+      setAdvisoryBusy(false)
+      inspectorEditedContext.current = false
+      inspectorEditedGeometry.current = false
     })
-  }, [projectId])
+  }, [projectId, manholePipeDiameterMm])
+
+  useEffect(() => () => advisoryControllerRef.current?.abort(), [])
 
   const handleSaveCalibration = () => {
     setSaveErrorMsg('')
@@ -175,12 +192,54 @@ export const PhotoUploadPage = ({
   const throughputValue = reportedDownlink !== null ? `${reportedDownlink.toFixed(1)} Mbps` : `${queueCompletion}% queue progress`
   const throughputCaption = reportedDownlink !== null ? 'Reported device link' : 'Live queue throughput'
 
+  const analyzeForSuggestions = async (photo: File) => {
+    advisoryControllerRef.current?.abort()
+    const controller = new AbortController()
+    advisoryControllerRef.current = controller
+    setAdvisory(null)
+    setAdvisoryError('')
+    setAdvisoryBusy(true)
+    const timeout = window.setTimeout(() => controller.abort(), 45000)
+    try {
+      const result = await requestInspectionContextSuggestions(photo, controller.signal, manholePipeDiameterMm)
+      if (controller.signal.aborted || advisoryControllerRef.current !== controller) return
+      setAdvisory(result)
+      if (!result.processing_allowed) {
+        setAdvisoryError('A clear pipe joint could not be confirmed. Please review the photo and fill the context manually.')
+        return
+      }
+      // Auto-populate only fields the inspector has not touched. Every field stays editable.
+      if (result.suggested_joint_type && !inspectorEditedGeometry.current) {
+        setJointType(result.suggested_joint_type)
+      }
+      if (result.suggested_inspection_context && !inspectorEditedContext.current) {
+        setOperatorContext((current) => current.trim() ? current : result.suggested_inspection_context || '')
+      }
+    } catch (error) {
+      if (!controller.signal.aborted && advisoryControllerRef.current === controller) {
+        setAdvisoryError(error instanceof Error ? error.message : 'Suggestions unavailable; enter context manually.')
+      }
+    } finally {
+      window.clearTimeout(timeout)
+      if (advisoryControllerRef.current === controller) {
+        setAdvisoryBusy(false)
+      }
+    }
+  }
+
   const handleFileSelection = async (files: FileList | null) => {
     if (!files?.length) return
     setBusy(true)
     setError('')
     try {
-      await onAddFiles(Array.from(files))
+      const selected = Array.from(files)
+      await onAddFiles(selected)
+      // Only the first photo is used as an image-only suggestion; avoid extra API costs for every frame.
+      if (online && selected[0]) {
+        void analyzeForSuggestions(selected[0])
+      } else if (!online) {
+        setAdvisoryError('Cloud suggestions require a connection; manual editing remains available.')
+      }
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Could not add selected files.')
     } finally {
@@ -415,6 +474,9 @@ export const PhotoUploadPage = ({
               ) : null}
             </div>
             <p style={{ fontSize: '0.72rem', opacity: 0.7, marginTop: '0.4rem' }}>
+              {manholePipeDiameterMm && !getInitialCalibration(projectId).pipeDiameter
+                ? `Diameter prefilled from manhole specifications (${manholePipeDiameterMm} mm), NOT inferred by AI. `
+                : ''}
               Save the calibration reference once for this project. The backend verifies trusted references before issuing authoritative millimetres.
             </p>
           </section>
@@ -445,15 +507,47 @@ export const PhotoUploadPage = ({
           <section className="network-card operator-context-card">
             <div className="network-head">
               <strong>Inspection context</strong>
-              <span>Optional</span>
+              <span>Optional / Editable</span>
             </div>
+            {advisoryBusy ? <p role="status" style={{ fontSize: '0.8rem' }}>Gemini is suggesting context from the first uploaded photo…</p> : null}
+            {advisory ? (
+              <div role="status" style={{ padding: '0.75rem', marginTop: '0.5rem', border: '1px solid #8daedb', borderRadius: '8px', background: 'rgba(75, 135, 220, 0.08)', lineHeight: 1.55 }}>
+                <strong>AI suggestions — review and edit</strong>
+                <p style={{ fontSize: '0.76rem', margin: '0.4rem 0' }}>
+                  Source: {advisory.model}. Photo-only suggestions; not private history, engineering evidence, or verified calibration.
+                </p>
+                {advisory.suggested_joint_type ? (
+                  <p style={{ fontSize: '0.8rem', margin: '0.25rem 0' }}>
+                    Suggested geometry: <strong>{advisory.suggested_joint_type.replaceAll('_', ' ')}</strong>
+                  </p>
+                ) : null}
+                {advisory.suggested_inspection_context ? (
+                  <p style={{ fontSize: '0.8rem', margin: '0.25rem 0' }}>
+                    Visual note: {advisory.suggested_inspection_context}
+                  </p>
+                ) : null}
+                {advisory.possible_gap_visible === true ? (
+                  <p style={{ fontSize: '0.76rem' }}>Possible visible gap (unverified; not a confirmed OPEN_JOINT defect).</p>
+                ) : null}
+                {advisory.processing_allowed ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <button type="button" className="button button-secondary" onClick={() => {
+                      if (advisory.suggested_joint_type) setJointType(advisory.suggested_joint_type)
+                      if (advisory.suggested_inspection_context) setOperatorContext(advisory.suggested_inspection_context)
+                    }}>Apply suggestions</button>
+                    <button type="button" className="button button-ghost" onClick={() => setAdvisory(null)}>Dismiss</button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {advisoryError ? <p role="status" style={{ fontSize: '0.78rem', color: '#b45309' }}>{advisoryError}</p> : null}
             <label htmlFor="joint-geometry-type" style={{ display: 'block', marginTop: '0.5rem' }}>
               Joint geometry
             </label>
             <select
               id="joint-geometry-type"
               value={jointType}
-              onChange={(event) => setJointType(event.target.value as JointGeometryType)}
+              onChange={(event) => { inspectorEditedGeometry.current = true; setJointType(event.target.value as JointGeometryType) }}
               style={{ width: '100%', padding: '0.55rem', marginTop: '0.25rem' }}
             >
               <option value="CIRCULAR_OPENING">Circular opening</option>
@@ -466,7 +560,7 @@ export const PhotoUploadPage = ({
               rows={3}
               maxLength={1000}
               value={operatorContext}
-              onChange={(e) => setOperatorContext(e.target.value)}
+              onChange={(e) => { inspectorEditedContext.current = true; setOperatorContext(e.target.value) }}
               placeholder='Add useful context for this inspection, for example: "Possible gasket extrusion near the upper-right edge. Focus on joint alignment."'
               style={{
                 width: '100%',
