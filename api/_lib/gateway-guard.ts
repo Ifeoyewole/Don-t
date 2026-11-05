@@ -139,6 +139,21 @@ export function resolveGatewayRoute(url: string, method: string): RouteResolutio
     return { allowed: false, status: 405, routeCategory: 'validation', requiresAuth: false, requiresAdmin: false }
   }
 
+  // 2b. Advisory image-context suggestions (no calibration or engineering authority)
+  if (subPath === '/context-suggestions') {
+    if (upperMethod === 'POST') {
+      return {
+        allowed: true,
+        status: 200,
+        targetPath: 'api/v1/cv/context-suggestions',
+        routeCategory: 'validation',
+        requiresAuth: false,
+        requiresAdmin: false,
+      }
+    }
+    return { allowed: false, status: 405, routeCategory: 'validation', requiresAuth: false, requiresAdmin: false }
+  }
+
   // 3. Single Frame Measurement
   if (subPath === '/measure') {
     if (upperMethod === 'POST') {

@@ -179,8 +179,11 @@ class VertexSemanticGateResult(BaseModel):
     processing_allowed: bool = Field(..., description="Whether joint geometry processing is permitted")
     user_message: str = Field(..., description="Operator guidance message")
     observation: str = Field(..., description="Detailed semantic visual observation")
-    model: str = Field(default="gemini-2.5-flash", description="Underlying multimodal model ID")
+    model: str = Field(default="gemini-3.1-pro-preview", description="Underlying multimodal model ID")
     confidence: Optional[float] = Field(default=None, description="Semantic confidence when supplied by the provider; None when unavailable")
+    suggested_joint_type: Optional[JointType] = Field(default=None, description="Image-only geometry suggestion for inspector confirmation; never authoritative")
+    suggested_inspection_context: Optional[str] = Field(default=None, description="Advisory observation for inspector review; no physical units or engineering verdict")
+    possible_gap_visible: Optional[bool] = Field(default=None, description="Advisory visual candidate only; not a validated open-joint defect")
 
 
 class MeasurementResponse(BaseModel):

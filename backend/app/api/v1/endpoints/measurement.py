@@ -512,7 +512,7 @@ async def measure_joint_gap(
                         native_result=cond_res,
                         vertex_observation=semantic_res.observation,
                         segmenter_result=seg_res,
-                        vertex_live=(semantic_res.model == "gemini-2.5-flash"),
+                        vertex_live=semantic_res.model.startswith("gemini-") and semantic_res.processing_allowed,
                     )
                 except Exception as comp_err:
                     logger.warning("Experimental model comparison failed: %s", comp_err)
