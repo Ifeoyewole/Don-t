@@ -69,7 +69,14 @@ def get_verified_calibration(
     pipe_diameter_mm: Optional[float],
     camera_id: Optional[str],
 ) -> Optional[VerifiedCalibration]:
-    if not reference_id or source is None or pipe_diameter_mm is None:
+    if (
+        not reference_id
+        or not reference_id.strip()
+        or source is None
+        or pipe_diameter_mm is None
+        or not math.isfinite(float(pipe_diameter_mm))
+        or pipe_diameter_mm <= 0.0
+    ):
         return None
 
     for record in _records():
@@ -77,9 +84,11 @@ def get_verified_calibration(
             continue
         if record.source != source:
             continue
-        if record.project_id and project_id and record.project_id != project_id:
+        # A server-owned reference scoped to a project or camera must NEVER
+        # authorize an omitted, different, or unrecognized project/camera.
+        if record.project_id and record.project_id != project_id:
             continue
-        if record.camera_id and camera_id and record.camera_id != camera_id:
+        if record.camera_id and record.camera_id != camera_id:
             continue
         if not _close(record.pipe_diameter_mm, pipe_diameter_mm):
             continue
