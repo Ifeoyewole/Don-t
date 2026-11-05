@@ -28,6 +28,21 @@ describe('photo-specific geometry', () => {
     expect([a.jointType, c.jointType]).toEqual(['CIRCULAR_OPENING', 'VERTICAL_SEAM'])
     expect([a.operatorContext, c.operatorContext]).toEqual(['Annular view', 'Vertical view'])
   })
+  it('keeps camera identity distinct across two photos', () => {
+    const a = resolveImageContext(photo({
+      cameraId: 'RIG-A', pipeDiameterMm: 900,
+      jointType: 'CIRCULAR_OPENING', geometrySelectionProvenance: 'INSPECTOR_SELECTED',
+    }), { cameraId: 'BATCH-CAMERA', pipeDiameterMm: 600 })
+    const c = resolveImageContext(photo({
+      cameraId: 'RIG-B', pipeDiameterMm: 600,
+      jointType: 'HORIZONTAL_SEAM', geometrySelectionProvenance: 'INSPECTOR_SELECTED',
+    }), { cameraId: 'BATCH-CAMERA', pipeDiameterMm: 900 })
+    expect(a.cameraId).toBe('RIG-A')
+    expect(c.cameraId).toBe('RIG-B')
+    expect([a.pipeDiameterMm, c.pipeDiameterMm]).toEqual([900, 600])
+    expect(resolveImageContext(photo({}), { cameraId: 'BATCH-CAMERA' }).cameraId).toBeUndefined()
+  })
+
   it('supports evidence-only review', () => {
     expect(hasExplicitPhotoMode(photo({ analysisMode: 'EVIDENCE_ONLY' }))).toBe(true)
   })
