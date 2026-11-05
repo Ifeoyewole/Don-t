@@ -68,13 +68,13 @@ class Settings(BaseModel):
     WRC_LOW_CONFIDENCE_THRESHOLD: float = float(os.getenv("WRC_LOW_CONFIDENCE_THRESHOLD", "0.40"))
 
     # Vertex AI Semantic Domain Gate & Multi-Modal Context Understanding
-    VERTEX_INSPECTION_MODEL: str = os.getenv("VERTEX_INSPECTION_MODEL", "gemini-2.5-flash")
-    VERTEX_INSPECTION_LOCATION: str = os.getenv("VERTEX_INSPECTION_LOCATION", "europe-west2")
+    VERTEX_INSPECTION_MODEL: str = os.getenv("VERTEX_INSPECTION_MODEL", "gemini-3.1-pro-preview")
+    VERTEX_INSPECTION_LOCATION: str = os.getenv("VERTEX_INSPECTION_LOCATION", "global")
     VERTEX_PROJECT_ID: str = os.getenv("VERTEX_PROJECT_ID", "joint-inspection-510310")
     VERTEX_SEMANTIC_GATE_ENABLED: bool = os.getenv("VERTEX_SEMANTIC_GATE_ENABLED", "true").lower() in ("true", "1", "yes")
     VERTEX_CACHE_TTL_SECONDS: int = int(os.getenv("VERTEX_CACHE_TTL_SECONDS", "600"))
     VERTEX_MAX_RETRIES: int = int(os.getenv("VERTEX_MAX_RETRIES", "1"))
-    VERTEX_TIMEOUT_SECONDS: float = float(os.getenv("VERTEX_TIMEOUT_SECONDS", "10.0"))
+    VERTEX_TIMEOUT_SECONDS: float = float(os.getenv("VERTEX_TIMEOUT_SECONDS", "45.0"))
 
 
 settings = Settings()
