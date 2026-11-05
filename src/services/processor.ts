@@ -9,6 +9,7 @@ import type {
 } from '../types'
 import { CloudMeasurementError, fuseMeasurementWithAi, measureLocalPreview, measureWithCv } from '../lib'
 import { createId, createTimestamp } from '../utils/identity'
+import { hasExplicitPhotoMode, resolveImageContext } from './imageContext'
 
 const listeners = new Set<(event: ProcessingEvent) => void>()
 
@@ -89,6 +90,10 @@ async function runAiAssistedMeasurement(
       calibrationSource: options?.calibrationSource,
       calibrationVerified: options?.calibrationVerified,
       calibrationReferenceId: options?.calibrationReferenceId,
+      // Explicitly confirmed for THIS photograph, never inherited from a project profile.
+      // An AI-suggested joint orientation is provisional. Physical scale requires
+      // the inspector to confirm geometry for this individual photograph.
+      cameraId: options?.geometrySelectionProvenance === 'INSPECTOR_SELECTED' ? options?.cameraId : undefined,
       projectId: options?.projectId,
       jointType: options?.jointType,
     }
@@ -103,6 +108,38 @@ async function runAiAssistedMeasurement(
   }
 }
 
+async function recordEvidenceOnly(image: InspectionImage): Promise<string> {
+  const resultId = createId()
+  const result: InspectionResult = {
+    id: resultId,
+    imageId: image.id,
+    projectId: image.projectId,
+    manholeId: image.manholeId,
+    jointLabel: image.jointLabel,
+    originalGapMm: null,
+    finalGapMm: null,
+    status: 'REVIEW',
+    resultStatus: 'REVIEW_REQUIRED',
+    measurementSource: 'manual',
+    measurementNote: 'Evidence-only inspection: no supported measurable joint geometry. Human review required.',
+    rejectionReason: 'EVIDENCE_ONLY: No physical measurement or engineering acceptance generated.',
+    aiExplanation: image.suggestedInspectionContext ? `Unverified image observation: ${image.suggestedInspectionContext}` : image.operatorContext ?? 'Image reserved for inspector review.',
+    engineeringResult: 'REVIEW',
+    authoritativeGapMm: null,
+    geometrySelectionProvenance: 'INSPECTOR_SELECTED',
+    processedAt: createTimestamp(),
+    overrideApplied: false,
+  }
+  await db.transaction('rw', db.inspectionImages, db.inspectionResults, async () => {
+    const previous = await db.inspectionResults.where('imageId').equals(image.id).toArray()
+    for (const old of previous) await db.inspectionResults.delete(old.id)
+    await db.inspectionResults.add(result)
+    await db.inspectionImages.update(image.id, { queueStatus: 'completed' })
+  })
+  emit({ type: 'completed', imageId: image.id, inspectionId: resultId })
+  return resultId
+}
+
 async function processImage(imageId: string, options?: ProcessOptions): Promise<string | null> {
   const image = await db.inspectionImages.get(imageId)
   if (!image) {
@@ -114,6 +151,14 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
     return null
   }
 
+  if (image.analysisMode === 'EVIDENCE_ONLY') {
+    emit({ type: 'started', imageId })
+    return recordEvidenceOnly(image)
+  }
+  if (!hasExplicitPhotoMode(image)) {
+    throw new Error('REVIEW_REQUIRED: confirm this photo\'s joint geometry or choose evidence-only review.')
+  }
+  const photoOptions = resolveImageContext(image, options)
   const blobRecord = await db.inspectionBlobs.get(image.blobKey)
 
   emit({ type: 'started', imageId })
@@ -129,13 +174,13 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
   await wait(20)
 
   const pipeDiameter =
-    options?.pipeDiameterMm ??
-    options?.calibrationProfile?.pipeDiameterMm ??
-    options?.calibrationProfile?.pipe_diameter_mm ??
+    photoOptions?.pipeDiameterMm ??
+    photoOptions?.calibrationProfile?.pipeDiameterMm ??
+    photoOptions?.calibrationProfile?.pipe_diameter_mm ??
     undefined
   const effectiveOptions: ProcessOptions = {
-    ...options,
-    projectId: options?.projectId ?? image.projectId,
+    ...photoOptions,
+    projectId: photoOptions?.projectId ?? image.projectId,
     calibrationSource: options?.calibrationSource ?? options?.calibrationProfile?.source,
     calibrationVerified: options?.calibrationVerified ?? options?.calibrationProfile?.verified,
     calibrationReferenceId:
@@ -288,20 +333,27 @@ export const processor = {
     const blobRecord = await db.inspectionBlobs.get(image.blobKey)
 
     emit({ type: 'started', imageId: image.id, inspectionId })
+    if (image.analysisMode === 'EVIDENCE_ONLY') {
+      emit({ type: 'completed', imageId: image.id, inspectionId })
+      return existing  // No automatic circular measurement of review-only evidence.
+    }
     let reprocessOptions: ProcessOptions = {
       projectId: image.projectId,
-      jointType: existing.jointType ?? 'CIRCULAR_OPENING',
-      geometrySelectionProvenance: existing.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
+      jointType: image.jointType ?? existing.jointType,
+      operatorContext: image.operatorContext,
+      cameraId: image.cameraId,
+      pipeDiameterMm: image.pipeDiameterMm ?? undefined,
+      geometrySelectionProvenance: image.geometrySelectionProvenance ?? existing.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
       executionMode: existing.executionSource === 'LOCAL_PREVIEW_UNVERIFIED' ? 'local-preview' : 'cloud',
     }
     try {
-      const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(`jointinspect_cal_${image.projectId}`) : null
+      const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(`jointinspect_cal_${image.projectId}_${image.manholeId}`) : null
       if (stored) {
         const parsed = JSON.parse(stored) as CalibrationProfile
         reprocessOptions = {
           ...reprocessOptions,
           calibrationProfile: parsed,
-          pipeDiameterMm: parsed.pipe_diameter_mm ?? parsed.pipeDiameterMm ?? undefined,
+          pipeDiameterMm: image.pipeDiameterMm ?? parsed.pipe_diameter_mm ?? parsed.pipeDiameterMm ?? undefined,
           calibrationSource: parsed.source,
           calibrationVerified: parsed.verified,
           calibrationReferenceId: parsed.calibration_reference_id ?? parsed.calibrationReferenceId,

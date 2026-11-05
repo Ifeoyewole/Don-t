@@ -249,6 +249,7 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
     if (request.calibrationReferenceId) {
       formData.append('calibration_reference_id', request.calibrationReferenceId)
     }
+    if (request.cameraId) formData.append('camera_id', request.cameraId)
     if (request.projectId) {
       formData.append('project_id', request.projectId)
     }

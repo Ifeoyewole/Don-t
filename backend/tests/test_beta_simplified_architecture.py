@@ -20,11 +20,13 @@ Verifies:
 
 from unittest.mock import MagicMock, patch
 import urllib.error
+import json
 import cv2
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.app.core.cv.calibration_authority import clear_calibration_cache
 from backend.app.core.cv.ai.joint_classifier import JointClassifier
 from backend.app.core.cv.ai.vertex_semantic_gate import VertexSemanticGate, get_vertex_semantic_gate
 from backend.app.core.cv.ai.wrc_inception_classifier import WRCInceptionClassifier
@@ -74,7 +76,18 @@ def mock_vertex_ok(monkeypatch):
         confidence=0.98,
     )
     monkeypatch.setattr("backend.app.api.v1.endpoints.measurement.get_vertex_semantic_gate", lambda: mock_gate)
-    return mock_gate
+    # Real server-side authority, never browser-asserted calibration.
+    monkeypatch.setenv("JOINTINSPECT_VERIFIED_CALIBRATIONS_JSON", json.dumps([{
+        "reference_id": "CAL-PRJ-2026-001",
+        "project_id": "prj-test-123",
+        "camera_id": "TEST-CAMERA-01",
+        "source": "PROJECT_METADATA",
+        "pipe_diameter_mm": 100.0,
+        "validated_joint_types": ["CIRCULAR_OPENING"],
+    }]))
+    clear_calibration_cache()
+    yield mock_gate
+    clear_calibration_cache()
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +102,9 @@ def test_model_b_not_invoked_during_normal_measure(client: TestClient, synthetic
                 "pipe_diameter_mm": 100.0,
                 "calibration_source": "PROJECT_METADATA",
                 "calibration_verified": "true",
+                "calibration_reference_id": "CAL-PRJ-2026-001",
+                "project_id": "prj-test-123",
+                "camera_id": "TEST-CAMERA-01",
             },
         )
         assert response.status_code == 200
@@ -111,6 +127,9 @@ def test_wrc_is_only_live_defect_classifier(client: TestClient, synthetic_joint_
             "pipe_diameter_mm": 100.0,
             "calibration_source": "PROJECT_METADATA",
             "calibration_verified": "true",
+            "calibration_reference_id": "CAL-PRJ-2026-001",
+            "project_id": "prj-test-123",
+            "camera_id": "TEST-CAMERA-01",
         },
     )
     assert response.status_code == 200
@@ -150,6 +169,9 @@ def test_wrc_mapped_condition_populates_response(client: TestClient, synthetic_j
             "pipe_diameter_mm": 100.0,
             "calibration_source": "PROJECT_METADATA",
             "calibration_verified": "true",
+            "calibration_reference_id": "CAL-PRJ-2026-001",
+            "project_id": "prj-test-123",
+            "camera_id": "TEST-CAMERA-01",
         },
     )
     assert response.status_code == 200
@@ -181,6 +203,9 @@ def test_wrc_mapped_condition_populates_response(client: TestClient, synthetic_j
             "pipe_diameter_mm": 100.0,
             "calibration_source": "PROJECT_METADATA",
             "calibration_verified": "true",
+            "calibration_reference_id": "CAL-PRJ-2026-001",
+            "project_id": "prj-test-123",
+            "camera_id": "TEST-CAMERA-01",
         },
     )
     assert response.status_code == 200
@@ -217,6 +242,9 @@ def test_wrc_unavailable_measurement_succeeds_independently(client: TestClient, 
             "pipe_diameter_mm": 100.0,
             "calibration_source": "PROJECT_METADATA",
             "calibration_verified": "true",
+            "calibration_reference_id": "CAL-PRJ-2026-001",
+            "project_id": "prj-test-123",
+            "camera_id": "TEST-CAMERA-01",
         },
     )
     assert response.status_code == 200
@@ -256,6 +284,9 @@ def test_wrc_low_confidence_measurement_unchanged(client: TestClient, synthetic_
             "pipe_diameter_mm": 100.0,
             "calibration_source": "PROJECT_METADATA",
             "calibration_verified": "true",
+            "calibration_reference_id": "CAL-PRJ-2026-001",
+            "project_id": "prj-test-123",
+            "camera_id": "TEST-CAMERA-01",
         },
     )
     assert response.status_code == 200
@@ -346,6 +377,9 @@ def test_zero_guessing_acceptable_tier(client: TestClient, synthetic_joint_image
             "pipe_diameter_mm": 100.0,
             "calibration_source": "PROJECT_METADATA",
             "calibration_verified": "true",
+            "calibration_reference_id": "CAL-PRJ-2026-001",
+            "project_id": "prj-test-123",
+            "camera_id": "TEST-CAMERA-01",
         },
     )
     assert response.status_code == 200
@@ -389,6 +423,9 @@ def test_zero_guessing_partial_review_tier(monkeypatch, synthetic_joint_image: b
             "pipe_diameter_mm": 100.0,
             "calibration_source": "PROJECT_METADATA",
             "calibration_verified": "true",
+            "calibration_reference_id": "CAL-PRJ-2026-001",
+            "project_id": "prj-test-123",
+            "camera_id": "TEST-CAMERA-01",
         },
     )
     assert response.status_code == 200
@@ -458,6 +495,7 @@ def test_saved_verified_calibration_enables_authoritative_mm(client: TestClient,
             "calibration_verified": "true",
             "calibration_reference_id": "CAL-PRJ-2026-001",
             "project_id": "prj-test-123",
+            "camera_id": "TEST-CAMERA-01",
         },
     )
     assert response.status_code == 200
@@ -520,6 +558,9 @@ def test_wrc_classification_cannot_alter_measured_gap(client: TestClient, synthe
             "pipe_diameter_mm": 100.0,
             "calibration_source": "PROJECT_METADATA",
             "calibration_verified": "true",
+            "calibration_reference_id": "CAL-PRJ-2026-001",
+            "project_id": "prj-test-123",
+            "camera_id": "TEST-CAMERA-01",
         },
     ).json()
 
@@ -546,6 +587,9 @@ def test_wrc_classification_cannot_alter_measured_gap(client: TestClient, synthe
             "pipe_diameter_mm": 100.0,
             "calibration_source": "PROJECT_METADATA",
             "calibration_verified": "true",
+            "calibration_reference_id": "CAL-PRJ-2026-001",
+            "project_id": "prj-test-123",
+            "camera_id": "TEST-CAMERA-01",
         },
     ).json()
 
@@ -581,6 +625,9 @@ def test_wrc_classification_cannot_alter_engineering_tolerance(client: TestClien
             "pipe_diameter_mm": 100.0,
             "calibration_source": "PROJECT_METADATA",
             "calibration_verified": "true",
+            "calibration_reference_id": "CAL-PRJ-2026-001",
+            "project_id": "prj-test-123",
+            "camera_id": "TEST-CAMERA-01",
             "min_gap_mm": 1.0,
             "max_gap_mm": 50.0,  # High tolerance -> physical gap passes
         },

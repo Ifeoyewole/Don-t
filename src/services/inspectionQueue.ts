@@ -1,6 +1,6 @@
 import { db } from '../db'
 import { validateGuidedPhoto } from '../lib/photoValidation'
-import type { QueueFilesInput, QueuedInspectionImage } from '../types'
+import type { InspectionImage, QueueFilesInput, QueuedInspectionImage } from '../types'
 import { createJointLabels } from '../utils'
 import { createId, createTimestamp } from '../utils/identity'
 
@@ -57,6 +57,66 @@ export const inspectionQueue = {
     }
 
     return queuedImages
+  },
+
+  async updateImageContext(
+    imageId: string,
+    patch: Partial<InspectionImage>,
+    origin: 'ai' | 'inspector' | 'system',
+  ): Promise<void> {
+    // A single atomic update avoids delayed AI responses overwriting operator edits.
+    await db.transaction('rw', db.inspectionImages, async () => {
+      const image = await db.inspectionImages.get(imageId)
+      if (!image || (image.queueStatus !== 'queued' && image.queueStatus !== 'failed')) return
+      const update: Partial<InspectionImage> = {}
+      if (origin === 'ai') {
+        update.suggestedJointType = patch.suggestedJointType
+        update.suggestedInspectionContext = patch.suggestedInspectionContext?.slice(0, 1000)
+        update.possibleGapVisible = patch.possibleGapVisible
+        update.contextSuggestionModel = patch.contextSuggestionModel
+        update.contextSuggestionStatus = patch.contextSuggestionStatus
+        update.contextSuggestionMessage = patch.contextSuggestionMessage?.slice(0, 300)
+        if (patch.jointType && image.geometrySelectionProvenance !== 'INSPECTOR_SELECTED' && image.analysisMode !== 'EVIDENCE_ONLY') {
+          update.analysisMode = 'MEASURE_JOINT'
+          update.jointType = patch.jointType
+          update.geometrySelectionProvenance = 'EVIDENCE_SUGGESTED'
+        }
+        if (patch.operatorContext && !image.operatorContextEdited) {
+          update.operatorContext = patch.operatorContext.slice(0, 1000)
+        }
+      } else if (origin === 'inspector') {
+        if (patch.analysisMode === 'EVIDENCE_ONLY') {
+          update.analysisMode = 'EVIDENCE_ONLY'
+          update.jointType = undefined
+          update.geometrySelectionProvenance = 'INSPECTOR_SELECTED'
+        } else if (patch.jointType) {
+          update.analysisMode = 'MEASURE_JOINT'
+          update.jointType = patch.jointType
+          update.geometrySelectionProvenance = 'INSPECTOR_SELECTED'
+        }
+        if (patch.operatorContext !== undefined) {
+          update.operatorContext = patch.operatorContext.slice(0, 1000)
+          update.operatorContextEdited = true
+        }
+        if (patch.cameraId !== undefined) {
+          update.cameraId = patch.cameraId.slice(0, 160).trim()
+        }
+        if (patch.pipeDiameterMm !== undefined) {
+          if (patch.pipeDiameterMm === null) {
+            update.pipeDiameterMm = null
+          } else {
+            if (!Number.isFinite(patch.pipeDiameterMm) || patch.pipeDiameterMm <= 0 || patch.pipeDiameterMm > 5000) {
+              throw new Error('Photo diameter must be a finite value between 1 and 5000 mm.')
+            }
+            update.pipeDiameterMm = patch.pipeDiameterMm
+          }
+        }
+      } else {
+        if (patch.contextSuggestionStatus) update.contextSuggestionStatus = patch.contextSuggestionStatus
+        if (patch.contextSuggestionMessage) update.contextSuggestionMessage = patch.contextSuggestionMessage.slice(0, 300)
+      }
+      await db.inspectionImages.update(imageId, update)
+    })
   },
 
   async removeFile(imageId: string): Promise<void> {

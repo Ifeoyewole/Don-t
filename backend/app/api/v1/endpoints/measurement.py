@@ -359,16 +359,10 @@ async def measure_joint_gap(
             source=calibration_source,
             pipe_diameter_mm=pipe_diameter_mm,
             camera_id=camera_id,
+            joint_type=joint_type.value,
         )
         is_calibrated = verified_calibration is not None
 
-        # Preserve the historical test harness while production remains server-owned.
-        if os.getenv("PYTEST_CURRENT_TEST") and calibration_verified:
-            is_calibrated = (
-                calibration_source is not None
-                and pipe_diameter_mm is not None
-                and pipe_diameter_mm > 0.0
-            )
 
         if cal_profile is not None and is_calibrated:
             cal_profile.verified = True

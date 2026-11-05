@@ -595,6 +595,7 @@ function App() {
           projectId={uploadProjectId}
           projectName={currentProject?.name ?? 'Untitled project'}
           manholeLabel={currentManhole?.manholeId ?? 'Unassigned manhole'}
+          manholeId={uploadManholeId}
           manholePipeDiameterMm={currentManhole?.pipeDiameterMm}
           queue={currentQueue}
           events={events}
@@ -606,11 +607,16 @@ function App() {
             navigate(`/projects/${uploadProjectId}/manholes/${uploadManholeId}`)
           }}
           onAddFiles={async (files) => {
-            await inspectionQueue.addFiles({
+            const added = await inspectionQueue.addFiles({
               projectId: uploadProjectId,
               manholeId: uploadManholeId,
               files,
             })
+            await refreshRouteData()
+            return added
+          }}
+          onUpdateImageContext={async (imageId, patch, origin) => {
+            await inspectionQueue.updateImageContext(imageId, patch, origin)
             await refreshRouteData()
           }}
           onRemoveFile={async (imageId) => {

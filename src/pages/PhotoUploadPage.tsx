@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
-import { requestInspectionContextSuggestions, type InspectionContextSuggestion } from '../lib/contextSuggestions'
+import { requestInspectionContextSuggestions } from '../lib/contextSuggestions'
+import { checkCalibrationReference, type CalibrationReferenceStatus } from '../lib/calibrationReference'
 import type { CalibrationProfile, GeometrySelectionProvenance, InspectionImage, JointGeometryType, ProcessBatchResult } from '../types/domain'
 
 type Props = {
@@ -8,11 +9,13 @@ type Props = {
   projectId: string
   projectName: string
   manholeLabel: string
+  manholeId: string
   manholePipeDiameterMm?: number
   queue: InspectionImage[]
   events: string[]
   onBack: () => void
-  onAddFiles: (files: File[]) => Promise<void>
+  onAddFiles: (files: File[]) => Promise<InspectionImage[]>
+  onUpdateImageContext: (imageId: string, patch: Partial<InspectionImage>, origin: 'ai' | 'inspector' | 'system') => Promise<void>
   onRemoveFile: (imageId: string) => Promise<void>
   onClearQueue: () => Promise<void>
   onStartInspection: (operatorContext?: string, calibration?: CalibrationProfile, jointType?: JointGeometryType, provenance?: GeometrySelectionProvenance) => Promise<ProcessBatchResult>
@@ -30,7 +33,7 @@ const phaseLabel = (image: InspectionImage) => {
 
 type CalibrationSourceType = 'PROJECT_METADATA' | 'MANHOLE_METADATA' | 'PHYSICAL_REFERENCE' | 'TEST_RIG' | 'CAMERA_CALIBRATION'
 
-function getInitialCalibration(projId: string) {
+function getInitialCalibration(projId: string, manholeId: string) {
   if (!projId || typeof localStorage === 'undefined') {
     return {
       profile: null as CalibrationProfile | null,
@@ -42,7 +45,7 @@ function getInitialCalibration(projId: string) {
     }
   }
   try {
-    const stored = localStorage.getItem(`jointinspect_cal_${projId}`)
+    const stored = localStorage.getItem(`jointinspect_cal_${projId}_${manholeId}`)
     if (stored) {
       const parsed = JSON.parse(stored) as CalibrationProfile
       const dia = parsed.pipe_diameter_mm ?? parsed.pipeDiameterMm
@@ -74,40 +77,42 @@ export const PhotoUploadPage = ({
   projectId,
   projectName,
   manholeLabel,
+  manholeId,
   manholePipeDiameterMm,
   queue,
   events,
   onBack,
   onAddFiles,
+  onUpdateImageContext,
   onRemoveFile,
   onClearQueue,
   onStartInspection,
 }: Props) => {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [operatorContext, setOperatorContext] = useState('')
-  const [jointType, setJointType] = useState<JointGeometryType>('CIRCULAR_OPENING')
-  const [geometryProvenance, setGeometryProvenance] = useState<GeometrySelectionProvenance>('LEGACY_DEFAULT')
-  const [advisory, setAdvisory] = useState<InspectionContextSuggestion | null>(null)
-  const [advisoryBusy, setAdvisoryBusy] = useState(false)
-  const [advisoryError, setAdvisoryError] = useState('')
-  const advisoryControllerRef = useRef<AbortController | null>(null)
-  const inspectorEditedContext = useRef(false)
-  const inspectorEditedGeometry = useRef(false)
+  const [notesDrafts, setNotesDrafts] = useState<Record<string, string>>({})
+  const [cameraDrafts, setCameraDrafts] = useState<Record<string, string>>({})
+  const [diameterDrafts, setDiameterDrafts] = useState<Record<string, string>>({})
+  const suggestionControllers = useRef(new Map<string, AbortController>())
+  const pendingWrites = useRef(new Set<Promise<void>>())
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [reportedDownlink, setReportedDownlink] = useState<number | null>(null)
 
   // Calibration Profile Setup - Fail-Safe Defaults initialized from project storage
-  const [calPipeDiameter, setCalPipeDiameter] = useState<number | ''>(() => getInitialCalibration(projectId).pipeDiameter || manholePipeDiameterMm || '')
-  const [calSource, setCalSource] = useState<CalibrationSourceType>(() => getInitialCalibration(projectId).pipeDiameter ? getInitialCalibration(projectId).source : manholePipeDiameterMm ? 'MANHOLE_METADATA' : 'PROJECT_METADATA')
-  const [calReferenceId, setCalReferenceId] = useState<string>(() => getInitialCalibration(projectId).referenceId)
-  const [calNotes, setCalNotes] = useState<string>(() => getInitialCalibration(projectId).notes)
-  const [savedProfile, setSavedProfile] = useState<CalibrationProfile | null>(() => getInitialCalibration(projectId).profile)
+  const [calPipeDiameter, setCalPipeDiameter] = useState<number | ''>(() => getInitialCalibration(projectId, manholeId).pipeDiameter || manholePipeDiameterMm || '')
+  const [calSource, setCalSource] = useState<CalibrationSourceType>(() => getInitialCalibration(projectId, manholeId).pipeDiameter ? getInitialCalibration(projectId, manholeId).source : manholePipeDiameterMm ? 'MANHOLE_METADATA' : 'PROJECT_METADATA')
+  const [calReferenceId, setCalReferenceId] = useState<string>(() => getInitialCalibration(projectId, manholeId).referenceId)
+  const [calNotes, setCalNotes] = useState<string>(() => getInitialCalibration(projectId, manholeId).notes)
+  const [calCameraId, setCalCameraId] = useState<string>(() => getInitialCalibration(projectId, manholeId).profile?.camera_id ?? '')
+  const [savedProfile, setSavedProfile] = useState<CalibrationProfile | null>(() => getInitialCalibration(projectId, manholeId).profile)
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('')
   const [saveErrorMsg, setSaveErrorMsg] = useState<string>('')
+  const [referenceStatus, setReferenceStatus] = useState<CalibrationReferenceStatus | null>(null)
+  const [referenceChecking, setReferenceChecking] = useState(false)
+  const [calDirty, setCalDirty] = useState(false)
 
   useEffect(() => {
-    const init = getInitialCalibration(projectId)
+    const init = getInitialCalibration(projectId, manholeId)
     // Defer the state reset so the effect synchronizes the selected project
     // without triggering React's synchronous set-state-in-effect rule.
     queueMicrotask(() => {
@@ -116,22 +121,21 @@ export const PhotoUploadPage = ({
       setCalSource(diameterConflict ? 'MANHOLE_METADATA' : init.pipeDiameter !== '' ? init.source : manholePipeDiameterMm ? 'MANHOLE_METADATA' : init.source)
       setCalReferenceId(diameterConflict ? '' : init.referenceId)
       setCalNotes(diameterConflict ? '' : init.notes)
+      setCalCameraId(diameterConflict ? '' : init.profile?.camera_id ?? '')
       setSavedProfile(diameterConflict ? null : init.profile ? { ...init.profile, verified: false, verified_at: null, verifiedAt: null } : null)
-      setJointType('CIRCULAR_OPENING')
-      setGeometryProvenance('LEGACY_DEFAULT')
-      setOperatorContext('')
-      advisoryControllerRef.current?.abort()
-      setAdvisory(null)
-      setAdvisoryError('')
-      setAdvisoryBusy(false)
-      inspectorEditedContext.current = false
-      inspectorEditedGeometry.current = false
+      setReferenceStatus(null)
+      setCalDirty(false)
+      for (const controller of suggestionControllers.current.values()) controller.abort()
+      suggestionControllers.current.clear()
+      setNotesDrafts({})
+      setCameraDrafts({})
+      setDiameterDrafts({})
     })
-  }, [projectId, manholeLabel, manholePipeDiameterMm])
+  }, [projectId, manholeId, manholePipeDiameterMm])
 
-  useEffect(() => () => advisoryControllerRef.current?.abort(), [])
+  useEffect(() => () => { for (const controller of suggestionControllers.current.values()) controller.abort() }, [])
 
-  const handleSaveCalibration = () => {
+  const handleSaveCalibration = async () => {
     setSaveErrorMsg('')
     setSaveSuccessMsg('')
 
@@ -155,11 +159,27 @@ export const PhotoUploadPage = ({
       verified_at: null,
       verifiedAt: null,
       notes: calNotes.trim() || undefined,
+      camera_id: calCameraId.trim() || null,
+      cameraId: calCameraId.trim() || null,
     }
     try {
-      localStorage.setItem(`jointinspect_cal_${projectId}`, JSON.stringify(profile))
+      localStorage.setItem(`jointinspect_cal_${projectId}_${manholeId}`, JSON.stringify(profile))
       setSavedProfile(profile)
-      setSaveSuccessMsg('Calibration reference saved. The server must verify it before authoritative millimetres are available.')
+      setCalDirty(false)
+      setReferenceStatus(null)
+      setSaveSuccessMsg('Local reference saved for this manhole. Checking server authority…')
+      setReferenceChecking(true)
+      try {
+        const result = await checkCalibrationReference(profile)
+        setReferenceStatus(result)
+        setSaveSuccessMsg(result.reference_verified
+          ? 'Server reference matched. This does NOT guarantee scale for every photo.'
+          : 'Reference not verified by server. Pixel-space evidence remains available.')
+      } catch (err) {
+        setSaveErrorMsg(err instanceof Error ? err.message : 'Could not verify calibration reference.')
+      } finally {
+        setReferenceChecking(false)
+      }
       setTimeout(() => {
         setSaveSuccessMsg('')
         setSaveErrorMsg('')
@@ -196,44 +216,45 @@ export const PhotoUploadPage = ({
 
   const throughputValue = reportedDownlink !== null ? `${reportedDownlink.toFixed(1)} Mbps` : `${queueCompletion}% queue progress`
   const throughputCaption = reportedDownlink !== null ? 'Reported device link' : 'Live queue throughput'
+  const needsImageSelection = queue.some((image) => (image.queueStatus === 'queued' || image.queueStatus === 'failed') && image.analysisMode !== 'EVIDENCE_ONLY' && !image.jointType)
 
-  const analyzeForSuggestions = async (photo: File) => {
-    advisoryControllerRef.current?.abort()
+  const persistPhotoContext = (imageId: string, patch: Partial<InspectionImage>, origin: 'ai' | 'inspector' | 'system') => {
+    const write = onUpdateImageContext(imageId, patch, origin)
+    pendingWrites.current.add(write)
+    void write.catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not update image context.'))
+      .finally(() => pendingWrites.current.delete(write))
+    return write
+  }
+
+  const analyzeForSuggestions = async (image: InspectionImage, photo: File) => {
     const controller = new AbortController()
-    advisoryControllerRef.current = controller
-    setAdvisory(null)
-    setAdvisoryError('')
-    setAdvisoryBusy(true)
-    if (!inspectorEditedContext.current) setOperatorContext('')
-    if (!inspectorEditedGeometry.current) { setJointType('CIRCULAR_OPENING'); setGeometryProvenance('LEGACY_DEFAULT') }
+    suggestionControllers.current.set(image.id, controller)
+    await persistPhotoContext(image.id, { contextSuggestionStatus: 'pending' }, 'system')
     const timeout = window.setTimeout(() => controller.abort('timeout'), 45000)
     try {
       const result = await requestInspectionContextSuggestions(photo, controller.signal, manholePipeDiameterMm)
-      if (controller.signal.aborted || advisoryControllerRef.current !== controller) return
-      setAdvisory(result)
-      if (!result.processing_allowed || !result.image_quality_usable) {
-        setAdvisoryError(result.reason || 'No suitable pipe joint found. Check photo quality or enter context manually.')
-        return
-      }
-      // Auto-populate only fields the inspector has not touched. Every field stays editable.
-      if (result.suggested_joint_type && !inspectorEditedGeometry.current) {
-        setJointType(result.suggested_joint_type)
-        setGeometryProvenance('EVIDENCE_SUGGESTED')
-      }
-      if (result.suggested_inspection_context && !inspectorEditedContext.current) {
-        setOperatorContext((current) => current.trim() ? current : result.suggested_inspection_context || '')
-      }
-    } catch (error) {
-      if (advisoryControllerRef.current === controller && (!controller.signal.aborted || controller.signal.reason === 'timeout')) {
-        setAdvisoryError(controller.signal.reason === 'timeout'
-          ? 'AI suggestion timed out. You can continue with manual entry.'
-          : error instanceof Error ? error.message : 'Suggestions unavailable; enter context manually.')
-      }
+      if (controller.signal.aborted) return
+      const allowed = result.processing_allowed && result.image_quality_usable
+      await persistPhotoContext(image.id, {
+        contextSuggestionStatus: allowed ? 'ready' : 'review_required',
+        contextSuggestionMessage: result.reason,
+        contextSuggestionModel: result.model,
+        suggestedJointType: allowed ? result.suggested_joint_type ?? undefined : undefined,
+        suggestedInspectionContext: allowed ? result.suggested_inspection_context ?? undefined : undefined,
+        possibleGapVisible: allowed ? result.possible_gap_visible : null,
+        jointType: allowed ? result.suggested_joint_type ?? undefined : undefined,
+        operatorContext: allowed ? result.suggested_inspection_context ?? undefined : undefined,
+      }, 'ai')
+    } catch (err) {
+      if (controller.signal.aborted && controller.signal.reason !== 'timeout') return
+      await persistPhotoContext(image.id, {
+        contextSuggestionStatus: 'unavailable',
+        contextSuggestionMessage: controller.signal.reason === 'timeout' ? 'Suggestion timed out; choose geometry manually.' :
+          err instanceof Error ? err.message : 'AI suggestion unavailable. You can still enter context manually.',
+      }, 'system')
     } finally {
       window.clearTimeout(timeout)
-      if (advisoryControllerRef.current === controller) {
-        setAdvisoryBusy(false)
-      }
+      suggestionControllers.current.delete(image.id)
     }
   }
 
@@ -243,12 +264,20 @@ export const PhotoUploadPage = ({
     setError('')
     try {
       const selected = Array.from(files)
-      await onAddFiles(selected)
-      // Only the first photo is used as an image-only suggestion; avoid extra API costs for every frame.
-      if (online && selected[0]) {
-        void analyzeForSuggestions(selected[0])
-      } else if (!online) {
-        setAdvisoryError('Cloud suggestions require a connection; manual editing remains available.')
+      const added = await onAddFiles(selected)
+      if (online) {
+        // Two image-only requests at a time, to limit network and Vertex usage.
+        void (async () => {
+          for (let i = 0; i < added.length; i += 2) {
+            await Promise.all(added.slice(i, i + 2).map((image, offset) =>
+              analyzeForSuggestions(image, selected[i + offset])))
+          }
+        })().catch((err: unknown) => setError(err instanceof Error ? err.message : 'Suggestion preflight interrupted.'))
+      } else {
+        for (const image of added) void persistPhotoContext(image.id, {
+          contextSuggestionStatus: 'unavailable',
+          contextSuggestionMessage: 'Offline: enter geometry and notes manually.',
+        }, 'system')
       }
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Could not add selected files.')
@@ -258,11 +287,36 @@ export const PhotoUploadPage = ({
     }
   }
 
+  const saveNote = (imageId: string, textValue: string) => {
+    void persistPhotoContext(imageId, { operatorContext: textValue }, 'inspector')
+    setNotesDrafts((current) => {
+      const next = { ...current }
+      delete next[imageId]
+      return next
+    })
+  }
+
   const handleStart = async () => {
     setBusy(true)
     setError('')
     try {
-      await onStartInspection(operatorContext.trim() || undefined, savedProfile ?? undefined, jointType, geometryProvenance)
+      for (const [imageId, note] of Object.entries(notesDrafts)) {
+        await persistPhotoContext(imageId, { operatorContext: note }, 'inspector')
+      }
+      for (const [imageId, cameraId] of Object.entries(cameraDrafts)) {
+        await persistPhotoContext(imageId, { cameraId }, 'inspector')
+      }
+      for (const [imageId, value] of Object.entries(diameterDrafts)) {
+        const diameter = value.trim() ? Number(value) : null
+        await persistPhotoContext(imageId, { pipeDiameterMm: diameter }, 'inspector')
+      }
+      await Promise.all([...pendingWrites.current])
+      const readyToMeasure = queue.filter((image) => image.queueStatus === 'queued' || image.queueStatus === 'failed')
+      if (readyToMeasure.some((image) => image.analysisMode !== 'EVIDENCE_ONLY' && !image.jointType)) {
+        throw new Error('Choose a geometry or evidence-only review for every photo before processing.')
+      }
+      if (calDirty) throw new Error('Save or discard edited calibration fields before inspection; stale references are not used.')
+      await onStartInspection(undefined, savedProfile ?? undefined)
     } catch (processingError) {
       setError(processingError instanceof Error ? processingError.message : 'Processing failed.')
     } finally {
@@ -293,7 +347,7 @@ export const PhotoUploadPage = ({
           className="button button-primary dashboard-cta"
           type="button"
           onClick={() => void handleStart()}
-          disabled={!queue.length || busy}
+          disabled={!queue.length || busy || needsImageSelection}
         >
           {busy ? 'Processing...' : 'Start Inspection'}
         </button>
@@ -332,7 +386,7 @@ export const PhotoUploadPage = ({
             <div className="network-head">
               <strong>Calibration</strong>
               <span className="status-pill is-review">
-                {savedProfile ? 'REFERENCE SAVED' : 'CALIBRATION REQUIRED'}
+                {referenceStatus?.reference_verified ? 'REFERENCE MATCHED' : savedProfile ? 'UNVERIFIED REFERENCE' : 'CALIBRATION REQUIRED'}
               </span>
             </div>
 
@@ -381,6 +435,8 @@ export const PhotoUploadPage = ({
                       } else if (e.target.value !== 'custom') {
                         setCalPipeDiameter(Number(e.target.value))
                       }
+                      setReferenceStatus(null)
+                      setCalDirty(true)
                     }}
                     style={{
                       flex: 1,
@@ -406,7 +462,7 @@ export const PhotoUploadPage = ({
                     max="5000"
                     placeholder="mm"
                     value={calPipeDiameter}
-                    onChange={(e) => setCalPipeDiameter(e.target.value ? Number(e.target.value) : '')}
+                    onChange={(e) => { setCalPipeDiameter(e.target.value ? Number(e.target.value) : ''); setReferenceStatus(null); setCalDirty(true) }}
                     style={{
                       width: '80px',
                       padding: '0.4rem',
@@ -425,7 +481,7 @@ export const PhotoUploadPage = ({
                 </label>
                 <select
                   value={calSource}
-                  onChange={(e) => setCalSource(e.target.value as CalibrationSourceType)}
+                  onChange={(e) => { setCalSource(e.target.value as CalibrationSourceType); setReferenceStatus(null); setCalDirty(true) }}
                   style={{
                     width: '100%',
                     padding: '0.4rem',
@@ -451,7 +507,7 @@ export const PhotoUploadPage = ({
                   type="text"
                   placeholder="e.g. DWG-2026-04, MH-402-SPEC"
                   value={calReferenceId}
-                  onChange={(e) => setCalReferenceId(e.target.value)}
+                  onChange={(e) => { setCalReferenceId(e.target.value); setReferenceStatus(null); setCalDirty(true) }}
                   style={{
                     width: '100%',
                     padding: '0.4rem',
@@ -464,11 +520,25 @@ export const PhotoUploadPage = ({
                 />
               </div>
 
+              <div style={{ marginTop: '0.5rem' }}>
+                <label htmlFor="calibration-camera-id" style={{ display: 'block', fontSize: '0.75rem' }}>
+                  Camera or rig ID (if covered by reference)
+                </label>
+                <input id="calibration-camera-id" type="text" value={calCameraId}
+                  placeholder="e.g. CCTV-STANDARD-01"
+                  onChange={(event) => { setCalCameraId(event.target.value); setReferenceStatus(null); setCalDirty(true) }}
+                  style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box' }} />
+                <p style={{ fontSize: '0.72rem' }}>Choose the actual capture camera. Never guess a camera ID from the image.</p>
+              </div>
+              {referenceStatus && <p role="status" style={{ fontSize: '0.76rem' }}>
+                {referenceStatus.guidance}
+              </p>}
+              {referenceChecking && <p role="status">Checking the calibration registry…</p>}
               <button
                 type="button"
                 className="button button-secondary"
                 style={{ marginTop: '0.35rem', width: '100%' }}
-                onClick={handleSaveCalibration}
+                onClick={() => void handleSaveCalibration()}
               >
                 Save Calibration Profile
               </button>
@@ -484,10 +554,10 @@ export const PhotoUploadPage = ({
               ) : null}
             </div>
             <p style={{ fontSize: '0.72rem', opacity: 0.7, marginTop: '0.4rem' }}>
-              {manholePipeDiameterMm && !getInitialCalibration(projectId).pipeDiameter
+              {manholePipeDiameterMm && !getInitialCalibration(projectId, manholeId).pipeDiameter
                 ? `Diameter prefilled from manhole specifications (${manholePipeDiameterMm} mm), NOT inferred by AI. `
                 : ''}
-              Save the calibration reference once for this project. The backend verifies trusted references before issuing authoritative millimetres.
+              Save a reference for this manhole, not the whole project. A diameter is nominal metadata; real millimetres require matching server-owned calibration, suitable camera geometry and reliable image edges.
             </p>
           </section>
 
@@ -508,94 +578,16 @@ export const PhotoUploadPage = ({
             </p>
             <p>{aiReviewCount ? `${aiReviewCount} photo(s) will use enhanced CV and AI review before a retake decision.` : 'All queued photos are eligible for measurement.'}</p>
             <div className="action-row">
-              <button className="button button-ghost" type="button" onClick={() => { advisoryControllerRef.current?.abort(); setAdvisory(null); setAdvisoryError(''); void onClearQueue() }} disabled={!queue.length || busy}>
+              <button className="button button-ghost" type="button" onClick={() => { for (const controller of suggestionControllers.current.values()) controller.abort(); suggestionControllers.current.clear(); void onClearQueue() }} disabled={!queue.length || busy}>
                 Clear All
               </button>
             </div>
           </section>
 
           <section className="network-card operator-context-card">
-            <div className="network-head">
-              <strong>Inspection context</strong>
-              <span>Optional / Editable</span>
-            </div>
-            {queue.length > 1 ? <p role="note" style={{ fontSize: '0.78rem' }}>One geometry is currently used for every queued photo. Use separate inspections for different joint types or camera views.</p> : null}
-            {advisoryBusy ? <p role="status" style={{ fontSize: '0.8rem' }}>Gemini is suggesting context from the first uploaded photo…</p> : null}
-            {advisory ? (
-              <div role="status" style={{ padding: '0.75rem', marginTop: '0.5rem', border: '1px solid #8daedb', borderRadius: '8px', background: 'rgba(75, 135, 220, 0.08)', lineHeight: 1.55 }}>
-                <strong>AI suggestions — review and edit</strong>
-                <p style={{ fontSize: '0.76rem', margin: '0.4rem 0' }}>
-                  Source: {advisory.model}. First uploaded photo only; not private inspection history. These are unverified hints, not physical measurements.
-                </p>
-                {advisory.suggested_joint_type ? (
-                  <p style={{ fontSize: '0.8rem', margin: '0.25rem 0' }}>
-                    Suggested geometry: <strong>{advisory.suggested_joint_type.replaceAll('_', ' ')}</strong>
-                  </p>
-                ) : null}
-                {advisory.suggested_inspection_context ? (
-                  <p style={{ fontSize: '0.8rem', margin: '0.25rem 0' }}>
-                    Visual note: {advisory.suggested_inspection_context}
-                  </p>
-                ) : null}
-                {advisory.possible_gap_visible === true ? (
-                  <p style={{ fontSize: '0.76rem' }}>Possible visible gap (unverified; not a confirmed OPEN_JOINT defect).</p>
-                ) : null}
-                {advisory.processing_allowed ? (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
-                    <button type="button" className="button button-secondary" onClick={() => {
-                      if (advisory.suggested_joint_type) {
-                        setJointType(advisory.suggested_joint_type)
-                        setGeometryProvenance('INSPECTOR_SELECTED')
-                        inspectorEditedGeometry.current = true
-                      }
-                      if (advisory.suggested_inspection_context) {
-                        setOperatorContext(advisory.suggested_inspection_context)
-                        inspectorEditedContext.current = true
-                      }
-                    }}>Apply suggestions</button>
-                    <button type="button" className="button button-ghost" onClick={() => setAdvisory(null)}>Dismiss</button>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            {advisoryError ? <p role="status" style={{ fontSize: '0.78rem', color: '#b45309' }}>{advisoryError}</p> : null}
-            <label htmlFor="joint-geometry-type" style={{ display: 'block', marginTop: '0.5rem' }}>
-              Joint geometry
-            </label>
-            <select
-              id="joint-geometry-type"
-              value={jointType}
-              onChange={(event) => { inspectorEditedGeometry.current = true; setJointType(event.target.value as JointGeometryType); setGeometryProvenance('INSPECTOR_SELECTED') }}
-              style={{ width: '100%', padding: '0.55rem', marginTop: '0.25rem' }}
-            >
-              <option value="CIRCULAR_OPENING">Circular opening</option>
-              <option value="HORIZONTAL_SEAM">Horizontal seam</option>
-              <option value="VERTICAL_SEAM">Vertical seam</option>
-            </select>
-            <textarea
-              id="operator-context-input"
-              className="operator-context-textarea"
-              rows={3}
-              maxLength={1000}
-              value={operatorContext}
-              onChange={(e) => { inspectorEditedContext.current = true; setOperatorContext(e.target.value) }}
-              placeholder='Add useful context for this inspection, for example: "Possible gasket extrusion near the upper-right edge. Focus on joint alignment."'
-              style={{
-                width: '100%',
-                padding: '0.6rem',
-                borderRadius: '6px',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                background: 'rgba(0, 0, 0, 0.25)',
-                color: 'inherit',
-                fontSize: '0.85rem',
-                resize: 'vertical',
-                marginTop: '0.5rem',
-                boxSizing: 'border-box',
-              }}
-            />
-            <p style={{ fontSize: '0.75rem', opacity: 0.75, marginTop: '0.35rem' }}>
-              Optional. This helps AI interpret the inspection and tailor its explanation. It does not override measurements, calibration, tolerance rules, or safety checks.
-            </p>
+            <div className="network-head"><strong>Photo-specific evidence</strong><span>Editable</span></div>
+            <p>Each photo below has its own geometry and inspection note. Gemini suggests them independently; operators can correct or mark unsupported views as evidence-only review.</p>
+            <p>Other conditions such as infiltration, deposits, surface damage, intruding connections and unknown features are never silently labelled as open joints.</p>
           </section>
         </aside>
 
@@ -622,7 +614,10 @@ export const PhotoUploadPage = ({
                 >
                   <div className="asset-image-wrap">
                     {image.previewUrl ? <img src={image.previewUrl} alt={image.fileName} /> : <div className="preview-placeholder" />}
-                    <button className="icon-button" type="button" onClick={() => void onRemoveFile(image.id)}>
+                    <button className="icon-button" type="button" onClick={() => {
+                      suggestionControllers.current.get(image.id)?.abort()
+                      void onRemoveFile(image.id)
+                    }}>
                       Remove
                     </button>
                     {image.queueStatus === 'completed' ? <span className="asset-check">✓</span> : null}
@@ -647,6 +642,117 @@ export const PhotoUploadPage = ({
                     </div>
                     <p>{phaseLabel(image)}</p>
                     {image.validationMessage ? <p className="asset-validation-message">{image.validationMessage}</p> : null}
+                    <div className="photo-context-editor" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--outline, #cbd5e1)' }}>
+                      <label htmlFor={`geometry-${image.id}`} style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem' }}>
+                        Photo-specific geometry
+                      </label>
+                      <select
+                        id={`geometry-${image.id}`}
+                        value={image.analysisMode === 'EVIDENCE_ONLY' ? 'EVIDENCE_ONLY' : image.jointType ?? ''}
+                        disabled={image.queueStatus === 'completed' || image.queueStatus === 'processing'}
+                        onChange={(event) => {
+                          const selection = event.target.value
+                          if (selection === 'EVIDENCE_ONLY') {
+                            void persistPhotoContext(image.id, { analysisMode: 'EVIDENCE_ONLY' }, 'inspector')
+                          } else if (selection) {
+                            void persistPhotoContext(image.id, { jointType: selection as JointGeometryType }, 'inspector')
+                          }
+                        }}
+                        style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+                      >
+                        <option value="">Select / await AI suggestion</option>
+                        <option value="CIRCULAR_OPENING">Circular joint / opening</option>
+                        <option value="HORIZONTAL_SEAM">Horizontal seam</option>
+                        <option value="VERTICAL_SEAM">Vertical seam</option>
+                        <option value="EVIDENCE_ONLY">Other defect, lateral, or uncertain — review only</option>
+                      </select>
+                      <p style={{ fontSize: '0.72rem', marginTop: '0.3rem' }}>
+                        {image.contextSuggestionStatus === 'pending' ? 'Gemini is analyzing this photo…' :
+                          image.contextSuggestionStatus === 'ready' ? `AI suggestion: ${image.contextSuggestionModel ?? 'visual model'} — review before trusting.` :
+                            image.contextSuggestionMessage ?? 'Select a supported gap geometry or keep evidence for manual review.'}
+                      </p>
+                      {image.suggestedInspectionContext && (
+                        <p style={{ fontSize: '0.74rem', marginTop: '0.35rem' }}>
+                          AI observation: {image.suggestedInspectionContext}
+                        </p>
+                      )}
+                      {image.possibleGapVisible === true && <p style={{ fontSize: '0.72rem' }}>Potential gap visible; not a confirmed defect.</p>}
+                      {(image.suggestedJointType || image.suggestedInspectionContext) && image.queueStatus !== 'completed' && (
+                        <button type="button" className="button button-ghost" style={{ marginTop: '0.4rem' }}
+                          onClick={() => void persistPhotoContext(image.id, {
+                            ...(image.suggestedJointType ? { jointType: image.suggestedJointType } : {}),
+                            ...(image.suggestedInspectionContext ? { operatorContext: image.suggestedInspectionContext } : {}),
+                          }, 'inspector')}>
+                          Apply this photo's suggestions
+                        </button>
+                      )}
+                      <label htmlFor={`camera-${image.id}`} style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginTop: '0.6rem' }}>
+                        Capture camera / rig ID
+                      </label>
+                      <input id={`camera-${image.id}`} type="text" maxLength={160}
+                        value={cameraDrafts[image.id] ?? image.cameraId ?? ''}
+                        disabled={image.queueStatus === 'completed' || image.queueStatus === 'processing'}
+                        onChange={(event) => setCameraDrafts((old) => ({ ...old, [image.id]: event.target.value }))}
+                        onBlur={() => {
+                          if (cameraDrafts[image.id] !== undefined) {
+                            void persistPhotoContext(image.id, { cameraId: cameraDrafts[image.id] }, 'inspector')
+                            setCameraDrafts((old) => { const next = { ...old }; delete next[image.id]; return next })
+                          }
+                        }}
+                        placeholder="Actual camera ID (not AI inferred)"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '0.5rem', marginTop: '0.25rem' }} />
+                      {savedProfile?.camera_id && image.queueStatus !== 'completed' && (
+                        <button type="button" className="button button-ghost" style={{ marginTop: '0.3rem' }}
+                          onClick={() => {
+                            setCameraDrafts((old) => { const next = { ...old }; delete next[image.id]; return next })
+                            void persistPhotoContext(image.id, { cameraId: savedProfile.camera_id ?? '' }, 'inspector')
+                          }}>
+                          Confirm saved rig for this photo
+                        </button>
+                      )}
+                      <label htmlFor={`diameter-${image.id}`} style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginTop: '0.6rem' }}>
+                        Nominal diameter for this photo (mm)
+                      </label>
+                      <input id={`diameter-${image.id}`} type="number" min="1" max="5000"
+                        value={diameterDrafts[image.id] ?? image.pipeDiameterMm ?? manholePipeDiameterMm ?? ''}
+                        disabled={image.queueStatus === 'completed' || image.queueStatus === 'processing'}
+                        onChange={(event) => setDiameterDrafts((old) => ({ ...old, [image.id]: event.target.value }))}
+                        onBlur={() => {
+                          if (diameterDrafts[image.id] !== undefined) {
+                            const diameter = diameterDrafts[image.id].trim() ? Number(diameterDrafts[image.id]) : null
+                            void persistPhotoContext(image.id, { pipeDiameterMm: diameter }, 'inspector')
+                            setDiameterDrafts((old) => { const next = { ...old }; delete next[image.id]; return next })
+                          }
+                        }}
+                        placeholder="From manhole metadata or verified pipe specification"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '0.5rem', marginTop: '0.25rem' }} />
+                      <p style={{ fontSize: '0.7rem', opacity: 0.8 }}>
+                        Camera and diameter are never inferred by Gemini. Missing or mismatched reference means pixel-only geometry.
+                      </p>
+                      <label htmlFor={`notes-${image.id}`} style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginTop: '0.6rem' }}>
+                        Inspection note
+                      </label>
+                      <textarea
+                        id={`notes-${image.id}`}
+                        className="operator-context-textarea"
+                        rows={2}
+                        maxLength={1000}
+                        disabled={image.queueStatus === 'completed' || image.queueStatus === 'processing'}
+                        value={notesDrafts[image.id] ?? image.operatorContext ?? ''}
+                        onChange={(event) => setNotesDrafts((old) => ({ ...old, [image.id]: event.target.value }))}
+                        onBlur={() => {
+                          if (notesDrafts[image.id] !== undefined) saveNote(image.id, notesDrafts[image.id])
+                        }}
+                        placeholder="Optional visible observations or inspector findings; never calibration authority."
+                        style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', marginTop: '0.25rem' }}
+                      />
+                      <p style={{ fontSize: '0.7rem', opacity: 0.78 }}>
+                        {image.analysisMode === 'EVIDENCE_ONLY' ? 'Review only — no fabricated mm or PASS.' :
+                          image.geometrySelectionProvenance === 'INSPECTOR_SELECTED' ? 'Geometry confirmed/edited by inspector.' :
+                            image.geometrySelectionProvenance === 'EVIDENCE_SUGGESTED' ? 'AI-suggested geometry — remains provisional.' :
+                              'Geometry not confirmed; select a mode before processing.'}
+                      </p>
+                    </div>
                   </div>
                 </article>
               ))
@@ -663,14 +769,14 @@ export const PhotoUploadPage = ({
               Showing {queue.length} of {queue.length} assets for current inspection run.
             </span>
             <div className="action-row">
-              <button className="button button-ghost" type="button" onClick={() => { advisoryControllerRef.current?.abort(); setAdvisory(null); setAdvisoryError(''); void onClearQueue() }} disabled={!queue.length || busy}>
+              <button className="button button-ghost" type="button" onClick={() => { for (const controller of suggestionControllers.current.values()) controller.abort(); suggestionControllers.current.clear(); void onClearQueue() }} disabled={!queue.length || busy}>
                 Clear all
               </button>
               <button
                 className="button button-primary"
                 type="button"
                 onClick={() => void handleStart()}
-                disabled={!queue.length || busy}
+                disabled={!queue.length || busy || needsImageSelection}
               >
                 {busy ? 'Processing Queue...' : 'Start Inspection'}
               </button>
