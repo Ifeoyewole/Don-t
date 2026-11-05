@@ -91,6 +91,8 @@ export const PhotoUploadPage = ({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notesDrafts, setNotesDrafts] = useState<Record<string, string>>({})
+  const [cameraDrafts, setCameraDrafts] = useState<Record<string, string>>({})
+  const [diameterDrafts, setDiameterDrafts] = useState<Record<string, string>>({})
   const suggestionControllers = useRef(new Map<string, AbortController>())
   const pendingWrites = useRef(new Set<Promise<void>>())
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -126,6 +128,8 @@ export const PhotoUploadPage = ({
       for (const controller of suggestionControllers.current.values()) controller.abort()
       suggestionControllers.current.clear()
       setNotesDrafts({})
+      setCameraDrafts({})
+      setDiameterDrafts({})
     })
   }, [projectId, manholeId, manholePipeDiameterMm])
 
@@ -298,6 +302,13 @@ export const PhotoUploadPage = ({
     try {
       for (const [imageId, note] of Object.entries(notesDrafts)) {
         await persistPhotoContext(imageId, { operatorContext: note }, 'inspector')
+      }
+      for (const [imageId, cameraId] of Object.entries(cameraDrafts)) {
+        await persistPhotoContext(imageId, { cameraId }, 'inspector')
+      }
+      for (const [imageId, value] of Object.entries(diameterDrafts)) {
+        const diameter = value.trim() ? Number(value) : null
+        await persistPhotoContext(imageId, { pipeDiameterMm: diameter }, 'inspector')
       }
       await Promise.all([...pendingWrites.current])
       const readyToMeasure = queue.filter((image) => image.queueStatus === 'queued' || image.queueStatus === 'failed')
