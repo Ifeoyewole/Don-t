@@ -102,10 +102,14 @@ export const inspectionQueue = {
           update.cameraId = patch.cameraId.slice(0, 160).trim()
         }
         if (patch.pipeDiameterMm !== undefined) {
-          if (!Number.isFinite(patch.pipeDiameterMm) || patch.pipeDiameterMm <= 0 || patch.pipeDiameterMm > 5000) {
-            throw new Error('Photo diameter must be a finite value between 1 and 5000 mm.')
+          if (patch.pipeDiameterMm === null) {
+            update.pipeDiameterMm = null
+          } else {
+            if (!Number.isFinite(patch.pipeDiameterMm) || patch.pipeDiameterMm <= 0 || patch.pipeDiameterMm > 5000) {
+              throw new Error('Photo diameter must be a finite value between 1 and 5000 mm.')
+            }
+            update.pipeDiameterMm = patch.pipeDiameterMm
           }
-          update.pipeDiameterMm = patch.pipeDiameterMm
         }
       } else {
         if (patch.contextSuggestionStatus) update.contextSuggestionStatus = patch.contextSuggestionStatus
