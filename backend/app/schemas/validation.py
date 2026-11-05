@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from backend.app.schemas.domain import DomainStatus, ExposureStatus, JointType
+from backend.app.schemas.domain import CalibrationSource, DomainStatus, ExposureStatus, JointType
 
 
 class PhotoQualityResult(BaseModel):
@@ -42,12 +42,23 @@ class PhotoQualityResult(BaseModel):
     )
 
 
+class AdvisoryCalibrationMetadata(BaseModel):
+    """Unverified, editable diameter and source copied from submitted metadata, never from AI."""
+
+    pipe_diameter_mm: Optional[float] = Field(default=None, gt=0.0, le=5000.0)
+    source: Optional[CalibrationSource] = None
+    verified: bool = False
+    calibration_reference_id: Optional[str] = None
+
+
 class InspectionContextSuggestions(BaseModel):
     """Untrusted, editable image-derived hints; never calibration or defect authority."""
 
     model: str = Field(..., description="Actual image-assessment model used by the semantic gate.")
     domain_status: DomainStatus
     processing_allowed: bool
+    review_required: bool = True
+    calibration: AdvisoryCalibrationMetadata = Field(default_factory=AdvisoryCalibrationMetadata)
     source: str = Field(default="IMAGE_ADVISORY", description="No private inspection history or customer data is used.")
     suggested_joint_type: Optional[JointType] = None
     suggested_inspection_context: Optional[str] = Field(default=None, max_length=400)
