@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
 import { requestInspectionContextSuggestions } from '../lib/contextSuggestions'
+import { checkCalibrationReference, type CalibrationReferenceStatus } from '../lib/calibrationReference'
 import type { CalibrationProfile, GeometrySelectionProvenance, InspectionImage, JointGeometryType, ProcessBatchResult } from '../types/domain'
 
 type Props = {
@@ -104,6 +105,8 @@ export const PhotoUploadPage = ({
   const [savedProfile, setSavedProfile] = useState<CalibrationProfile | null>(() => getInitialCalibration(projectId, manholeId).profile)
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('')
   const [saveErrorMsg, setSaveErrorMsg] = useState<string>('')
+  const [referenceStatus, setReferenceStatus] = useState<CalibrationReferenceStatus | null>(null)
+  const [referenceChecking, setReferenceChecking] = useState(false)
 
   useEffect(() => {
     const init = getInitialCalibration(projectId, manholeId)
@@ -117,6 +120,7 @@ export const PhotoUploadPage = ({
       setCalNotes(diameterConflict ? '' : init.notes)
       setCalCameraId(diameterConflict ? '' : init.profile?.camera_id ?? '')
       setSavedProfile(diameterConflict ? null : init.profile ? { ...init.profile, verified: false, verified_at: null, verifiedAt: null } : null)
+      setReferenceStatus(null)
       for (const controller of suggestionControllers.current.values()) controller.abort()
       suggestionControllers.current.clear()
       setNotesDrafts({})
@@ -125,7 +129,7 @@ export const PhotoUploadPage = ({
 
   useEffect(() => () => { for (const controller of suggestionControllers.current.values()) controller.abort() }, [])
 
-  const handleSaveCalibration = () => {
+  const handleSaveCalibration = async () => {
     setSaveErrorMsg('')
     setSaveSuccessMsg('')
 
@@ -155,7 +159,20 @@ export const PhotoUploadPage = ({
     try {
       localStorage.setItem(`jointinspect_cal_${projectId}_${manholeId}`, JSON.stringify(profile))
       setSavedProfile(profile)
-      setSaveSuccessMsg('Calibration reference saved. The server must verify it before authoritative millimetres are available.')
+      setReferenceStatus(null)
+      setSaveSuccessMsg('Local reference saved for this manhole. Checking server authority…')
+      setReferenceChecking(true)
+      try {
+        const result = await checkCalibrationReference(profile)
+        setReferenceStatus(result)
+        setSaveSuccessMsg(result.reference_verified
+          ? 'Server reference matched. This does NOT guarantee scale for every photo.'
+          : 'Reference not verified by server. Pixel-space evidence remains available.')
+      } catch (err) {
+        setSaveErrorMsg(err instanceof Error ? err.message : 'Could not verify calibration reference.')
+      } finally {
+        setReferenceChecking(false)
+      }
       setTimeout(() => {
         setSaveSuccessMsg('')
         setSaveErrorMsg('')
@@ -354,7 +371,7 @@ export const PhotoUploadPage = ({
             <div className="network-head">
               <strong>Calibration</strong>
               <span className="status-pill is-review">
-                {savedProfile ? 'REFERENCE SAVED' : 'CALIBRATION REQUIRED'}
+                {referenceStatus?.reference_verified ? 'REFERENCE MATCHED' : savedProfile ? 'UNVERIFIED REFERENCE' : 'CALIBRATION REQUIRED'}
               </span>
             </div>
 
@@ -490,7 +507,7 @@ export const PhotoUploadPage = ({
                 type="button"
                 className="button button-secondary"
                 style={{ marginTop: '0.35rem', width: '100%' }}
-                onClick={handleSaveCalibration}
+                onClick={() => void handleSaveCalibration()}
               >
                 Save Calibration Profile
               </button>
@@ -509,7 +526,7 @@ export const PhotoUploadPage = ({
               {manholePipeDiameterMm && !getInitialCalibration(projectId, manholeId).pipeDiameter
                 ? `Diameter prefilled from manhole specifications (${manholePipeDiameterMm} mm), NOT inferred by AI. `
                 : ''}
-              Save the calibration reference once for this project. The backend verifies trusted references before issuing authoritative millimetres.
+              Save a reference for this manhole, not the whole project. A diameter is nominal metadata; real millimetres require matching server-owned calibration, suitable camera geometry and reliable image edges.
             </p>
           </section>
 
