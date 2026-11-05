@@ -25,6 +25,7 @@ export interface CvWorkerRequest {
   calibrationSource?: string
   calibrationVerified?: boolean
   calibrationReferenceId?: string
+  cameraId?: string
   projectId?: string
   jointType?: JointGeometryType
 }
