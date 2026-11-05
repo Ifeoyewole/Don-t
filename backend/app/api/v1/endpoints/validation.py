@@ -1,13 +1,14 @@
 """Photo quality validation endpoint."""
 
 import asyncio
+from typing import Optional
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
 from backend.app.core.cv.preprocessor import validate_photo_quality
 from backend.app.core.cv.ai.vertex_semantic_gate import get_vertex_semantic_gate
-from backend.app.schemas.validation import PhotoQualityResult, InspectionContextSuggestions
+from backend.app.schemas.validation import AdvisoryCalibrationMetadata, PhotoQualityResult, InspectionContextSuggestions
 from backend.app.utils.image_io import decode_image_bytes
-from backend.app.schemas.domain import DomainStatus
+from backend.app.schemas.domain import CalibrationSource, DomainStatus
 
 router = APIRouter()
 
@@ -86,17 +87,20 @@ async def validate_photo(
 )
 async def suggest_inspection_context(
     file: UploadFile = File(..., description="Inspection image (JPEG/PNG/WebP)."),
+    metadata_pipe_diameter_mm: Optional[float] = Form(default=None, gt=0.0, le=5000.0),
+    metadata_source: Optional[CalibrationSource] = Form(default=None),
 ) -> InspectionContextSuggestions:
     """Reuse the production Gemini semantic gate without assuming calibration.
 
     The image itself is the only contextual input; no prior user photos, customer
-    histories, or fabricated dimensions are supplied to Gemini. Missing or
-    rejected semantic validation yields empty suggestions, not a PASS.
+    histories, or fabricated dimensions are supplied to Gemini. Supplied
+    manhole metadata is copied only as unverified form hints and is NEVER fed
+    into the image model. Rejected semantic validation yields empty suggestions.
     """
     try:
         if file.content_type not in ("image/jpeg", "image/png", "image/webp"):
             raise HTTPException(
-                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Only JPEG, PNG, and WEBP inspection photos are accepted.",
             )
         content = await file.read(15 * 1024 * 1024 + 1)
@@ -118,6 +122,12 @@ async def suggest_inspection_context(
             and semantic.domain_status == DomainStatus.PIPE_JOINT_INSPECTION
         )
         return InspectionContextSuggestions(
+            calibration=AdvisoryCalibrationMetadata(
+                pipe_diameter_mm=metadata_pipe_diameter_mm,
+                source=metadata_source,
+                verified=False,
+                calibration_reference_id=None,
+            ),
             model=semantic.model,
             domain_status=semantic.domain_status,
             processing_allowed=allowed,
