@@ -198,14 +198,14 @@ def measure_seam_gap(
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 7))
         filtered_grad = cv2.morphologyEx(np.abs(grad), cv2.MORPH_CLOSE, kernel)
 
-        scan_coords = np.linspace(max(y0, int(h * 0.10)), min(y1 - 1, int(h * 0.90)), num_scanlines, dtype=int)
+        scan_coords = np.linspace(y0, y1 - 1, num_scanlines, dtype=int) if roi_bbox is not None else np.linspace(int(h * 0.10), int(h * 0.90), num_scanlines, dtype=int)
     else:
         # Horizontal seam -> Gradients along Y axis
         grad = cv2.Sobel(enhanced, cv2.CV_32F, 0, 1, ksize=3)
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 1))
         filtered_grad = cv2.morphologyEx(np.abs(grad), cv2.MORPH_CLOSE, kernel)
 
-        scan_coords = np.linspace(max(x0, int(w * 0.10)), min(x1 - 1, int(w * 0.90)), num_scanlines, dtype=int)
+        scan_coords = np.linspace(x0, x1 - 1, num_scanlines, dtype=int) if roi_bbox is not None else np.linspace(int(w * 0.10), int(w * 0.90), num_scanlines, dtype=int)
 
     # Step 3: Scanline Profiling and Edge Peak Extraction
     left_points: List[Point2D] = []
