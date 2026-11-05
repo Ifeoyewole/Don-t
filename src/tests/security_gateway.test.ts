@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isMaliciousPath, sanitizeForwardHeaders, validateMagicBytes } from '../../api/_lib/gateway-guard'
+import { isMaliciousPath, resolveGatewayRoute, sanitizeForwardHeaders, validateMagicBytes } from '../../api/_lib/gateway-guard'
 import { checkRateLimit } from '../../api/_lib/rate-limiter'
 import { DisabledUserAuthProvider, PluggableUserAuthProvider } from '../../api/_lib/auth-abstraction'
 
@@ -12,6 +12,15 @@ describe('Vercel Secure API Gateway Security Controls', () => {
     expect(isMaliciousPath('/server-status')).toBe(true)
     expect(isMaliciousPath('/api/v1/cv/health')).toBe(false)
     expect(isMaliciousPath('/api/v1/cv/measure')).toBe(false)
+  })
+
+  it('allows only POST advisory suggestions at the secure CV gateway', () => {
+    const allowed = resolveGatewayRoute('/api/v1/cv/context-suggestions', 'POST')
+    expect(allowed.allowed).toBe(true)
+    expect(allowed.targetPath).toBe('api/v1/cv/context-suggestions')
+    expect(allowed.routeCategory).toBe('validation')
+    expect(resolveGatewayRoute('/api/v1/cv/context-suggestions', 'GET').status).toBe(405)
+    expect(resolveGatewayRoute('/api/v1/cv/unknown', 'POST').status).toBe(404)
   })
 
   it('strips client-supplied internal and authorization headers', () => {
