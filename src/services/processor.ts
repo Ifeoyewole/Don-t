@@ -334,7 +334,8 @@ export const processor = {
 
     emit({ type: 'started', imageId: image.id, inspectionId })
     if (image.analysisMode === 'EVIDENCE_ONLY') {
-      return existing  // Never turn an evidence-only inspection into a default circular measurement.
+      emit({ type: 'completed', imageId: image.id, inspectionId })
+      return existing  // No automatic circular measurement of review-only evidence.
     }
     let reprocessOptions: ProcessOptions = {
       projectId: image.projectId,
