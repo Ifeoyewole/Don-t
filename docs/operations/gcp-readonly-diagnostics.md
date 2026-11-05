@@ -10,7 +10,7 @@ secrets, execute Gemini inference, or change IAM or billing.
 Create a *separate GitHub Actions* Workload Identity Federation OIDC provider.
 The existing Vercel OIDC provider is **not** a GitHub provider. Restrict the
 Google provider with an attribute condition requiring
-`assertion.repository == "Ifeoyewole/Don-t"` and, preferably, main branch.
+`assertion.repository == "Ifeoyewole/Don-t" && assertion.ref == "refs/heads/main"`. This main-branch restriction is required; do not trust other branches or pull requests.
 Bind the provider principal for this repository ONLY to a dedicated service
 account with `roles/iam.workloadIdentityUser` (on that SA).
 
