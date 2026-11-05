@@ -595,6 +595,7 @@ function App() {
           projectId={uploadProjectId}
           projectName={currentProject?.name ?? 'Untitled project'}
           manholeLabel={currentManhole?.manholeId ?? 'Unassigned manhole'}
+          manholePipeDiameterMm={currentManhole?.pipeDiameterMm}
           queue={currentQueue}
           events={events}
           onBack={() => {
