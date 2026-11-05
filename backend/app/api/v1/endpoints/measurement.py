@@ -287,13 +287,26 @@ async def measure_joint_gap(
                 warning_margin_mm=warning_margin_mm if warning_margin_mm is not None else 2.0,
             )
 
+        # Resolve calibration authority BEFORE running any geometry conversion.
+        # A nominal diameter entered in a UI is not a pixel-to-mm reference.
+        verified_calibration = get_verified_calibration(
+            reference_id=calibration_reference_id,
+            project_id=project_id,
+            source=calibration_source,
+            pipe_diameter_mm=pipe_diameter_mm,
+            camera_id=camera_id,
+            joint_type=joint_type.value,
+        )
+        is_calibrated = verified_calibration is not None
+        verified_diameter_mm = pipe_diameter_mm if is_calibrated else None
+
         # Step 5: Mask-Constrained OpenCV Geometry Engine (Zero Guessing with Evidence Tiers)
         try:
             if joint_type == JointType.CIRCULAR_OPENING:
                 rays = num_samples if num_samples is not None else 72
                 response = measure_circular_gap(
                     image_bgr=rectified_bgr,
-                    pipe_diameter_mm=pipe_diameter_mm,
+                    pipe_diameter_mm=verified_diameter_mm,
                     tolerance_spec=tolerance_spec,
                     num_rays=rays,
                     return_debug_image=return_debug_image,
@@ -305,7 +318,7 @@ async def measure_joint_gap(
                 response = measure_seam_gap(
                     image_bgr=rectified_bgr,
                     joint_type=joint_type,
-                    pipe_diameter_mm=pipe_diameter_mm,
+                    pipe_diameter_mm=verified_diameter_mm,
                     tolerance_spec=tolerance_spec,
                     num_scanlines=scanlines,
                     return_debug_image=return_debug_image,
@@ -353,17 +366,7 @@ async def measure_joint_gap(
         # Step 6: Calibration Authority Validation
         # calibration_verified is kept only as legacy/audit input. The client
         # cannot grant engineering authority to itself.
-        verified_calibration = get_verified_calibration(
-            reference_id=calibration_reference_id,
-            project_id=project_id,
-            source=calibration_source,
-            pipe_diameter_mm=pipe_diameter_mm,
-            camera_id=camera_id,
-            joint_type=joint_type.value,
-        )
-        is_calibrated = verified_calibration is not None
-
-
+        # The authority result was resolved before geometry detection.
         if cal_profile is not None and is_calibrated:
             cal_profile.verified = True
             cal_profile.verified_at = datetime.now(timezone.utc).isoformat()
@@ -371,8 +374,9 @@ async def measure_joint_gap(
         if not is_calibrated:
             # When uncalibrated: physical_measurement_available = False, authoritative_gap_mm = None.
             # Physical mm values MUST NOT be emitted.
-            if response.mean_gap_mm is not None:
-                response.candidate_gap_mm = response.mean_gap_mm
+            # Avoid exposing a provisional mm conversion from nominal diameter:
+            # keep only pixel-space evidence when no server scale exists.
+            response.candidate_gap_mm = None
             response.mean_gap_mm = None
             response.min_gap_mm = None
             response.max_gap_mm = None

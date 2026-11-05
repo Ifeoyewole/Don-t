@@ -285,12 +285,12 @@ export const AppShell = ({
             type="button"
             className={`status-pill ${isModelReady ? 'is-model-ready' : 'is-model-loading'} status-pill-clickable`}
             onClick={() => setActiveModal('models')}
-            title="Authoritative cloud classifier readiness. Click for model details."
+            title="Primary defect classifier load status (not Gemini reachability or field accuracy). Click for details."
           >
             <span className="status-dot-ready" aria-hidden="true">
               <CheckIcon />
             </span>
-            <span className="status-pill-text">{isModelReady ? 'Primary Model Ready' : 'Cloud Model Unavailable'}</span>
+            <span className="status-pill-text">{isModelReady ? 'Defect Classifier Ready' : 'Defect Classifier Unavailable'}</span>
           </button>
 
           {/* Dynamic Inspector Session Profile */}
@@ -577,7 +577,7 @@ export const AppShell = ({
                 </div>
                 <div className="spec-card">
                   <span className="spec-label">Primary Classifier</span>
-                  <strong>{isModelReady ? 'WRc InceptionResNetV2' : 'Not ready'}</strong>
+                  <strong>{isModelReady ? 'Primary defect classifier loaded' : 'Not loaded / not verifiable'}</strong>
                   <span className="spec-note">Runtime health determines whether the production model is loaded</span>
                 </div>
                 <div className="spec-card">

@@ -1,0 +1,62 @@
+name: GCP Read-only Diagnostics
+
+# Manual invocation only: this workflow never deploys or changes GCP resources.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write  # short-lived Google Workload Identity Federation; no JSON keys
+
+concurrency:
+  group: gcp-readonly-diagnostics
+  cancel-in-progress: false
+
+jobs:
+  inspect-cloud-run:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GCP_DIAGNOSTICS_PROJECT_ID: ${{ vars.GCP_DIAGNOSTICS_PROJECT_ID }}
+      GCP_DIAGNOSTICS_REGION: ${{ vars.GCP_DIAGNOSTICS_REGION }}
+      GCP_DIAGNOSTICS_SERVICE: ${{ vars.GCP_DIAGNOSTICS_SERVICE }}
+    steps:
+      - name: Validate read-only identity configuration
+        env:
+          WIF_PROVIDER: ${{ vars.GCP_DIAGNOSTICS_WIF_PROVIDER }}
+          READER_SERVICE_ACCOUNT: ${{ vars.GCP_DIAGNOSTICS_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          for name in WIF_PROVIDER READER_SERVICE_ACCOUNT GCP_DIAGNOSTICS_PROJECT_ID GCP_DIAGNOSTICS_REGION GCP_DIAGNOSTICS_SERVICE; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing repository Actions variable $name. See docs/operations/gcp-readonly-diagnostics.md"
+              exit 1
+            fi
+          done
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Authenticate using GitHub OIDC (read-only service account)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_DIAGNOSTICS_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DIAGNOSTICS_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_DIAGNOSTICS_PROJECT_ID }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Install Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ vars.GCP_DIAGNOSTICS_PROJECT_ID }}
+
+      - name: Inspect Cloud Run and sanitized recent error counts
+        run: |
+          python3 scripts/ops/gcp_readonly_diagnostics.py \
+            --project "$GCP_DIAGNOSTICS_PROJECT_ID" \
+            --region "$GCP_DIAGNOSTICS_REGION" \
+            --service "$GCP_DIAGNOSTICS_SERVICE" \
+            --summary "$GITHUB_STEP_SUMMARY"
