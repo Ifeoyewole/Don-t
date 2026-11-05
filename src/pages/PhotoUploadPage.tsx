@@ -530,7 +530,7 @@ export const PhotoUploadPage = ({
             </p>
             <p>{aiReviewCount ? `${aiReviewCount} photo(s) will use enhanced CV and AI review before a retake decision.` : 'All queued photos are eligible for measurement.'}</p>
             <div className="action-row">
-              <button className="button button-ghost" type="button" onClick={() => { for (const controller of suggestionControllers.current.values()) controller.abort(); suggestionControllers.current.clear(); void onClearQueue() }} disabled={!queue.length || busy || needsImageSelection}>
+              <button className="button button-ghost" type="button" onClick={() => { for (const controller of suggestionControllers.current.values()) controller.abort(); suggestionControllers.current.clear(); void onClearQueue() }} disabled={!queue.length || busy}>
                 Clear All
               </button>
             </div>
@@ -678,7 +678,7 @@ export const PhotoUploadPage = ({
               Showing {queue.length} of {queue.length} assets for current inspection run.
             </span>
             <div className="action-row">
-              <button className="button button-ghost" type="button" onClick={() => { for (const controller of suggestionControllers.current.values()) controller.abort(); suggestionControllers.current.clear(); void onClearQueue() }} disabled={!queue.length || busy || needsImageSelection}>
+              <button className="button button-ghost" type="button" onClick={() => { for (const controller of suggestionControllers.current.values()) controller.abort(); suggestionControllers.current.clear(); void onClearQueue() }} disabled={!queue.length || busy}>
                 Clear all
               </button>
               <button
