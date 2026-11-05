@@ -23,6 +23,7 @@ class VerifiedCalibration:
     source: CalibrationSource
     pipe_diameter_mm: float
     camera_id: Optional[str] = None
+    validated_joint_types: tuple[str, ...] = ('CIRCULAR_OPENING',)
 
 
 def _close(a: float, b: float) -> bool:
@@ -50,6 +51,10 @@ def _records() -> tuple[VerifiedCalibration, ...]:
                     source=CalibrationSource(str(item["source"])),
                     pipe_diameter_mm=float(item["pipe_diameter_mm"]),
                     camera_id=(str(item["camera_id"]).strip() if item.get("camera_id") else None),
+                    validated_joint_types=tuple(
+                        x for x in item.get("validated_joint_types", ["CIRCULAR_OPENING"])
+                        if x in {"CIRCULAR_OPENING", "HORIZONTAL_SEAM", "VERTICAL_SEAM"}
+                    ),
                 )
             )
         except (KeyError, TypeError, ValueError):
@@ -68,6 +73,7 @@ def get_verified_calibration(
     source: Optional[CalibrationSource],
     pipe_diameter_mm: Optional[float],
     camera_id: Optional[str],
+    joint_type: Optional[str] = None,
 ) -> Optional[VerifiedCalibration]:
     if (
         not reference_id
@@ -88,7 +94,11 @@ def get_verified_calibration(
         # authorize an omitted, different, or unrecognized project/camera.
         if record.project_id and record.project_id != project_id:
             continue
-        if record.camera_id and record.camera_id != camera_id:
+        # Photo-scale permission is camera/rig-specific; a diameter-only record
+        # is nominal metadata, not sufficient to authorize spatial millimetres.
+        if not record.camera_id or not camera_id or record.camera_id != camera_id:
+            continue
+        if joint_type is not None and joint_type not in record.validated_joint_types:
             continue
         if not _close(record.pipe_diameter_mm, pipe_diameter_mm):
             continue
