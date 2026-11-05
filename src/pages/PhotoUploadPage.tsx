@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
 import { requestInspectionContextSuggestions } from '../lib/contextSuggestions'
-import type { CalibrationProfile, InspectionImage, JointGeometryType, ProcessBatchResult } from '../types/domain'
+import type { CalibrationProfile, GeometrySelectionProvenance, InspectionImage, JointGeometryType, ProcessBatchResult } from '../types/domain'
 
 type Props = {
   online: boolean
