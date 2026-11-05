@@ -9,6 +9,7 @@ import type {
 } from '../types'
 import { CloudMeasurementError, fuseMeasurementWithAi, measureLocalPreview, measureWithCv } from '../lib'
 import { createId, createTimestamp } from '../utils/identity'
+import { hasExplicitPhotoMode, resolveImageContext } from './imageContext'
 
 const listeners = new Set<(event: ProcessingEvent) => void>()
 
@@ -104,16 +105,6 @@ async function runAiAssistedMeasurement(
   }
 }
 
-/** Never pass batch-level geometry/context to an individual photograph. */
-export function resolveImageContext(image: InspectionImage, options?: ProcessOptions): ProcessOptions {
-  return {
-    ...options,
-    jointType: image.jointType,
-    operatorContext: image.operatorContext,
-    geometrySelectionProvenance: image.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
-  }
-}
-
 async function recordEvidenceOnly(image: InspectionImage): Promise<string> {
   const resultId = createId()
   const result: InspectionResult = {
@@ -129,10 +120,9 @@ async function recordEvidenceOnly(image: InspectionImage): Promise<string> {
     measurementSource: 'ai-review',
     measurementNote: 'Evidence-only inspection: no supported measurable joint geometry. Human review required.',
     rejectionReason: 'EVIDENCE_ONLY: No physical measurement or engineering acceptance generated.',
-    aiExplanation: image.suggestedInspectionContext ?? image.operatorContext ?? 'Image reserved for inspector review.',
+    aiExplanation: image.suggestedInspectionContext ? `Unverified image observation: ${image.suggestedInspectionContext}` : image.operatorContext ?? 'Image reserved for inspector review.',
     engineeringResult: 'REVIEW',
     authoritativeGapMm: null,
-    executionSource: 'CLOUD_PENDING',
     geometrySelectionProvenance: 'INSPECTOR_SELECTED',
     processedAt: createTimestamp(),
     overrideApplied: false,
@@ -162,7 +152,7 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
     emit({ type: 'started', imageId })
     return recordEvidenceOnly(image)
   }
-  if (!image.jointType || image.geometrySelectionProvenance === 'LEGACY_DEFAULT') {
+  if (!hasExplicitPhotoMode(image)) {
     throw new Error('REVIEW_REQUIRED: confirm this photo\'s joint geometry or choose evidence-only review.')
   }
   const photoOptions = resolveImageContext(image, options)
