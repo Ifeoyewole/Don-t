@@ -1,0 +1,6 @@
+{
+  "earlier_v3_training_records": 20000,
+  "validation_records": 2359,
+  "sha_overlap": 0,
+  "scope": "Exact hashes only; no video independence claim"
+}

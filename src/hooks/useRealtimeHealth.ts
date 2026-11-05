@@ -10,7 +10,7 @@ export function useRealtimeHealth(pollIntervalMs = 20000) {
   const [health, setHealth] = useState<RealtimeHealthState>({
     online: typeof window !== 'undefined' ? window.navigator.onLine : true,
     cloudConnected: false,
-    modelReady: true,
+    modelReady: false,
     source: 'local',
     isChecking: true,
   })

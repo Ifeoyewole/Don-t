@@ -1,0 +1,15 @@
+steps:
+- name: gcr.io/google.com/cloudsdktool/google-cloud-cli:slim
+  entrypoint: bash
+  args:
+  - -c
+  - |
+    gcloud storage cat gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-masked-r5-20261104/best.pt > /workspace/preview-model.pt
+    echo '659b56baa3e04c30b611c21de85d7ba00abeadc7e2c40dcf801a475719e74ed7  /workspace/preview-model.pt' | sha256sum -c -
+- name: gcr.io/cloud-builders/docker
+  args: [build, -f, scripts/external_datasets/preview-web.Dockerfile, -t, 'europe-west2-docker.pkg.dev/$PROJECT_ID/joint-inspection-training/preview-web:$BUILD_ID', .]
+images: ['europe-west2-docker.pkg.dev/$PROJECT_ID/joint-inspection-training/preview-web:$BUILD_ID']
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+timeout: 1800s

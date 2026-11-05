@@ -1,0 +1,45 @@
+{
+  "release_id": "inspect-view-engineering-preview-v1",
+  "status": "DEPLOYED_ENGINEERING_RESEARCH",
+  "purpose": "Internal engineering evaluation and correction collection",
+  "candidate": {
+    "architecture": "convnext_tiny",
+    "artifact": "gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-masked-r5-20261104/best.pt",
+    "sha256": "659b56baa3e04c30b611c21de85d7ba00abeadc7e2c40dcf801a475719e74ed7"
+  },
+  "unsupported_classes": [
+    "OPEN_JOINT",
+    "INFILTRATION",
+    "PROTRUDING_LATERAL"
+  ],
+  "limited_evidence_classes": [
+    "JOINT_MISALIGNMENT",
+    "RUPTURE"
+  ],
+  "production_approved": false,
+  "locked_test_evaluated": false,
+  "fusion_policy": "Use fusion only if it exceeds the strongest standalone on identical held-out images in both macro-F1 and macro-F2; otherwise retain standalone.",
+  "measurement_failure": "joint_geometry_not_reliable",
+  "rights_scope": "Research evaluation; Sewer-ML-derived weights require appropriate rights before commercial release.",
+  "release_gates": [
+    "Audit inherited checkpoint exposure against new evaluation families",
+    "Validate source label semantics, including deposits versus surface damage and obstacles versus geometry uncertainty",
+    "Verify artifact checksum and runtime preprocessing",
+    "Compare candidates on identical held-out records",
+    "Measure latency, memory, calibration and unreadable-image failures",
+    "Verify unsupported outputs cannot yield NORMAL or engineering PASS",
+    "Publish engineer-facing model card and correction schema"
+  ],
+  "next_action": "Collect engineer-reviewed field examples; request missing defect datasets using ENGINEER_BRIEFING.md; retain unsupported-class gates and evaluate locked independent data before accepting fusion.",
+  "deferred_sources": [
+    "AI-Hub dataset 139: download approval unavailable; proceed with existing sources"
+  ],
+  "runtime": {
+    "endpoint": "/api/v1/cv/measure",
+    "primary_classifier": "inspect_view",
+    "revision": "pipe-joint-api-00013-wel",
+    "rollback_revision": "pipe-joint-api-00011-kod",
+    "semantic_model": "gemini-3.1-pro-preview",
+    "semantic_location": "global"
+  }
+}

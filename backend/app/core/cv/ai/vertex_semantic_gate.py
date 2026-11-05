@@ -285,6 +285,7 @@ Return ONLY a valid JSON object matching this structure:
             "generationConfig": {
                 "responseMimeType": "application/json",
                 "temperature": 0.1,
+                "maxOutputTokens": 4096,
             },
         }
 

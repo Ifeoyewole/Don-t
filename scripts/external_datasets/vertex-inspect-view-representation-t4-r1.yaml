@@ -1,0 +1,28 @@
+workerPoolSpecs:
+- machineSpec:
+    machineType: n1-standard-4
+    acceleratorType: NVIDIA_TESLA_T4
+    acceleratorCount: 1
+  replicaCount: 1
+  diskSpec:
+    bootDiskType: pd-standard
+    bootDiskSizeGb: 100
+  containerSpec:
+    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/inspect-view-representation@sha256:83c6908e7e3215a85b4e27edb52723739c574457fbd1b9076eae13ba8afc6599
+    args:
+    - --project=joint-inspection-510310
+    - --manifest=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/inspect-view-manifests/representation.jsonl
+    - --labels=training/data_sources/canonical_labels.json
+    - --output-prefix=gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-v1.0.0-t4-r1-20261102
+    - --config-id=repr-v1.0.0-t4-r1-20261102
+    - --architecture=efficientnet_b0
+    - --epochs=2
+    - --batch-size=32
+    - --learning-rate=0.0001
+    - --max-train=1000
+    - --max-val=200
+    - --pretrained
+scheduling:
+  strategy: SPOT
+  timeout: 3600s
+  restartJobOnWorkerRestart: false

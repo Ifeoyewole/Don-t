@@ -204,7 +204,7 @@ export async function checkBackendHealth(): Promise<BackendHealthResult> {
     return {
       online: true,
       cloudConnected: true,
-      modelReady: Boolean(primaryModel?.enabled && primaryModel?.loaded),
+      modelReady: Boolean(data.primary_classifier?.loaded === true || (data.primary_classifier == null && primaryModel?.enabled && primaryModel?.loaded)),
       latencyMs,
       version: data.version || '1.0.0',
       opencvVersion: data.opencv_version,

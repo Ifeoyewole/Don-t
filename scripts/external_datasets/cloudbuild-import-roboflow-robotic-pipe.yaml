@@ -1,0 +1,47 @@
+steps:
+- name: python:3.12-slim
+  id: download-and-inventory
+  entrypoint: bash
+  args:
+  - -c
+  - |
+    set -eu
+    python -m pip install --no-cache-dir --target=/workspace/import-deps \
+      google-cloud-secret-manager==2.25.0 google-cloud-storage==3.4.1 \
+      pillow==12.0.0 pyyaml==6.0.3 requests==2.32.5
+    PYTHONPATH=/workspace/import-deps:/workspace python scripts/external_datasets/import_roboflow.py \
+      --gcp-project="$PROJECT_ID" \
+      --workspace=hatim-husaini \
+      --roboflow-project=pipe-defect-detection \
+      --dataset-name='Robotic Pipe Defect Detection' \
+      --version=7 \
+      --label-map-file=training/data_sources/canonical_labels.json \
+      --mapping-name='Robotic Pipe Defect Detection' \
+      --baseline-manifest=gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v4/20k/manifest.json \
+      --baseline-manifest=gs://joint-inspection-510310-data/datasets/quarantine/sruibo-sewer-pipe-defects/7fafcbe676aad60f38d8fe39cde93cf599f8362e/dataset_registry.json \
+      --output-root=/workspace/roboflow-robotic-pipe \
+      --manifest-output=/workspace/roboflow-robotic-pipe-registry.json
+- name: gcr.io/cloud-builders/gcloud
+  id: upload-quarantine-media
+  waitFor: [download-and-inventory]
+  entrypoint: bash
+  args:
+  - -c
+  - |
+    set -eu
+    gcloud storage cp --recursive --no-clobber /workspace/roboflow-robotic-pipe/ \
+      gs://joint-inspection-510310-data/datasets/quarantine/roboflow/hatim-husaini/pipe-defect-detection/v7/
+- name: gcr.io/cloud-builders/gcloud
+  id: publish-registry-last
+  waitFor: [upload-quarantine-media]
+  args:
+  - storage
+  - cp
+  - --no-clobber
+  - /workspace/roboflow-robotic-pipe-registry.json
+  - gs://joint-inspection-510310-data/datasets/quarantine/roboflow/hatim-husaini/pipe-defect-detection/v7/dataset_registry.json
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+  diskSizeGb: 30
+timeout: 3600s

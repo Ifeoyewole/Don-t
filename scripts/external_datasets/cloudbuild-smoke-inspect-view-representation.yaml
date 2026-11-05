@@ -1,0 +1,22 @@
+steps:
+- name: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/v3@sha256:6c52ca265c587baffd26133078916fa297fc5321f7c2d6b2b787ee7a0a7c47fb
+  id: bounded-cpu-training-smoke
+  entrypoint: python
+  args:
+  - training/inspect_view_representation.py
+  - --project=$PROJECT_ID
+  - --manifest=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/inspect-view-manifests/representation.jsonl
+  - --labels=training/data_sources/canonical_labels.json
+  - --output-prefix=gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-v1.0.0-cpu-smoke
+  - --config-id=repr-v1.0.0-cpu-smoke
+  - --architecture=efficientnet_b0
+  - --epochs=1
+  - --batch-size=4
+  - --max-train=24
+  - --max-val=12
+  - --cpu-only
+options:
+  logging: GCS_ONLY
+  machineType: E2_HIGHCPU_8
+  diskSizeGb: 30
+timeout: 1800s

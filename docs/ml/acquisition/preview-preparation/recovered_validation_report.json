@@ -1,0 +1,33 @@
+{
+  "records": 28793,
+  "split_counts": {
+    "train": 26434,
+    "val": 2359
+  },
+  "positive_counts": {
+    "CORROSION": 7021,
+    "OBSTACLE": 292,
+    "JOINT_MISALIGNMENT": 47,
+    "RUPTURE": 32,
+    "DEFORMATION": 339,
+    "JOINT_DISPLACEMENT": 12655,
+    "NORMAL": 6716,
+    "SURFACE_DAMAGE": 5813,
+    "BROKEN_PIPE": 2063,
+    "INFILTRATION": 120
+  },
+  "excluded": {
+    "held_out_test_excluded": 4038,
+    "unresolved_source_label_semantics": 3649,
+    "no_observed_targets": 23568
+  },
+  "training_ready": false,
+  "blockers": [
+    "Validate masked trainer in PyTorch",
+    "Audit inherited evaluation exposure",
+    "Verify negative annotation completeness for external sources"
+  ],
+  "production_approved": false,
+  "locked_test_evaluated": false,
+  "manifest_sha256": "a1e24576d289133d1dbe2f529fc6b220b1b02c8471f77461d9a09959ae96fc46"
+}

@@ -40,6 +40,7 @@ class HealthResponse(BaseModel):
         default=None,
         description="Diagnostics for Vertex AI semantic gatekeeper.",
     )
+    primary_classifier: Optional[ExternalModelHealth] = None
     timestamp: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(),
         description="ISO 8601 UTC timestamp of health check.",
@@ -59,6 +60,16 @@ async def get_health() -> HealthResponse:
         )
     }
 
+    primary = external_models["wrc_inceptionresnetv2"]
+    if settings.PRIMARY_CONDITION_CLASSIFIER == "inspect_view":
+        try:
+            from backend.app.api.v1.endpoints.engineering_preview import load_preview, MODEL_VERSION
+            load_preview()
+            primary = ExternalModelHealth(enabled=True, loaded=True, model_id=MODEL_VERSION)
+        except Exception:
+            primary = ExternalModelHealth(enabled=True, loaded=False, model_id="inspect-view-unavailable")
+        external_models["inspect_view"] = primary
+
     semantic_gate = SemanticGateHealth(
         enabled=settings.VERTEX_SEMANTIC_GATE_ENABLED,
         model=settings.VERTEX_INSPECTION_MODEL,
@@ -70,5 +81,6 @@ async def get_health() -> HealthResponse:
         version="1.0.0",
         opencv_version=cv2.__version__,
         external_models=external_models,
+        primary_classifier=primary,
         semantic_gate=semantic_gate,
     )

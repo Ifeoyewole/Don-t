@@ -1,0 +1,12 @@
+{
+  "sha256": "659b56baa3e04c30b611c21de85d7ba00abeadc7e2c40dcf801a475719e74ed7",
+  "size_bytes": 111383576,
+  "load_seconds": 0.3902143410014105,
+  "cpu_threads": 4,
+  "samples": 18,
+  "latency_median_ms": 108.35938299715053,
+  "latency_max_ms": 126.50060099986149,
+  "peak_process_rss_kib": 611152,
+  "torch": "2.15.0+cpu",
+  "scope": "Local CPU smoke on six repeated validation images; not Cloud Run performance"
+}
