@@ -111,11 +111,15 @@ export const PhotoUploadPage = ({
     // Defer the state reset so the effect synchronizes the selected project
     // without triggering React's synchronous set-state-in-effect rule.
     queueMicrotask(() => {
-      setCalPipeDiameter(init.pipeDiameter !== '' ? init.pipeDiameter : manholePipeDiameterMm ?? '')
-      setCalSource(init.pipeDiameter !== '' ? init.source : manholePipeDiameterMm ? 'MANHOLE_METADATA' : init.source)
-      setCalReferenceId(init.referenceId)
-      setCalNotes(init.notes)
-      setSavedProfile(init.profile ? { ...init.profile, verified: false, verified_at: null, verifiedAt: null } : null)
+      const diameterConflict = Boolean(manholePipeDiameterMm && init.pipeDiameter !== '' && init.pipeDiameter !== manholePipeDiameterMm)
+      setCalPipeDiameter(diameterConflict ? manholePipeDiameterMm! : init.pipeDiameter !== '' ? init.pipeDiameter : manholePipeDiameterMm ?? '')
+      setCalSource(diameterConflict ? 'MANHOLE_METADATA' : init.pipeDiameter !== '' ? init.source : manholePipeDiameterMm ? 'MANHOLE_METADATA' : init.source)
+      setCalReferenceId(diameterConflict ? '' : init.referenceId)
+      setCalNotes(diameterConflict ? '' : init.notes)
+      setSavedProfile(diameterConflict ? null : init.profile ? { ...init.profile, verified: false, verified_at: null, verifiedAt: null } : null)
+      setJointType('CIRCULAR_OPENING')
+      setGeometryProvenance('LEGACY_DEFAULT')
+      setOperatorContext('')
       advisoryControllerRef.current?.abort()
       setAdvisory(null)
       setAdvisoryError('')
@@ -123,7 +127,7 @@ export const PhotoUploadPage = ({
       inspectorEditedContext.current = false
       inspectorEditedGeometry.current = false
     })
-  }, [projectId, manholePipeDiameterMm])
+  }, [projectId, manholeLabel, manholePipeDiameterMm])
 
   useEffect(() => () => advisoryControllerRef.current?.abort(), [])
 
@@ -200,7 +204,9 @@ export const PhotoUploadPage = ({
     setAdvisory(null)
     setAdvisoryError('')
     setAdvisoryBusy(true)
-    const timeout = window.setTimeout(() => controller.abort(), 45000)
+    if (!inspectorEditedContext.current) setOperatorContext('')
+    if (!inspectorEditedGeometry.current) { setJointType('CIRCULAR_OPENING'); setGeometryProvenance('LEGACY_DEFAULT') }
+    const timeout = window.setTimeout(() => controller.abort('timeout'), 45000)
     try {
       const result = await requestInspectionContextSuggestions(photo, controller.signal, manholePipeDiameterMm)
       if (controller.signal.aborted || advisoryControllerRef.current !== controller) return
@@ -218,8 +224,10 @@ export const PhotoUploadPage = ({
         setOperatorContext((current) => current.trim() ? current : result.suggested_inspection_context || '')
       }
     } catch (error) {
-      if (!controller.signal.aborted && advisoryControllerRef.current === controller) {
-        setAdvisoryError(error instanceof Error ? error.message : 'Suggestions unavailable; enter context manually.')
+      if (advisoryControllerRef.current === controller && (!controller.signal.aborted || controller.signal.reason === 'timeout')) {
+        setAdvisoryError(controller.signal.reason === 'timeout'
+          ? 'AI suggestion timed out. You can continue with manual entry.'
+          : error instanceof Error ? error.message : 'Suggestions unavailable; enter context manually.')
       }
     } finally {
       window.clearTimeout(timeout)
