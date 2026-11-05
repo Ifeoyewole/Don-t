@@ -1,8 +1,8 @@
 """Photo validation and image quality assessment schemas."""
 
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, Field
-from backend.app.schemas.domain import ExposureStatus
+from backend.app.schemas.domain import DomainStatus, ExposureStatus, JointType
 
 
 class PhotoQualityResult(BaseModel):
@@ -39,4 +39,22 @@ class PhotoQualityResult(BaseModel):
     recommendations: List[str] = Field(
         default_factory=list,
         description="Actionable user tips if photo quality issues are detected.",
+    )
+
+
+class InspectionContextSuggestions(BaseModel):
+    """Untrusted, editable image-derived hints; never calibration or defect authority."""
+
+    model: str = Field(..., description="Actual image-assessment model used by the semantic gate.")
+    domain_status: DomainStatus
+    processing_allowed: bool
+    source: str = Field(default="IMAGE_ADVISORY", description="No private inspection history or customer data is used.")
+    suggested_joint_type: Optional[JointType] = None
+    suggested_inspection_context: Optional[str] = Field(default=None, max_length=400)
+    possible_gap_visible: Optional[bool] = None
+    calibration_verified: bool = Field(default=False, description="Never infer calibration verification from pixels.")
+    calibration_reference_id: Optional[str] = Field(default=None, description="AI must not invent calibration references.")
+    pipe_diameter_mm: Optional[float] = Field(default=None, description="AI must not infer pipe diameter from image.")
+    guidance: str = Field(
+        default="Review and edit suggestions before inspection. Source diameter from trusted project records; the server alone verifies calibration.",
     )
