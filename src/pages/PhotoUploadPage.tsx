@@ -107,6 +107,7 @@ export const PhotoUploadPage = ({
   const [saveErrorMsg, setSaveErrorMsg] = useState<string>('')
   const [referenceStatus, setReferenceStatus] = useState<CalibrationReferenceStatus | null>(null)
   const [referenceChecking, setReferenceChecking] = useState(false)
+  const [calDirty, setCalDirty] = useState(false)
 
   useEffect(() => {
     const init = getInitialCalibration(projectId, manholeId)
@@ -121,6 +122,7 @@ export const PhotoUploadPage = ({
       setCalCameraId(diameterConflict ? '' : init.profile?.camera_id ?? '')
       setSavedProfile(diameterConflict ? null : init.profile ? { ...init.profile, verified: false, verified_at: null, verifiedAt: null } : null)
       setReferenceStatus(null)
+      setCalDirty(false)
       for (const controller of suggestionControllers.current.values()) controller.abort()
       suggestionControllers.current.clear()
       setNotesDrafts({})
@@ -159,6 +161,7 @@ export const PhotoUploadPage = ({
     try {
       localStorage.setItem(`jointinspect_cal_${projectId}_${manholeId}`, JSON.stringify(profile))
       setSavedProfile(profile)
+      setCalDirty(false)
       setReferenceStatus(null)
       setSaveSuccessMsg('Local reference saved for this manhole. Checking server authority…')
       setReferenceChecking(true)
@@ -301,6 +304,7 @@ export const PhotoUploadPage = ({
       if (readyToMeasure.some((image) => image.analysisMode !== 'EVIDENCE_ONLY' && !image.jointType)) {
         throw new Error('Choose a geometry or evidence-only review for every photo before processing.')
       }
+      if (calDirty) throw new Error('Save or discard edited calibration fields before inspection; stale references are not used.')
       await onStartInspection(undefined, savedProfile ?? undefined)
     } catch (processingError) {
       setError(processingError instanceof Error ? processingError.message : 'Processing failed.')
@@ -420,6 +424,8 @@ export const PhotoUploadPage = ({
                       } else if (e.target.value !== 'custom') {
                         setCalPipeDiameter(Number(e.target.value))
                       }
+                      setReferenceStatus(null)
+                      setCalDirty(true)
                     }}
                     style={{
                       flex: 1,
@@ -445,7 +451,7 @@ export const PhotoUploadPage = ({
                     max="5000"
                     placeholder="mm"
                     value={calPipeDiameter}
-                    onChange={(e) => setCalPipeDiameter(e.target.value ? Number(e.target.value) : '')}
+                    onChange={(e) => { setCalPipeDiameter(e.target.value ? Number(e.target.value) : ''); setReferenceStatus(null); setCalDirty(true) }}
                     style={{
                       width: '80px',
                       padding: '0.4rem',
@@ -464,7 +470,7 @@ export const PhotoUploadPage = ({
                 </label>
                 <select
                   value={calSource}
-                  onChange={(e) => setCalSource(e.target.value as CalibrationSourceType)}
+                  onChange={(e) => { setCalSource(e.target.value as CalibrationSourceType); setReferenceStatus(null); setCalDirty(true) }}
                   style={{
                     width: '100%',
                     padding: '0.4rem',
@@ -490,7 +496,7 @@ export const PhotoUploadPage = ({
                   type="text"
                   placeholder="e.g. DWG-2026-04, MH-402-SPEC"
                   value={calReferenceId}
-                  onChange={(e) => setCalReferenceId(e.target.value)}
+                  onChange={(e) => { setCalReferenceId(e.target.value); setReferenceStatus(null); setCalDirty(true) }}
                   style={{
                     width: '100%',
                     padding: '0.4rem',
@@ -509,7 +515,7 @@ export const PhotoUploadPage = ({
                 </label>
                 <input id="calibration-camera-id" type="text" value={calCameraId}
                   placeholder="e.g. CCTV-STANDARD-01"
-                  onChange={(event) => { setCalCameraId(event.target.value); setReferenceStatus(null) }}
+                  onChange={(event) => { setCalCameraId(event.target.value); setReferenceStatus(null); setCalDirty(true) }}
                   style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box' }} />
                 <p style={{ fontSize: '0.72rem' }}>Choose the actual capture camera. Never guess a camera ID from the image.</p>
               </div>
