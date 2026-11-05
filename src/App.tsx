@@ -595,6 +595,7 @@ function App() {
           projectId={uploadProjectId}
           projectName={currentProject?.name ?? 'Untitled project'}
           manholeLabel={currentManhole?.manholeId ?? 'Unassigned manhole'}
+          manholePipeDiameterMm={currentManhole?.pipeDiameterMm}
           queue={currentQueue}
           events={events}
           onBack={() => {
@@ -620,13 +621,13 @@ function App() {
             await inspectionQueue.clearManholeQueue(uploadManholeId)
             await refreshRouteData()
           }}
-          onStartInspection={async (operatorContext, calibration, jointType) => {
+          onStartInspection={async (operatorContext, calibration, jointType, geometrySelectionProvenance) => {
             const result = await processor.processQueuedImages(uploadManholeId, {
               operatorContext,
               calibrationProfile: calibration,
               projectId: uploadProjectId,
               jointType,
-              geometrySelectionProvenance: 'INSPECTOR_SELECTED',
+              geometrySelectionProvenance: geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
             })
             if (!result.success || !result.inspectionId) {
               throw new Error(result.message || 'Inspection processing failed')
