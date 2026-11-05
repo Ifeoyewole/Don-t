@@ -104,6 +104,49 @@ async function runAiAssistedMeasurement(
   }
 }
 
+/** Never pass batch-level geometry/context to an individual photograph. */
+export function resolveImageContext(image: InspectionImage, options?: ProcessOptions): ProcessOptions {
+  return {
+    ...options,
+    jointType: image.jointType,
+    operatorContext: image.operatorContext,
+    geometrySelectionProvenance: image.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
+  }
+}
+
+async function recordEvidenceOnly(image: InspectionImage): Promise<string> {
+  const resultId = createId()
+  const result: InspectionResult = {
+    id: resultId,
+    imageId: image.id,
+    projectId: image.projectId,
+    manholeId: image.manholeId,
+    jointLabel: image.jointLabel,
+    originalGapMm: null,
+    finalGapMm: null,
+    status: 'REVIEW',
+    resultStatus: 'REVIEW_REQUIRED',
+    measurementSource: 'ai-review',
+    measurementNote: 'Evidence-only inspection: no supported measurable joint geometry. Human review required.',
+    rejectionReason: 'EVIDENCE_ONLY: No physical measurement or engineering acceptance generated.',
+    aiExplanation: image.suggestedInspectionContext ?? image.operatorContext ?? 'Image reserved for inspector review.',
+    engineeringResult: 'REVIEW',
+    authoritativeGapMm: null,
+    executionSource: 'CLOUD_PENDING',
+    geometrySelectionProvenance: 'INSPECTOR_SELECTED',
+    processedAt: createTimestamp(),
+    overrideApplied: false,
+  }
+  await db.transaction('rw', db.inspectionImages, db.inspectionResults, async () => {
+    const previous = await db.inspectionResults.where('imageId').equals(image.id).toArray()
+    for (const old of previous) await db.inspectionResults.delete(old.id)
+    await db.inspectionResults.add(result)
+    await db.inspectionImages.update(image.id, { queueStatus: 'completed' })
+  })
+  emit({ type: 'completed', imageId: image.id, inspectionId: resultId })
+  return resultId
+}
+
 async function processImage(imageId: string, options?: ProcessOptions): Promise<string | null> {
   const image = await db.inspectionImages.get(imageId)
   if (!image) {
@@ -115,6 +158,14 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
     return null
   }
 
+  if (image.analysisMode === 'EVIDENCE_ONLY') {
+    emit({ type: 'started', imageId })
+    return recordEvidenceOnly(image)
+  }
+  if (!image.jointType || image.geometrySelectionProvenance === 'LEGACY_DEFAULT') {
+    throw new Error('REVIEW_REQUIRED: confirm this photo\'s joint geometry or choose evidence-only review.')
+  }
+  const photoOptions = resolveImageContext(image, options)
   const blobRecord = await db.inspectionBlobs.get(image.blobKey)
 
   emit({ type: 'started', imageId })
@@ -130,13 +181,13 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
   await wait(20)
 
   const pipeDiameter =
-    options?.pipeDiameterMm ??
-    options?.calibrationProfile?.pipeDiameterMm ??
-    options?.calibrationProfile?.pipe_diameter_mm ??
+    photoOptions?.pipeDiameterMm ??
+    photoOptions?.calibrationProfile?.pipeDiameterMm ??
+    photoOptions?.calibrationProfile?.pipe_diameter_mm ??
     undefined
   const effectiveOptions: ProcessOptions = {
-    ...options,
-    projectId: options?.projectId ?? image.projectId,
+    ...photoOptions,
+    projectId: photoOptions?.projectId ?? image.projectId,
     calibrationSource: options?.calibrationSource ?? options?.calibrationProfile?.source,
     calibrationVerified: options?.calibrationVerified ?? options?.calibrationProfile?.verified,
     calibrationReferenceId:
@@ -289,10 +340,14 @@ export const processor = {
     const blobRecord = await db.inspectionBlobs.get(image.blobKey)
 
     emit({ type: 'started', imageId: image.id, inspectionId })
+    if (image.analysisMode === 'EVIDENCE_ONLY') {
+      return existing  // Never turn an evidence-only inspection into a default circular measurement.
+    }
     let reprocessOptions: ProcessOptions = {
       projectId: image.projectId,
-      jointType: existing.jointType ?? 'CIRCULAR_OPENING',
-      geometrySelectionProvenance: existing.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
+      jointType: image.jointType ?? existing.jointType,
+      operatorContext: image.operatorContext,
+      geometrySelectionProvenance: image.geometrySelectionProvenance ?? existing.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
       executionMode: existing.executionSource === 'LOCAL_PREVIEW_UNVERIFIED' ? 'local-preview' : 'cloud',
     }
     try {
