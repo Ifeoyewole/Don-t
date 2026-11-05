@@ -201,7 +201,7 @@ export const PhotoUploadPage = ({
     setAdvisoryBusy(true)
     const timeout = window.setTimeout(() => controller.abort(), 45000)
     try {
-      const result = await requestInspectionContextSuggestions(photo, controller.signal)
+      const result = await requestInspectionContextSuggestions(photo, controller.signal, manholePipeDiameterMm)
       if (controller.signal.aborted || advisoryControllerRef.current !== controller) return
       setAdvisory(result)
       if (!result.processing_allowed) {
