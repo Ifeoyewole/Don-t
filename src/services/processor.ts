@@ -117,7 +117,7 @@ async function recordEvidenceOnly(image: InspectionImage): Promise<string> {
     finalGapMm: null,
     status: 'REVIEW',
     resultStatus: 'REVIEW_REQUIRED',
-    measurementSource: 'ai-review',
+    measurementSource: 'manual',
     measurementNote: 'Evidence-only inspection: no supported measurable joint geometry. Human review required.',
     rejectionReason: 'EVIDENCE_ONLY: No physical measurement or engineering acceptance generated.',
     aiExplanation: image.suggestedInspectionContext ? `Unverified image observation: ${image.suggestedInspectionContext}` : image.operatorContext ?? 'Image reserved for inspector review.',
