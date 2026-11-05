@@ -9,6 +9,8 @@ export function resolveImageContext(image: InspectionImage, options?: ProcessOpt
     ...options,
     jointType: image.jointType,
     operatorContext: image.operatorContext,
+    cameraId: image.cameraId,
+    pipeDiameterMm: image.pipeDiameterMm ?? options?.pipeDiameterMm,
     geometrySelectionProvenance: image.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
   }
 }
