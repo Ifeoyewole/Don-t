@@ -91,7 +91,9 @@ async function runAiAssistedMeasurement(
       calibrationVerified: options?.calibrationVerified,
       calibrationReferenceId: options?.calibrationReferenceId,
       // Explicitly confirmed for THIS photograph, never inherited from a project profile.
-      cameraId: options?.cameraId,
+      // An AI-suggested joint orientation is provisional. Physical scale requires
+      // the inspector to confirm geometry for this individual photograph.
+      cameraId: options?.geometrySelectionProvenance === 'INSPECTOR_SELECTED' ? options?.cameraId : undefined,
       projectId: options?.projectId,
       jointType: options?.jointType,
     }
