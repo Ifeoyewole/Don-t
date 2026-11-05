@@ -280,6 +280,8 @@ export interface InspectionImage {
   geometrySelectionProvenance?: GeometrySelectionProvenance
   operatorContext?: string
   operatorContextEdited?: boolean
+  cameraId?: string
+  pipeDiameterMm?: number
   suggestedJointType?: JointGeometryType
   suggestedInspectionContext?: string
   possibleGapVisible?: boolean | null
@@ -379,6 +381,7 @@ export interface ProcessingEvent {
 }
 
 export interface ProcessOptions {
+  cameraId?: string
   concurrency?: number
   failAtImageId?: string
   operatorContext?: string
