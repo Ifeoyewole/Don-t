@@ -351,7 +351,7 @@ export const processor = {
       executionMode: existing.executionSource === 'LOCAL_PREVIEW_UNVERIFIED' ? 'local-preview' : 'cloud',
     }
     try {
-      const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(`jointinspect_cal_${image.projectId}`) : null
+      const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(`jointinspect_cal_${image.projectId}_${image.manholeId}`) : null
       if (stored) {
         const parsed = JSON.parse(stored) as CalibrationProfile
         reprocessOptions = {
