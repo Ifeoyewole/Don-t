@@ -275,6 +275,17 @@ export interface InspectionImage {
   validationStatus?: GuidedPhotoStatus
   validationMessage?: string
   validationScore?: number
+  analysisMode?: 'MEASURE_JOINT' | 'EVIDENCE_ONLY'
+  jointType?: JointGeometryType
+  geometrySelectionProvenance?: GeometrySelectionProvenance
+  operatorContext?: string
+  operatorContextEdited?: boolean
+  suggestedJointType?: JointGeometryType
+  suggestedInspectionContext?: string
+  possibleGapVisible?: boolean | null
+  contextSuggestionModel?: string
+  contextSuggestionStatus?: 'pending' | 'ready' | 'review_required' | 'unavailable'
+  contextSuggestionMessage?: string
 }
 
 export interface InspectionBlob {
