@@ -1,12 +1,14 @@
 """Unit and integration tests for Vertex semantic gate, calibration authority, and prompt injection isolation."""
 
 import io
+import json
 import cv2
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
 from backend.app.core.cv.ai.vertex_semantic_gate import get_vertex_semantic_gate
+from backend.app.core.cv.calibration_authority import clear_calibration_cache
 from backend.app.main import app
 from backend.app.schemas.domain import CalibrationSource, DomainStatus, ToleranceStatus
 from backend.app.schemas.measurement import VertexSemanticGateResult
@@ -51,8 +53,17 @@ def test_calibration_authority_unverified_blocked(client: TestClient, synthetic_
     assert data["engineering_result"] == "REVIEW"
 
 
-def test_calibration_authority_verified_source_accepted(client: TestClient, synthetic_pipe_joint: np.ndarray):
-    """Case C: Client provides diameter backed by verified engineering source (e.g. PROJECT_METADATA)."""
+def test_calibration_authority_verified_source_accepted(client: TestClient, synthetic_pipe_joint: np.ndarray, monkeypatch):
+    """Case C: A server-owned, camera-bound test rig authorizes physical geometry."""
+    monkeypatch.setenv("JOINTINSPECT_VERIFIED_CALIBRATIONS_JSON", json.dumps([{
+        "reference_id": "CAL-RIG-100",
+        "project_id": "test-project",
+        "camera_id": "TEST-CAMERA-02",
+        "source": "TEST_RIG",
+        "pipe_diameter_mm": 100.0,
+        "validated_joint_types": ["CIRCULAR_OPENING"],
+    }]))
+    clear_calibration_cache()
     _, buf = cv2.imencode(".jpg", synthetic_pipe_joint)
     response = client.post(
         "/api/v1/cv/measure",
@@ -60,10 +71,14 @@ def test_calibration_authority_verified_source_accepted(client: TestClient, synt
         data={
             "pipe_diameter_mm": 100.0,
             "joint_type": "CIRCULAR_OPENING",
-            "calibration_source": "PROJECT_METADATA",
+            "calibration_source": "TEST_RIG",
+            "calibration_reference_id": "CAL-RIG-100",
+            "project_id": "test-project",
+            "camera_id": "TEST-CAMERA-02",
             "calibration_verified": "true",
         },
     )
+    clear_calibration_cache()
     assert response.status_code == 200
     data = response.json()
 
