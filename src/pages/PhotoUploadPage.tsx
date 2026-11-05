@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
 import { requestInspectionContextSuggestions, type InspectionContextSuggestion } from '../lib/contextSuggestions'
-import type { CalibrationProfile, InspectionImage, JointGeometryType, ProcessBatchResult } from '../types/domain'
+import type { CalibrationProfile, GeometrySelectionProvenance, InspectionImage, JointGeometryType, ProcessBatchResult } from '../types/domain'
 
 type Props = {
   online: boolean
@@ -15,7 +15,7 @@ type Props = {
   onAddFiles: (files: File[]) => Promise<void>
   onRemoveFile: (imageId: string) => Promise<void>
   onClearQueue: () => Promise<void>
-  onStartInspection: (operatorContext?: string, calibration?: CalibrationProfile, jointType?: JointGeometryType) => Promise<ProcessBatchResult>
+  onStartInspection: (operatorContext?: string, calibration?: CalibrationProfile, jointType?: JointGeometryType, provenance?: GeometrySelectionProvenance) => Promise<ProcessBatchResult>
 }
 
 const validationTone = (image: InspectionImage) =>
@@ -87,6 +87,7 @@ export const PhotoUploadPage = ({
   const [error, setError] = useState('')
   const [operatorContext, setOperatorContext] = useState('')
   const [jointType, setJointType] = useState<JointGeometryType>('CIRCULAR_OPENING')
+  const [geometryProvenance, setGeometryProvenance] = useState<GeometrySelectionProvenance>('LEGACY_DEFAULT')
   const [advisory, setAdvisory] = useState<InspectionContextSuggestion | null>(null)
   const [advisoryBusy, setAdvisoryBusy] = useState(false)
   const [advisoryError, setAdvisoryError] = useState('')
@@ -204,13 +205,14 @@ export const PhotoUploadPage = ({
       const result = await requestInspectionContextSuggestions(photo, controller.signal, manholePipeDiameterMm)
       if (controller.signal.aborted || advisoryControllerRef.current !== controller) return
       setAdvisory(result)
-      if (!result.processing_allowed) {
-        setAdvisoryError('A clear pipe joint could not be confirmed. Please review the photo and fill the context manually.')
+      if (!result.processing_allowed || !result.image_quality_usable) {
+        setAdvisoryError(result.reason || 'No suitable pipe joint found. Check photo quality or enter context manually.')
         return
       }
       // Auto-populate only fields the inspector has not touched. Every field stays editable.
       if (result.suggested_joint_type && !inspectorEditedGeometry.current) {
         setJointType(result.suggested_joint_type)
+        setGeometryProvenance('EVIDENCE_SUGGESTED')
       }
       if (result.suggested_inspection_context && !inspectorEditedContext.current) {
         setOperatorContext((current) => current.trim() ? current : result.suggested_inspection_context || '')
@@ -252,7 +254,7 @@ export const PhotoUploadPage = ({
     setBusy(true)
     setError('')
     try {
-      await onStartInspection(operatorContext.trim() || undefined, savedProfile ?? undefined, jointType)
+      await onStartInspection(operatorContext.trim() || undefined, savedProfile ?? undefined, jointType, geometryProvenance)
     } catch (processingError) {
       setError(processingError instanceof Error ? processingError.message : 'Processing failed.')
     } finally {
@@ -547,7 +549,7 @@ export const PhotoUploadPage = ({
             <select
               id="joint-geometry-type"
               value={jointType}
-              onChange={(event) => { inspectorEditedGeometry.current = true; setJointType(event.target.value as JointGeometryType) }}
+              onChange={(event) => { inspectorEditedGeometry.current = true; setJointType(event.target.value as JointGeometryType); setGeometryProvenance('INSPECTOR_SELECTED') }}
               style={{ width: '100%', padding: '0.55rem', marginTop: '0.25rem' }}
             >
               <option value="CIRCULAR_OPENING">Circular opening</option>
