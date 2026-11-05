@@ -503,6 +503,20 @@ export const PhotoUploadPage = ({
                 />
               </div>
 
+              <div style={{ marginTop: '0.5rem' }}>
+                <label htmlFor="calibration-camera-id" style={{ display: 'block', fontSize: '0.75rem' }}>
+                  Camera or rig ID (if covered by reference)
+                </label>
+                <input id="calibration-camera-id" type="text" value={calCameraId}
+                  placeholder="e.g. CCTV-STANDARD-01"
+                  onChange={(event) => { setCalCameraId(event.target.value); setReferenceStatus(null) }}
+                  style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box' }} />
+                <p style={{ fontSize: '0.72rem' }}>Choose the actual capture camera. Never guess a camera ID from the image.</p>
+              </div>
+              {referenceStatus && <p role="status" style={{ fontSize: '0.76rem' }}>
+                {referenceStatus.guidance}
+              </p>}
+              {referenceChecking && <p role="status">Checking the calibration registry…</p>}
               <button
                 type="button"
                 className="button button-secondary"
