@@ -16,6 +16,24 @@ from backend.app.schemas.measurement import ToleranceSpec
 from backend.app.utils.image_io import encode_image_to_base64
 
 
+import json
+from backend.app.core.cv.calibration_authority import clear_calibration_cache
+
+@pytest.fixture
+def authorized_calibration(monkeypatch):
+    monkeypatch.setenv("JOINTINSPECT_VERIFIED_CALIBRATIONS_JSON", json.dumps([{
+        "reference_id": "TEST-RIG-100",
+        "project_id": "integration-test",
+        "camera_id": "TEST-CAMERA-01",
+        "pipe_diameter_mm": 100.0,
+        "source": "TEST_RIG",
+        "validated_joint_types": ["CIRCULAR_OPENING", "VERTICAL_SEAM"],
+    }]))
+    clear_calibration_cache()
+    yield
+    clear_calibration_cache()
+
+
 # ==============================================================================
 # Test Fixtures & Synthetic Image Generators
 # ==============================================================================
@@ -256,7 +274,7 @@ def test_api_validate_photo(client, synthetic_circular_image):
     assert res_legacy.status_code == 404
 
 
-def test_api_measure_circular(client, synthetic_circular_image):
+def test_api_measure_circular(client, synthetic_circular_image, authorized_calibration):
     """Test POST /api/v1/cv/measure with verified calibration."""
     _, buffer = cv2.imencode(".jpg", synthetic_circular_image)
     files = {"file": ("pipe.jpg", io.BytesIO(buffer.tobytes()), "image/jpeg")}
@@ -264,6 +282,9 @@ def test_api_measure_circular(client, synthetic_circular_image):
         "joint_type": "CIRCULAR_OPENING",
         "pipe_diameter_mm": "100.0",
         "calibration_source": "TEST_RIG",
+        "calibration_reference_id": "TEST-RIG-100",
+        "project_id": "integration-test",
+        "camera_id": "TEST-CAMERA-01",
         "calibration_verified": "true",
         "return_debug_image": "true",
         "num_samples": "36",
@@ -282,7 +303,7 @@ def test_api_measure_circular(client, synthetic_circular_image):
     assert res_legacy.status_code == 404
 
 
-def test_api_measure_vertical_seam(client, synthetic_vertical_seam_image):
+def test_api_measure_vertical_seam(client, synthetic_vertical_seam_image, authorized_calibration):
     """Test POST /api/v1/cv/measure for vertical seam with verified calibration."""
     _, buffer = cv2.imencode(".jpg", synthetic_vertical_seam_image)
     files = {"file": ("seam.jpg", io.BytesIO(buffer.tobytes()), "image/jpeg")}
@@ -290,6 +311,9 @@ def test_api_measure_vertical_seam(client, synthetic_vertical_seam_image):
         "joint_type": "VERTICAL_SEAM",
         "pipe_diameter_mm": "100.0",
         "calibration_source": "TEST_RIG",
+        "calibration_reference_id": "TEST-RIG-100",
+        "project_id": "integration-test",
+        "camera_id": "TEST-CAMERA-01",
         "calibration_verified": "true",
         "return_debug_image": "true",
         "num_samples": "20",
