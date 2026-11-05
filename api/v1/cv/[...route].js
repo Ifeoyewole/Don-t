@@ -596,6 +596,13 @@ async function handler(req, res) {
             status: healthPayload.status === "ok" ? "ok" : "degraded",
             version: typeof healthPayload.version === "string" ? healthPayload.version : undefined,
             opencv_version: typeof healthPayload.opencv_version === "string" ? healthPayload.opencv_version : undefined,
+            // Safe aggregate readiness from the *selected* primary classifier.
+            // Do not leak model identifiers, paths, service accounts or other internal config.
+            primary_model_ready: Boolean(
+              healthPayload.primary_classifier
+                ? healthPayload.primary_classifier.enabled && healthPayload.primary_classifier.loaded
+                : healthPayload.external_models?.wrc_inceptionresnetv2?.enabled && healthPayload.external_models?.wrc_inceptionresnetv2?.loaded
+            ),
             external_models: {
               wrc_inceptionresnetv2: {
                 enabled: Boolean(wrc?.enabled),
