@@ -1,0 +1,53 @@
+[
+  {
+    "source": "zenodo_dataset_corrosion",
+    "url": "https://zenodo.org/api/records?q=resource_type.type:dataset%20AND%20corrosion&size=30",
+    "error": "HTTP Error 400: Bad Request"
+  },
+  {
+    "source": "zenodo_dataset_pipe",
+    "url": "https://zenodo.org/api/records?q=resource_type.type:dataset%20AND%20(pipe%20OR%20sewer)&size=30",
+    "error": "HTTP Error 400: Bad Request"
+  },
+  {
+    "source": "hf_mmkata",
+    "url": "https://huggingface.co/api/datasets/MMKata/sewerpipev2/tree/main?recursive=true&limit=100",
+    "status": 200,
+    "bytes": 1240
+  },
+  {
+    "source": "hf_crack",
+    "url": "https://huggingface.co/api/datasets/ZhiyaYang/sewer-defect-crack-dataset/tree/main?recursive=true&limit=100",
+    "status": 200,
+    "bytes": 1244
+  },
+  {
+    "source": "hf_mmkata_card",
+    "url": "https://huggingface.co/datasets/MMKata/sewerpipev2/raw/main/README.md",
+    "status": 200,
+    "bytes": 681
+  },
+  {
+    "source": "pipe_solo_xml",
+    "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC11644997/fullTextXML",
+    "status": 200,
+    "bytes": 330100
+  },
+  {
+    "source": "urbanpipe_paper",
+    "url": "https://api.github.com/search/repositories?q=UrbanPipe+dataset",
+    "status": 200,
+    "bytes": 55
+  },
+  {
+    "source": "videopipe",
+    "url": "https://raw.githubusercontent.com/Tramac/VideoPipe/main/README.md",
+    "error": "HTTP Error 404: Not Found"
+  },
+  {
+    "source": "hf_roboflow",
+    "url": "https://huggingface.co/api/datasets?search=sewer%20defect&full=true&limit=30",
+    "status": 200,
+    "bytes": 5777
+  }
+]

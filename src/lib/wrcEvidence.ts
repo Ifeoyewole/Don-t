@@ -8,6 +8,7 @@ export type WrcEvidenceState =
   | 'UNMAPPED'
   | 'AMBIGUOUS'
   | 'SUCCESS'
+  | 'REVIEW_REQUIRED'
 
 export interface WrcEvidenceLike {
   classification_status?: string | null
@@ -29,6 +30,7 @@ export function classifyWrcEvidence(evidence?: WrcEvidenceLike | null): WrcEvide
   if (!Number.isFinite(evidence.confidence) || evidence.confidence == null) return 'MISSING_RESPONSE'
   if (evidence.mapping_status?.includes('AMBIGUOUS')) return 'AMBIGUOUS'
   if (!evidence.mapping_status || evidence.mapping_status.includes('UNMAPPED')) return 'UNMAPPED'
+  if (status === 'REVIEW_REQUIRED') return 'REVIEW_REQUIRED'
   if (status === 'SUCCESS') return 'SUCCESS'
   return 'INFERENCE_FAILED'
 }

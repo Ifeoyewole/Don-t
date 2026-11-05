@@ -1,3 +1,4 @@
+import { InspectionReadiness } from '../components/InspectionReadiness'
 import { useMemo, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
 import type { ProjectSummary } from '../types/domain'
@@ -103,6 +104,7 @@ export const DashboardPage = ({
 
   return (
     <div className="page-grid dashboard-page">
+      <InspectionReadiness />
       {/* 6. Page Header with aligned Primary CTA */}
       <section className="dashboard-hero-row">
         <div className="hero-text-block">

@@ -1,0 +1,34 @@
+workerPoolSpecs:
+- machineSpec:
+    machineType: n1-standard-8
+  replicaCount: 1
+  diskSpec:
+    bootDiskType: pd-standard
+    bootDiskSizeGb: 100
+  containerSpec:
+    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/legacy-evaluator@sha256:e24104b0d456402fe95e54fdead2f668d261f49afb375c2079c3fcadca912ad2
+    env:
+    - name: PROJECT_ID
+      value: joint-inspection-510310
+    - name: BUILD_ID
+      value: vertex-eval-legacy-pilot-r2
+    args:
+    - --project=joint-inspection-510310
+    - --train=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/pilot-legacy-r2/train.csv
+    - --early-stop=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/pilot-legacy-r2/early_stop.csv
+    - --threshold-tune=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/pilot-legacy-r2/threshold_tune.csv
+    - --dev-report=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/pilot-legacy-r2/dev_report.csv
+    - --output-prefix=gs://joint-inspection-510310-data/models/inspect-view/evaluations/pilot-balanced-r2-20261103/legacy-onnx-r2
+    - --v1-model=gs://joint-inspection-510310-data/models/candidates/sewer-condition-v1/model.onnx
+    - --v1-sha=f5cc05da983f95e019bb45d926e8c98fb5909cf2ae1aa2dc37a574f35b526a44
+    - --v1-data=gs://joint-inspection-510310-data/models/candidates/sewer-condition-v1/model.onnx.data
+    - --v1-data-sha=05b139ecda2ccda7a7aabc9bc661f29e0f29b088cb5bfa27b0d46d80cea5491f
+    - --v2-model=gs://joint-inspection-510310-data/models/candidates/sewer-condition-v2/model.onnx
+    - --v2-sha=6bc54557537e46e76e1fe85238f5b215205fa20948b81ca57caf0301812a4134
+    - --v2-data=gs://joint-inspection-510310-data/models/candidates/sewer-condition-v2/model.onnx.data
+    - --v2-data-sha=9deedc5d11a798bd7b61e3833faecd3d3f88ae5b2d1d81892d05e8f6fefee25d
+    - --wrc-model=gs://joint-inspection-510310-data/models/external/wrc/inceptionresnetv2/v1/wrc_inceptionresnetv2_baseline_v1.onnx
+    - --wrc-sha=8a6115e9f6f6f3a5a4f5cc749cc35420a623a4547e904174ae9a18ceab63f9f4
+scheduling:
+  timeout: 3600s
+  restartJobOnWorkerRestart: false

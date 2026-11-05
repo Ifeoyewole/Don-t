@@ -1,0 +1,28 @@
+workerPoolSpecs:
+- machineSpec:
+    machineType: n1-standard-4
+    acceleratorType: NVIDIA_TESLA_T4
+    acceleratorCount: 1
+  replicaCount: 1
+  diskSpec:
+    bootDiskType: pd-standard
+    bootDiskSizeGb: 100
+  containerSpec:
+    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/inspect-view-representation@sha256:424f47b076231add73be666e00cf74779ab1b832438033ce5989801e5d4666b9
+    args:
+    - --project=joint-inspection-510310
+    - --manifest=gs://joint-inspection-510310-data/datasets/manifests/inspect-view-expanded-v1-20261102/inspect-view-manifests/representation.jsonl
+    - --labels=training/data_sources/canonical_labels.json
+    - --output-prefix=gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-expanded-full-r3-20261103
+    - --config-id=repr-convnext-expanded-full-r3-20261103
+    - --architecture=convnext_tiny
+    - --init-checkpoint=gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-balanced-r2-20261103/best.pt
+    - --epochs=1
+    - --batch-size=32
+    - --learning-rate=0.00005
+    - --max-train=0
+    - --max-val=0
+scheduling:
+  strategy: SPOT
+  timeout: 7200s
+  restartJobOnWorkerRestart: false

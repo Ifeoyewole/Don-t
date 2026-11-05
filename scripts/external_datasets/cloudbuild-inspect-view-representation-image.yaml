@@ -1,0 +1,21 @@
+steps:
+- name: gcr.io/cloud-builders/docker
+  id: build-worker
+  args:
+  - build
+  - --file=scripts/external_datasets/inspect-view-representation.Dockerfile
+  - --tag=europe-west2-docker.pkg.dev/$PROJECT_ID/joint-inspection-training/inspect-view-representation:$BUILD_ID
+  - .
+- name: gcr.io/cloud-builders/docker
+  id: push-worker
+  waitFor: [build-worker]
+  args:
+  - push
+  - europe-west2-docker.pkg.dev/$PROJECT_ID/joint-inspection-training/inspect-view-representation:$BUILD_ID
+images:
+- europe-west2-docker.pkg.dev/$PROJECT_ID/joint-inspection-training/inspect-view-representation:$BUILD_ID
+options:
+  logging: GCS_ONLY
+  machineType: E2_HIGHCPU_8
+  diskSizeGb: 50
+timeout: 3600s

@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "scope_id": "inspect-view-expanded-v1-20261102",
+  "status": "FROZEN_PENDING_RECORD_PROMOTION",
+  "base_dataset": {
+    "name": "Sewer-ML curated-v4",
+    "gcs_registry": "gs://joint-inspection-510310-data/datasets/sewer-ml/curated-v4/20k/manifest.json",
+    "verified_records": 20000,
+    "usage": ["RESEARCH_REPRESENTATION_LEARNING", "HELD_OUT_EVALUATION"],
+    "production_eligible": false
+  },
+  "external_sources": [
+    {
+      "name": "SRuibo/Sewer-pipe-defects",
+      "gcs_registry": "gs://joint-inspection-510310-data/datasets/quarantine/sruibo-sewer-pipe-defects/7fafcbe676aad60f38d8fe39cde93cf599f8362e/dataset_registry.json",
+      "gcs_media_root": "gs://joint-inspection-510310-data/datasets/quarantine/sruibo-sewer-pipe-defects/7fafcbe676aad60f38d8fe39cde93cf599f8362e/",
+      "unique_candidates": 1451,
+      "supervised_eligible": false,
+      "reason": "Original class semantics and primary provenance remain unresolved"
+    },
+    {
+      "name": "Robotic Pipe Defect Detection v7",
+      "gcs_registry": "gs://joint-inspection-510310-data/datasets/quarantine/roboflow/hatim-husaini/pipe-defect-detection/v7/dataset_registry.json",
+      "gcs_media_root": "gs://joint-inspection-510310-data/datasets/quarantine/roboflow/hatim-husaini/pipe-defect-detection/v7/roboflow-robotic-pipe/extracted/",
+      "unique_candidates": 333,
+      "target_stage": "JOINT_FOCUSED_DETECTION",
+      "supervised_eligible": false,
+      "reason": "Pending record-level annotation and primary provenance review"
+    },
+    {
+      "name": "PVC Pipe Defect v2",
+      "gcs_registry": "gs://joint-inspection-510310-data/datasets/quarantine/roboflow/esha-gupta-jfldf/pvc-pipe-defect/v2/dataset_registry.json",
+      "gcs_media_root": "gs://joint-inspection-510310-data/datasets/quarantine/roboflow/esha-gupta-jfldf/pvc-pipe-defect/v2/roboflow-pvc-pipe/extracted/",
+      "unique_candidates": 2817,
+      "target_stage": "JOINT_FOCUSED_DETECTION",
+      "supervised_eligible": false,
+      "reason": "Joint-type labels require semantic review before defect supervision"
+    },
+    {
+      "name": "Pipeline Defect Detection v8",
+      "gcs_registry": "gs://joint-inspection-510310-data/datasets/quarantine/roboflow/fyp-5vqpk/pipeline-defect-detection/v8/dataset_registry.json",
+      "gcs_media_root": "gs://joint-inspection-510310-data/datasets/quarantine/roboflow/fyp-5vqpk/pipeline-defect-detection/v8/pipeline-defect/extracted/",
+      "unique_candidates": 34089,
+      "target_stage": "REPRESENTATION_AND_SURFACE_CONDITION",
+      "supervised_eligible": false,
+      "reason": "Tiled and augmented records require source-family grouping and annotation review"
+    }
+  ],
+  "excluded_sources": [
+    {
+      "name": "Pipe Defects v1",
+      "reason": "Generated class metadata is corrupted"
+    },
+    {
+      "name": "VideoPipe QV-Pipe and CCTV-Pipe",
+      "reason": "Skipped for this phase by dataset owner"
+    },
+    {
+      "name": "IPD",
+      "reason": "Skipped for this phase; signed research licence required"
+    },
+    {
+      "name": "Co-UDlabs Google Drive data",
+      "reason": "Skipped for this phase; documented folder is not anonymously enumerable"
+    },
+    {
+      "name": "Roboflow Pipeline Defect Detection Segmentation",
+      "reason": "No generated downloadable version exists"
+    }
+  ],
+  "usable_unique_external_candidates": 38690,
+  "promotion_requirements": [
+    "Keep original source labels and annotations",
+    "Accept only UNIQUE_TO_BASELINE records",
+    "Group augmented image families before assigning splits",
+    "Keep source media families in exactly one split",
+    "Complete annotation and provenance review",
+    "Publish an immutable promoted manifest before training"
+  ],
+  "training_sequence": [
+    "REPRESENTATION_LEARNING",
+    "JOINT_FOCUSED_DETECTION",
+    "SEGMENTATION_WHEN_MASKS_ARE_AVAILABLE",
+    "JOINTINSPECT_DOMAIN_FINE_TUNING",
+    "STANDALONE_MODEL_EVALUATION",
+    "INSPECT_VIEW_CLASS_AWARE_FUSION",
+    "FUSION_ACCEPTANCE_GATE"
+  ],
+  "fusion_acceptance_gate": {
+    "rule": "Inspect View must strictly exceed the strongest standalone candidate on held-out macro-F1 and macro-F2",
+    "current_strongest_model": "ConvNeXt-Tiny",
+    "current_macro_f1": 0.554764,
+    "current_macro_f2": 0.583692
+  }
+}

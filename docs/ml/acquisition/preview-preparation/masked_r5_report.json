@@ -1,0 +1,33 @@
+{
+  "records": 21332,
+  "split_counts": {
+    "train": 20000,
+    "val": 1332
+  },
+  "positive_counts": {
+    "train": {
+      "DEFORMATION": 275,
+      "JOINT_DISPLACEMENT": 11691,
+      "NORMAL": 6316,
+      "SURFACE_DAMAGE": 5283,
+      "BROKEN_PIPE": 1784,
+      "OBSTACLE": 199,
+      "INFILTRATION": 101
+    },
+    "val": {
+      "NORMAL": 299,
+      "JOINT_DISPLACEMENT": 837,
+      "BROKEN_PIPE": 253,
+      "SURFACE_DAMAGE": 450,
+      "INFILTRATION": 19,
+      "OBSTACLE": 6,
+      "DEFORMATION": 32
+    }
+  },
+  "excluded_validation_families": 19,
+  "excluded_validation_records": 255,
+  "manifest_sha256": "7b6a8234cb6f63c5c041ed4d50e9ce188afe56d99a25a2ed0a6022fef465479a",
+  "evaluation_status": "EXPLORATORY_PENDING_VIDEO_PROVENANCE",
+  "production_approved": false,
+  "locked_test_evaluated": false
+}

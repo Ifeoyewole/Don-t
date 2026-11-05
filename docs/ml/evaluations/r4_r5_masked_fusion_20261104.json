@@ -1,0 +1,366 @@
+{
+  "selection": {
+    "BLOCKAGE": {
+      "status": "UNSUPPORTED_NO_TUNING_POSITIVES"
+    },
+    "BROKEN_PIPE": {
+      "r4_weight": 1.0,
+      "r5_weight": 0.0,
+      "threshold": 0.15,
+      "tuning": {
+        "support": 133,
+        "tp": 81,
+        "fp": 89,
+        "fn": 52,
+        "f1": 0.5346534653465347,
+        "f2": 0.5769230769230769
+      }
+    },
+    "CORROSION": {
+      "status": "UNSUPPORTED_NO_TUNING_POSITIVES"
+    },
+    "DEFORMATION": {
+      "r4_weight": 0.0,
+      "r5_weight": 1.0,
+      "threshold": 0.05,
+      "tuning": {
+        "support": 19,
+        "tp": 9,
+        "fp": 29,
+        "fn": 10,
+        "f1": 0.3157894736842105,
+        "f2": 0.39473684210526316
+      }
+    },
+    "FAULTY_JOINT": {
+      "status": "UNSUPPORTED_NO_TUNING_POSITIVES"
+    },
+    "GEOMETRY_UNCERTAIN": {
+      "status": "UNSUPPORTED_NO_TUNING_POSITIVES"
+    },
+    "INFILTRATION": {
+      "r4_weight": 0.0,
+      "r5_weight": 1.0,
+      "threshold": 0.05,
+      "tuning": {
+        "support": 13,
+        "tp": 0,
+        "fp": 0,
+        "fn": 13,
+        "f1": 0.0,
+        "f2": 0.0
+      }
+    },
+    "JOINT_DISPLACEMENT": {
+      "r4_weight": 0.0,
+      "r5_weight": 1.0,
+      "threshold": 0.5,
+      "tuning": {
+        "support": 394,
+        "tp": 390,
+        "fp": 41,
+        "fn": 4,
+        "f1": 0.9454545454545454,
+        "f2": 0.9715994020926756
+      }
+    },
+    "JOINT_MISALIGNMENT": {
+      "status": "UNSUPPORTED_NO_TUNING_POSITIVES"
+    },
+    "NORMAL": {
+      "r4_weight": 0.0,
+      "r5_weight": 1.0,
+      "threshold": 0.45,
+      "tuning": {
+        "support": 116,
+        "tp": 108,
+        "fp": 15,
+        "fn": 8,
+        "f1": 0.9037656903765691,
+        "f2": 0.919931856899489
+      }
+    },
+    "OBSTACLE": {
+      "r4_weight": 0.5,
+      "r5_weight": 0.5,
+      "threshold": 0.05,
+      "tuning": {
+        "support": 4,
+        "tp": 2,
+        "fp": 51,
+        "fn": 2,
+        "f1": 0.07017543859649122,
+        "f2": 0.14492753623188406
+      }
+    },
+    "OPEN_JOINT": {
+      "status": "UNSUPPORTED_NO_TUNING_POSITIVES"
+    },
+    "PROTRUDING_LATERAL": {
+      "status": "UNSUPPORTED_NO_TUNING_POSITIVES"
+    },
+    "RUPTURE": {
+      "status": "UNSUPPORTED_NO_TUNING_POSITIVES"
+    },
+    "SURFACE_DAMAGE": {
+      "r4_weight": 0.0,
+      "r5_weight": 1.0,
+      "threshold": 0.35,
+      "tuning": {
+        "support": 214,
+        "tp": 171,
+        "fp": 81,
+        "fn": 43,
+        "f1": 0.7339055793991416,
+        "f2": 0.7716606498194946
+      }
+    }
+  },
+  "reports": {
+    "r4": {
+      "macro_f1": 0.47175801423184016,
+      "macro_f2": 0.5349453043054556,
+      "evaluated_classes": 7,
+      "per_class": {
+        "BROKEN_PIPE": {
+          "support": 120,
+          "tp": 85,
+          "fp": 118,
+          "fn": 35,
+          "f1": 0.5263157894736842,
+          "f2": 0.6222547584187409
+        },
+        "DEFORMATION": {
+          "support": 13,
+          "tp": 8,
+          "fp": 35,
+          "fn": 5,
+          "f1": 0.2857142857142857,
+          "f2": 0.42105263157894735
+        },
+        "INFILTRATION": {
+          "support": 6,
+          "tp": 0,
+          "fp": 0,
+          "fn": 6,
+          "f1": 0.0,
+          "f2": 0.0
+        },
+        "JOINT_DISPLACEMENT": {
+          "support": 443,
+          "tp": 427,
+          "fp": 35,
+          "fn": 16,
+          "f1": 0.943646408839779,
+          "f2": 0.9556848701880036
+        },
+        "NORMAL": {
+          "support": 183,
+          "tp": 174,
+          "fp": 21,
+          "fn": 9,
+          "f1": 0.9206349206349206,
+          "f2": 0.9385113268608414
+        },
+        "OBSTACLE": {
+          "support": 2,
+          "tp": 0,
+          "fp": 129,
+          "fn": 2,
+          "f1": 0.0,
+          "f2": 0.0
+        },
+        "SURFACE_DAMAGE": {
+          "support": 236,
+          "tp": 236,
+          "fp": 282,
+          "fn": 0,
+          "f1": 0.6259946949602122,
+          "f2": 0.8071135430916553
+        }
+      }
+    },
+    "r5": {
+      "macro_f1": 0.4731690165170921,
+      "macro_f2": 0.5268648181680897,
+      "evaluated_classes": 7,
+      "per_class": {
+        "BROKEN_PIPE": {
+          "support": 120,
+          "tp": 101,
+          "fp": 172,
+          "fn": 19,
+          "f1": 0.5139949109414759,
+          "f2": 0.6706507304116865
+        },
+        "DEFORMATION": {
+          "support": 13,
+          "tp": 6,
+          "fp": 32,
+          "fn": 7,
+          "f1": 0.23529411764705882,
+          "f2": 0.3333333333333333
+        },
+        "INFILTRATION": {
+          "support": 6,
+          "tp": 0,
+          "fp": 4,
+          "fn": 6,
+          "f1": 0.0,
+          "f2": 0.0
+        },
+        "JOINT_DISPLACEMENT": {
+          "support": 443,
+          "tp": 434,
+          "fp": 41,
+          "fn": 9,
+          "f1": 0.9455337690631809,
+          "f2": 0.9657320872274143
+        },
+        "NORMAL": {
+          "support": 183,
+          "tp": 173,
+          "fp": 15,
+          "fn": 10,
+          "f1": 0.9326145552560647,
+          "f2": 0.9402173913043478
+        },
+        "OBSTACLE": {
+          "support": 2,
+          "tp": 0,
+          "fp": 15,
+          "fn": 2,
+          "f1": 0.0,
+          "f2": 0.0
+        },
+        "SURFACE_DAMAGE": {
+          "support": 236,
+          "tp": 202,
+          "fp": 152,
+          "fn": 34,
+          "f1": 0.6847457627118644,
+          "f2": 0.7781201848998459
+        }
+      }
+    },
+    "fusion": {
+      "macro_f1": 0.4749291420216933,
+      "macro_f2": 0.5199511078833832,
+      "evaluated_classes": 7,
+      "per_class": {
+        "BROKEN_PIPE": {
+          "support": 120,
+          "tp": 85,
+          "fp": 118,
+          "fn": 35,
+          "f1": 0.5263157894736842,
+          "f2": 0.6222547584187409
+        },
+        "DEFORMATION": {
+          "support": 13,
+          "tp": 6,
+          "fp": 32,
+          "fn": 7,
+          "f1": 0.23529411764705882,
+          "f2": 0.3333333333333333
+        },
+        "INFILTRATION": {
+          "support": 6,
+          "tp": 0,
+          "fp": 4,
+          "fn": 6,
+          "f1": 0.0,
+          "f2": 0.0
+        },
+        "JOINT_DISPLACEMENT": {
+          "support": 443,
+          "tp": 434,
+          "fp": 41,
+          "fn": 9,
+          "f1": 0.9455337690631809,
+          "f2": 0.9657320872274143
+        },
+        "NORMAL": {
+          "support": 183,
+          "tp": 173,
+          "fp": 15,
+          "fn": 10,
+          "f1": 0.9326145552560647,
+          "f2": 0.9402173913043478
+        },
+        "OBSTACLE": {
+          "support": 2,
+          "tp": 0,
+          "fp": 47,
+          "fn": 2,
+          "f1": 0.0,
+          "f2": 0.0
+        },
+        "SURFACE_DAMAGE": {
+          "support": 236,
+          "tp": 202,
+          "fp": 152,
+          "fn": 34,
+          "f1": 0.6847457627118644,
+          "f2": 0.7781201848998459
+        }
+      }
+    }
+  },
+  "acceptance_gate": {
+    "accepted": false,
+    "rule": "Exceed both standalone models on macro-F1 and macro-F2"
+  },
+  "infiltration_review": [
+    {
+      "sha256": "d8612246f954cea317d8b1a142722b17e2408f6e7cfb4992841edf1f803f515a",
+      "original_media_id": "00023899.png",
+      "r4_probability": 0.0009375263471156359,
+      "r5_probability": 0.005443837959319353,
+      "fusion_probability": 0.005443837959319353,
+      "threshold": 0.05
+    },
+    {
+      "sha256": "a7d8fed0d912cb6cf9b3fbb142cfc422b7d2c50a15c374a3edd17294ca920841",
+      "original_media_id": "00023897.png",
+      "r4_probability": 0.0009631223510950804,
+      "r5_probability": 0.005811297334730625,
+      "fusion_probability": 0.005811297334730625,
+      "threshold": 0.05
+    },
+    {
+      "sha256": "cb3491b32301fcba06f3f85b527413f3ab8a7d21c8c1ddda4da79eafe4128b34",
+      "original_media_id": "00023898.png",
+      "r4_probability": 0.0008403186220675707,
+      "r5_probability": 0.004352793097496033,
+      "fusion_probability": 0.004352793097496033,
+      "threshold": 0.05
+    },
+    {
+      "sha256": "dc2bb0dc665ac3fc1733c9d2f8489ed01234874269da2a64dbab625c9991d554",
+      "original_media_id": "00022218.png",
+      "r4_probability": 0.000999069889076054,
+      "r5_probability": 0.03310255706310272,
+      "fusion_probability": 0.03310255706310272,
+      "threshold": 0.05
+    },
+    {
+      "sha256": "c31ccb373ed0cdbc7c52775dcfe2d152d9422603f383c00bb192404b9dedc9bc",
+      "original_media_id": "00022217.png",
+      "r4_probability": 0.0006013591773808002,
+      "r5_probability": 0.01924920082092285,
+      "fusion_probability": 0.01924920082092285,
+      "threshold": 0.05
+    },
+    {
+      "sha256": "8acd1648583002784e0f2d8fd5e77f680484bc814b85e34fb5ddbd938b226fd4",
+      "original_media_id": "00022216.png",
+      "r4_probability": 0.0008043882553465664,
+      "r5_probability": 0.013631114736199379,
+      "fusion_probability": 0.013631114736199379,
+      "threshold": 0.05
+    }
+  ],
+  "production_approved": false,
+  "locked_test_evaluated": false
+}

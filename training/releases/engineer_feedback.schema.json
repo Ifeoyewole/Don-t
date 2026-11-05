@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Inspect View engineer feedback",
+  "type": "object",
+  "required": ["image_sha256", "model_version", "review_status", "reviewer_id", "notes"],
+  "properties": {
+    "image_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "model_version": {"type": "string", "minLength": 1},
+    "review_status": {"enum": ["UNREVIEWED", "CONFIRMED", "CORRECTED", "UNCERTAIN"]},
+    "reviewer_id": {"type": "string", "minLength": 1},
+    "notes": {"type": "string"},
+    "corrected_labels": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "video_id": {"type": ["string", "null"]},
+    "timestamp_seconds": {"type": ["number", "null"], "minimum": 0},
+    "training_eligible": {"const": false}
+  },
+  "additionalProperties": false
+}

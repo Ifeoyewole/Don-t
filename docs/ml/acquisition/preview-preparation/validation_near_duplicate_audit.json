@@ -1,0 +1,120 @@
+{
+  "hash_job": "a11c5c33-9aa1-4fc8-8c36-4abc73c8e8e7",
+  "verified_validation_images": 1587,
+  "training_hashes_checked": 20000,
+  "distance_counts": {
+    "outside_radius_4": 1560,
+    "near_1_to_4": 27
+  },
+  "matches": [
+    {
+      "sha256": "c9a39394f999dd84ba1cd8d9468f4b0ad5847ba6e7806866991148621914b80f",
+      "distance": 4
+    },
+    {
+      "sha256": "fdc13647d8d2281201218cc18c6b983ee97f0c9acbbd474676b40f8cc984b14a",
+      "distance": 4
+    },
+    {
+      "sha256": "07bafcc13ffc3a0ba6fcc0a0e3466939b1f69dc4a6114335b15e901a2278505a",
+      "distance": 4
+    },
+    {
+      "sha256": "5e1a398dad22b34c3cdd62cbd2b48e6084193039742f33aeb4b152e2104a52dc",
+      "distance": 4
+    },
+    {
+      "sha256": "ab71436372c5ff96749dd58b39ff266c81ded19cd2b32d6cac867b2533cb2081",
+      "distance": 3
+    },
+    {
+      "sha256": "37976f764f1fd738b724585ea11b4227815d5b4aff6485796f0a7ec286120697",
+      "distance": 4
+    },
+    {
+      "sha256": "3e80ea02cb54e1843fee205c4656d79eecef7c7d70d2f6374b09f320063fbf60",
+      "distance": 4
+    },
+    {
+      "sha256": "72f3722d7243e0a5bd2341f23ecf06e224e6b5f58f86e9622263df4dbc1a9974",
+      "distance": 4
+    },
+    {
+      "sha256": "bc7fa35a6469e2accf45a453f9206bf96ecc7c102ec157f6b7cf386ee072dc70",
+      "distance": 4
+    },
+    {
+      "sha256": "c0f84623d70f74e6b84166f00952c92d5fda31bd823dc2af48bdcef870ed8b58",
+      "distance": 4
+    },
+    {
+      "sha256": "bba3ffdf0a4e63fc0232eb3965af23b7b58f5adf8076255fa02629ef848fdefa",
+      "distance": 3
+    },
+    {
+      "sha256": "a46f0f2ce67d44dcf1894ec2c011296335edc37e84231946b792abdc3abf36da",
+      "distance": 3
+    },
+    {
+      "sha256": "b8ff5d97daa78330187fab3a217ab0d2b31f5373c33ba06d421b385da9769228",
+      "distance": 2
+    },
+    {
+      "sha256": "91fa2bb41596369936f4af61448fc48ca3f51ba8f236040adeea2b64db396211",
+      "distance": 4
+    },
+    {
+      "sha256": "26e0bd74a45b34d29794a2fbde368f785af1d25a0a01a98f5c652f98f9782939",
+      "distance": 3
+    },
+    {
+      "sha256": "8e0bf38129d651069a65b430870ad7f0fe39f2aa00b83b99ad690574497d66fc",
+      "distance": 4
+    },
+    {
+      "sha256": "bddea9a5460323662465201929ac4e84be366bc7e99653b4aa98998478f5b1c9",
+      "distance": 4
+    },
+    {
+      "sha256": "f7961f279269e9c9c0a141fc930f1bd264b92a22b39f28c7c4c8428761f62f42",
+      "distance": 4
+    },
+    {
+      "sha256": "89b364d27bcf9e59683353f77a9ec02debde905cdcf8ab35f01d9d978da9e3d4",
+      "distance": 3
+    },
+    {
+      "sha256": "113aa55358f2605a879c7605c9035943715d1bab0b4025f4369afcb093289f8b",
+      "distance": 4
+    },
+    {
+      "sha256": "2b8f160ba8049fbae1f1a7bbe7bbeddc5c44c13f15ced1ada5e410d0f1d78811",
+      "distance": 4
+    },
+    {
+      "sha256": "39ace1ff87390e3abb3c0827c8b240407e19fcfd1d9c25ab986afa32c86f1afb",
+      "distance": 3
+    },
+    {
+      "sha256": "ba44cec4c3d71d9687d668a8d97ef40bd31b8e53026b408dccbbc4e008ae8e1a",
+      "distance": 4
+    },
+    {
+      "sha256": "e52af73268abbb47f4cf670c634d6d5d957e20be04af18d29962aa3770c99792",
+      "distance": 4
+    },
+    {
+      "sha256": "a5e0cdd9467d970eca97daa6b41741b5ae546da922ac3b3d5390a53283549e74",
+      "distance": 1
+    },
+    {
+      "sha256": "bfa9b11ed325b5cc8f3fbcb0454911374934b78501b789d0407c0b5d3f8b900b",
+      "distance": 3
+    },
+    {
+      "sha256": "c14b14dabd08221beabc476f00f26976dac5f18a53c9f542b178d3840e2917be",
+      "distance": 1
+    }
+  ],
+  "interpretation": "Stored-hash comparison; visual and original-video independence still require validation"
+}
