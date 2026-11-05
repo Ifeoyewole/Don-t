@@ -686,6 +686,49 @@ export const PhotoUploadPage = ({
                           Apply this photo's suggestions
                         </button>
                       )}
+                      <label htmlFor={`camera-${image.id}`} style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginTop: '0.6rem' }}>
+                        Capture camera / rig ID
+                      </label>
+                      <input id={`camera-${image.id}`} type="text" maxLength={160}
+                        value={cameraDrafts[image.id] ?? image.cameraId ?? ''}
+                        disabled={image.queueStatus === 'completed' || image.queueStatus === 'processing'}
+                        onChange={(event) => setCameraDrafts((old) => ({ ...old, [image.id]: event.target.value }))}
+                        onBlur={() => {
+                          if (cameraDrafts[image.id] !== undefined) {
+                            void persistPhotoContext(image.id, { cameraId: cameraDrafts[image.id] }, 'inspector')
+                            setCameraDrafts((old) => { const next = { ...old }; delete next[image.id]; return next })
+                          }
+                        }}
+                        placeholder="Actual camera ID (not AI inferred)"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '0.5rem', marginTop: '0.25rem' }} />
+                      {savedProfile?.camera_id && image.queueStatus !== 'completed' && (
+                        <button type="button" className="button button-ghost" style={{ marginTop: '0.3rem' }}
+                          onClick={() => {
+                            setCameraDrafts((old) => { const next = { ...old }; delete next[image.id]; return next })
+                            void persistPhotoContext(image.id, { cameraId: savedProfile.camera_id ?? '' }, 'inspector')
+                          }}>
+                          Confirm saved rig for this photo
+                        </button>
+                      )}
+                      <label htmlFor={`diameter-${image.id}`} style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginTop: '0.6rem' }}>
+                        Nominal diameter for this photo (mm)
+                      </label>
+                      <input id={`diameter-${image.id}`} type="number" min="1" max="5000"
+                        value={diameterDrafts[image.id] ?? image.pipeDiameterMm ?? manholePipeDiameterMm ?? ''}
+                        disabled={image.queueStatus === 'completed' || image.queueStatus === 'processing'}
+                        onChange={(event) => setDiameterDrafts((old) => ({ ...old, [image.id]: event.target.value }))}
+                        onBlur={() => {
+                          if (diameterDrafts[image.id] !== undefined) {
+                            const diameter = diameterDrafts[image.id].trim() ? Number(diameterDrafts[image.id]) : null
+                            void persistPhotoContext(image.id, { pipeDiameterMm: diameter }, 'inspector')
+                            setDiameterDrafts((old) => { const next = { ...old }; delete next[image.id]; return next })
+                          }
+                        }}
+                        placeholder="From manhole metadata or verified pipe specification"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '0.5rem', marginTop: '0.25rem' }} />
+                      <p style={{ fontSize: '0.7rem', opacity: 0.8 }}>
+                        Camera and diameter are never inferred by Gemini. Missing or mismatched reference means pixel-only geometry.
+                      </p>
                       <label htmlFor={`notes-${image.id}`} style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginTop: '0.6rem' }}>
                         Inspection note
                       </label>
