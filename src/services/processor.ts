@@ -89,6 +89,7 @@ async function runAiAssistedMeasurement(
       calibrationSource: options?.calibrationSource,
       calibrationVerified: options?.calibrationVerified,
       calibrationReferenceId: options?.calibrationReferenceId,
+      cameraId: options?.calibrationProfile?.camera_id ?? options?.calibrationProfile?.cameraId ?? undefined,
       projectId: options?.projectId,
       jointType: options?.jointType,
     }
