@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
-import { requestInspectionContextSuggestions, type InspectionContextSuggestion } from '../lib/contextSuggestions'
-import type { CalibrationProfile, GeometrySelectionProvenance, InspectionImage, JointGeometryType, ProcessBatchResult } from '../types/domain'
+import { requestInspectionContextSuggestions } from '../lib/contextSuggestions'
+import type { CalibrationProfile, InspectionImage, JointGeometryType, ProcessBatchResult } from '../types/domain'
 
 type Props = {
   online: boolean
@@ -192,6 +192,7 @@ export const PhotoUploadPage = ({
 
   const throughputValue = reportedDownlink !== null ? `${reportedDownlink.toFixed(1)} Mbps` : `${queueCompletion}% queue progress`
   const throughputCaption = reportedDownlink !== null ? 'Reported device link' : 'Live queue throughput'
+  const needsImageSelection = queue.some((image) => (image.queueStatus === 'queued' || image.queueStatus === 'failed') && image.analysisMode !== 'EVIDENCE_ONLY' && !image.jointType)
 
   const persistPhotoContext = (imageId: string, patch: Partial<InspectionImage>, origin: 'ai' | 'inspector' | 'system') => {
     const write = onUpdateImageContext(imageId, patch, origin)
@@ -314,7 +315,7 @@ export const PhotoUploadPage = ({
           className="button button-primary dashboard-cta"
           type="button"
           onClick={() => void handleStart()}
-          disabled={!queue.length || busy}
+          disabled={!queue.length || busy || needsImageSelection}
         >
           {busy ? 'Processing...' : 'Start Inspection'}
         </button>
@@ -529,94 +530,16 @@ export const PhotoUploadPage = ({
             </p>
             <p>{aiReviewCount ? `${aiReviewCount} photo(s) will use enhanced CV and AI review before a retake decision.` : 'All queued photos are eligible for measurement.'}</p>
             <div className="action-row">
-              <button className="button button-ghost" type="button" onClick={() => { advisoryControllerRef.current?.abort(); setAdvisory(null); setAdvisoryError(''); void onClearQueue() }} disabled={!queue.length || busy}>
+              <button className="button button-ghost" type="button" onClick={() => { for (const controller of suggestionControllers.current.values()) controller.abort(); suggestionControllers.current.clear(); void onClearQueue() }} disabled={!queue.length || busy || needsImageSelection}>
                 Clear All
               </button>
             </div>
           </section>
 
           <section className="network-card operator-context-card">
-            <div className="network-head">
-              <strong>Inspection context</strong>
-              <span>Optional / Editable</span>
-            </div>
-            {queue.length > 1 ? <p role="note" style={{ fontSize: '0.78rem' }}>One geometry is currently used for every queued photo. Use separate inspections for different joint types or camera views.</p> : null}
-            {advisoryBusy ? <p role="status" style={{ fontSize: '0.8rem' }}>Gemini is suggesting context from the first uploaded photo…</p> : null}
-            {advisory ? (
-              <div role="status" style={{ padding: '0.75rem', marginTop: '0.5rem', border: '1px solid #8daedb', borderRadius: '8px', background: 'rgba(75, 135, 220, 0.08)', lineHeight: 1.55 }}>
-                <strong>AI suggestions — review and edit</strong>
-                <p style={{ fontSize: '0.76rem', margin: '0.4rem 0' }}>
-                  Source: {advisory.model}. First uploaded photo only; not private inspection history. These are unverified hints, not physical measurements.
-                </p>
-                {advisory.suggested_joint_type ? (
-                  <p style={{ fontSize: '0.8rem', margin: '0.25rem 0' }}>
-                    Suggested geometry: <strong>{advisory.suggested_joint_type.replaceAll('_', ' ')}</strong>
-                  </p>
-                ) : null}
-                {advisory.suggested_inspection_context ? (
-                  <p style={{ fontSize: '0.8rem', margin: '0.25rem 0' }}>
-                    Visual note: {advisory.suggested_inspection_context}
-                  </p>
-                ) : null}
-                {advisory.possible_gap_visible === true ? (
-                  <p style={{ fontSize: '0.76rem' }}>Possible visible gap (unverified; not a confirmed OPEN_JOINT defect).</p>
-                ) : null}
-                {advisory.processing_allowed ? (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
-                    <button type="button" className="button button-secondary" onClick={() => {
-                      if (advisory.suggested_joint_type) {
-                        setJointType(advisory.suggested_joint_type)
-                        setGeometryProvenance('INSPECTOR_SELECTED')
-                        inspectorEditedGeometry.current = true
-                      }
-                      if (advisory.suggested_inspection_context) {
-                        setOperatorContext(advisory.suggested_inspection_context)
-                        inspectorEditedContext.current = true
-                      }
-                    }}>Apply suggestions</button>
-                    <button type="button" className="button button-ghost" onClick={() => setAdvisory(null)}>Dismiss</button>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            {advisoryError ? <p role="status" style={{ fontSize: '0.78rem', color: '#b45309' }}>{advisoryError}</p> : null}
-            <label htmlFor="joint-geometry-type" style={{ display: 'block', marginTop: '0.5rem' }}>
-              Joint geometry
-            </label>
-            <select
-              id="joint-geometry-type"
-              value={jointType}
-              onChange={(event) => { inspectorEditedGeometry.current = true; setJointType(event.target.value as JointGeometryType); setGeometryProvenance('INSPECTOR_SELECTED') }}
-              style={{ width: '100%', padding: '0.55rem', marginTop: '0.25rem' }}
-            >
-              <option value="CIRCULAR_OPENING">Circular opening</option>
-              <option value="HORIZONTAL_SEAM">Horizontal seam</option>
-              <option value="VERTICAL_SEAM">Vertical seam</option>
-            </select>
-            <textarea
-              id="operator-context-input"
-              className="operator-context-textarea"
-              rows={3}
-              maxLength={1000}
-              value={operatorContext}
-              onChange={(e) => { inspectorEditedContext.current = true; setOperatorContext(e.target.value) }}
-              placeholder='Add useful context for this inspection, for example: "Possible gasket extrusion near the upper-right edge. Focus on joint alignment."'
-              style={{
-                width: '100%',
-                padding: '0.6rem',
-                borderRadius: '6px',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                background: 'rgba(0, 0, 0, 0.25)',
-                color: 'inherit',
-                fontSize: '0.85rem',
-                resize: 'vertical',
-                marginTop: '0.5rem',
-                boxSizing: 'border-box',
-              }}
-            />
-            <p style={{ fontSize: '0.75rem', opacity: 0.75, marginTop: '0.35rem' }}>
-              Optional. This helps AI interpret the inspection and tailor its explanation. It does not override measurements, calibration, tolerance rules, or safety checks.
-            </p>
+            <div className="network-head"><strong>Photo-specific evidence</strong><span>Editable</span></div>
+            <p>Each photo below has its own geometry and inspection note. Gemini suggests them independently; operators can correct or mark unsupported views as evidence-only review.</p>
+            <p>Other conditions such as infiltration, deposits, surface damage, intruding connections and unknown features are never silently labelled as open joints.</p>
           </section>
         </aside>
 
@@ -643,7 +566,10 @@ export const PhotoUploadPage = ({
                 >
                   <div className="asset-image-wrap">
                     {image.previewUrl ? <img src={image.previewUrl} alt={image.fileName} /> : <div className="preview-placeholder" />}
-                    <button className="icon-button" type="button" onClick={() => void onRemoveFile(image.id)}>
+                    <button className="icon-button" type="button" onClick={() => {
+                      suggestionControllers.current.get(image.id)?.abort()
+                      void onRemoveFile(image.id)
+                    }}>
                       Remove
                     </button>
                     {image.queueStatus === 'completed' ? <span className="asset-check">✓</span> : null}
@@ -668,6 +594,74 @@ export const PhotoUploadPage = ({
                     </div>
                     <p>{phaseLabel(image)}</p>
                     {image.validationMessage ? <p className="asset-validation-message">{image.validationMessage}</p> : null}
+                    <div className="photo-context-editor" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--outline, #cbd5e1)' }}>
+                      <label htmlFor={`geometry-${image.id}`} style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem' }}>
+                        Photo-specific geometry
+                      </label>
+                      <select
+                        id={`geometry-${image.id}`}
+                        value={image.analysisMode === 'EVIDENCE_ONLY' ? 'EVIDENCE_ONLY' : image.jointType ?? ''}
+                        disabled={image.queueStatus === 'completed' || image.queueStatus === 'processing'}
+                        onChange={(event) => {
+                          const selection = event.target.value
+                          if (selection === 'EVIDENCE_ONLY') {
+                            void persistPhotoContext(image.id, { analysisMode: 'EVIDENCE_ONLY' }, 'inspector')
+                          } else if (selection) {
+                            void persistPhotoContext(image.id, { jointType: selection as JointGeometryType }, 'inspector')
+                          }
+                        }}
+                        style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+                      >
+                        <option value="">Select / await AI suggestion</option>
+                        <option value="CIRCULAR_OPENING">Circular joint / opening</option>
+                        <option value="HORIZONTAL_SEAM">Horizontal seam</option>
+                        <option value="VERTICAL_SEAM">Vertical seam</option>
+                        <option value="EVIDENCE_ONLY">Other defect, lateral, or uncertain — review only</option>
+                      </select>
+                      <p style={{ fontSize: '0.72rem', marginTop: '0.3rem' }}>
+                        {image.contextSuggestionStatus === 'pending' ? 'Gemini is analyzing this photo…' :
+                          image.contextSuggestionStatus === 'ready' ? `AI suggestion: ${image.contextSuggestionModel ?? 'visual model'} — review before trusting.` :
+                            image.contextSuggestionMessage ?? 'Select a supported gap geometry or keep evidence for manual review.'}
+                      </p>
+                      {image.suggestedInspectionContext && (
+                        <p style={{ fontSize: '0.74rem', marginTop: '0.35rem' }}>
+                          AI observation: {image.suggestedInspectionContext}
+                        </p>
+                      )}
+                      {image.possibleGapVisible === true && <p style={{ fontSize: '0.72rem' }}>Potential gap visible; not a confirmed defect.</p>}
+                      {(image.suggestedJointType || image.suggestedInspectionContext) && image.queueStatus !== 'completed' && (
+                        <button type="button" className="button button-ghost" style={{ marginTop: '0.4rem' }}
+                          onClick={() => void persistPhotoContext(image.id, {
+                            ...(image.suggestedJointType ? { jointType: image.suggestedJointType } : {}),
+                            ...(image.suggestedInspectionContext ? { operatorContext: image.suggestedInspectionContext } : {}),
+                          }, 'inspector')}>
+                          Apply this photo's suggestions
+                        </button>
+                      )}
+                      <label htmlFor={`notes-${image.id}`} style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginTop: '0.6rem' }}>
+                        Inspection note
+                      </label>
+                      <textarea
+                        id={`notes-${image.id}`}
+                        className="operator-context-textarea"
+                        rows={2}
+                        maxLength={1000}
+                        disabled={image.queueStatus === 'completed' || image.queueStatus === 'processing'}
+                        value={notesDrafts[image.id] ?? image.operatorContext ?? ''}
+                        onChange={(event) => setNotesDrafts((old) => ({ ...old, [image.id]: event.target.value }))}
+                        onBlur={() => {
+                          if (notesDrafts[image.id] !== undefined) saveNote(image.id, notesDrafts[image.id])
+                        }}
+                        placeholder="Optional visible observations or inspector findings; never calibration authority."
+                        style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', marginTop: '0.25rem' }}
+                      />
+                      <p style={{ fontSize: '0.7rem', opacity: 0.78 }}>
+                        {image.analysisMode === 'EVIDENCE_ONLY' ? 'Review only — no fabricated mm or PASS.' :
+                          image.geometrySelectionProvenance === 'INSPECTOR_SELECTED' ? 'Geometry confirmed/edited by inspector.' :
+                            image.geometrySelectionProvenance === 'EVIDENCE_SUGGESTED' ? 'AI-suggested geometry — remains provisional.' :
+                              'Geometry not confirmed; select a mode before processing.'}
+                      </p>
+                    </div>
                   </div>
                 </article>
               ))
@@ -684,14 +678,14 @@ export const PhotoUploadPage = ({
               Showing {queue.length} of {queue.length} assets for current inspection run.
             </span>
             <div className="action-row">
-              <button className="button button-ghost" type="button" onClick={() => { advisoryControllerRef.current?.abort(); setAdvisory(null); setAdvisoryError(''); void onClearQueue() }} disabled={!queue.length || busy}>
+              <button className="button button-ghost" type="button" onClick={() => { for (const controller of suggestionControllers.current.values()) controller.abort(); suggestionControllers.current.clear(); void onClearQueue() }} disabled={!queue.length || busy || needsImageSelection}>
                 Clear all
               </button>
               <button
                 className="button button-primary"
                 type="button"
                 onClick={() => void handleStart()}
-                disabled={!queue.length || busy}
+                disabled={!queue.length || busy || needsImageSelection}
               >
                 {busy ? 'Processing Queue...' : 'Start Inspection'}
               </button>
