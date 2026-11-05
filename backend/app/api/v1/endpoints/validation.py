@@ -1,9 +1,13 @@
 """Photo quality validation endpoint."""
 
+import asyncio
+
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from backend.app.core.cv.preprocessor import validate_photo_quality
-from backend.app.schemas.validation import PhotoQualityResult
+from backend.app.core.cv.ai.vertex_semantic_gate import get_vertex_semantic_gate
+from backend.app.schemas.validation import PhotoQualityResult, InspectionContextSuggestions
 from backend.app.utils.image_io import decode_image_bytes
+from backend.app.schemas.domain import DomainStatus
 
 router = APIRouter()
 
@@ -72,4 +76,64 @@ async def validate_photo(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error evaluating photo quality due to internal processing error.",
+        )
+
+
+@router.post(
+    "/context-suggestions",
+    response_model=InspectionContextSuggestions,
+    summary="Generate optional editable inspection context from a photo",
+)
+async def suggest_inspection_context(
+    file: UploadFile = File(..., description="Inspection image (JPEG/PNG/WebP)."),
+) -> InspectionContextSuggestions:
+    """Reuse the production Gemini semantic gate without assuming calibration.
+
+    The image itself is the only contextual input; no prior user photos, customer
+    histories, or fabricated dimensions are supplied to Gemini. Missing or
+    rejected semantic validation yields empty suggestions, not a PASS.
+    """
+    try:
+        if file.content_type not in ("image/jpeg", "image/png", "image/webp"):
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail="Only JPEG, PNG, and WEBP inspection photos are accepted.",
+            )
+        content = await file.read(15 * 1024 * 1024 + 1)
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded file payload is empty.",
+            )
+        if len(content) > 15 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Uploaded image exceeds 15 MB.",
+            )
+
+        image_bgr = decode_image_bytes(content)
+        semantic = await asyncio.to_thread(get_vertex_semantic_gate().evaluate, image_bgr)
+        allowed = (
+            semantic.processing_allowed
+            and semantic.domain_status == DomainStatus.PIPE_JOINT_INSPECTION
+        )
+        return InspectionContextSuggestions(
+            model=semantic.model,
+            domain_status=semantic.domain_status,
+            processing_allowed=allowed,
+            suggested_joint_type=semantic.suggested_joint_type if allowed else None,
+            suggested_inspection_context=semantic.suggested_inspection_context if allowed else None,
+            possible_gap_visible=semantic.possible_gap_visible if allowed else None,
+        )
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Image context suggestions are temporarily unavailable; manual inspection remains available.",
         )
