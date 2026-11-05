@@ -342,7 +342,7 @@ export const processor = {
       jointType: image.jointType ?? existing.jointType,
       operatorContext: image.operatorContext,
       cameraId: image.cameraId,
-      pipeDiameterMm: image.pipeDiameterMm,
+      pipeDiameterMm: image.pipeDiameterMm ?? undefined,
       geometrySelectionProvenance: image.geometrySelectionProvenance ?? existing.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
       executionMode: existing.executionSource === 'LOCAL_PREVIEW_UNVERIFIED' ? 'local-preview' : 'cloud',
     }
