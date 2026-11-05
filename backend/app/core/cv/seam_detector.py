@@ -177,6 +177,14 @@ def measure_seam_gap(
 
     h, w = gray.shape
 
+    # Respect the independent locator's ROI instead of searching unrelated
+    # high-contrast pipe-wall boundaries across the whole image.
+    x0, y0, x1, y1 = 0, 0, w, h
+    if roi_bbox is not None:
+        x0, y0, x1, y1 = map(int, roi_bbox)
+        if not (0 <= x0 < x1 <= w and 0 <= y0 < y1 <= h):
+            raise ValueError("joint_geometry_not_reliable: Invalid seam localization ROI.")
+
     # Step 1: Preprocessing & Contrast Enhancement
     smoothed = filter_bilateral_smooth(gray, d=7, sigma_color=50, sigma_space=50)
     enhanced = enhance_edges_clahe(smoothed, clip_limit=2.0)
@@ -190,14 +198,14 @@ def measure_seam_gap(
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 7))
         filtered_grad = cv2.morphologyEx(np.abs(grad), cv2.MORPH_CLOSE, kernel)
 
-        scan_coords = np.linspace(int(h * 0.10), int(h * 0.90), num_scanlines, dtype=int)
+        scan_coords = np.linspace(max(y0, int(h * 0.10)), min(y1 - 1, int(h * 0.90)), num_scanlines, dtype=int)
     else:
         # Horizontal seam -> Gradients along Y axis
         grad = cv2.Sobel(enhanced, cv2.CV_32F, 0, 1, ksize=3)
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 1))
         filtered_grad = cv2.morphologyEx(np.abs(grad), cv2.MORPH_CLOSE, kernel)
 
-        scan_coords = np.linspace(int(w * 0.10), int(w * 0.90), num_scanlines, dtype=int)
+        scan_coords = np.linspace(max(x0, int(w * 0.10)), min(x1 - 1, int(w * 0.90)), num_scanlines, dtype=int)
 
     # Step 3: Scanline Profiling and Edge Peak Extraction
     left_points: List[Point2D] = []
@@ -206,11 +214,13 @@ def measure_seam_gap(
 
     for coord in scan_coords:
         if is_vertical:
-            profile = filtered_grad[coord, :]
-            axis_len = w
+            profile = filtered_grad[coord, x0:x1]
+            axis_len = x1 - x0
+            offset = x0
         else:
-            profile = filtered_grad[:, coord]
-            axis_len = h
+            profile = filtered_grad[y0:y1, coord]
+            axis_len = y1 - y0
+            offset = y0
 
         # Find two prominent edge peaks (outer/inner joint boundaries)
         # Threshold: minimum height of 20% max gradient
@@ -226,10 +236,16 @@ def measure_seam_gap(
             sorted_peaks = sorted(sorted_peaks)
             p1_int, p2_int = sorted_peaks[0], sorted_peaks[-1]
 
-            p1_sub = _subpixel_peak(profile, p1_int)
-            p2_sub = _subpixel_peak(profile, p2_int)
+            p1_sub = _subpixel_peak(profile, p1_int) + offset
+            p2_sub = _subpixel_peak(profile, p2_int) + offset
 
-            gap_px = max(1.0, abs(p2_sub - p1_sub))
+            gap_px = abs(p2_sub - p1_sub)
+            # This detector is for a localized seam, not the full separation
+            # between distant edges or between opposite pipe-wall regions.
+            # Large apparent openings require an inspector-provided region or
+            # a different validated geometry algorithm; never emit fake pixels.
+            if not (1.0 <= gap_px <= max(8.0, axis_len * 0.25)):
+                continue
             raw_gaps_px.append(gap_px)
 
             if is_vertical:
