@@ -90,7 +90,8 @@ async function runAiAssistedMeasurement(
       calibrationSource: options?.calibrationSource,
       calibrationVerified: options?.calibrationVerified,
       calibrationReferenceId: options?.calibrationReferenceId,
-      cameraId: options?.calibrationProfile?.camera_id ?? options?.calibrationProfile?.cameraId ?? undefined,
+      // Explicitly confirmed for THIS photograph, never inherited from a project profile.
+      cameraId: options?.cameraId,
       projectId: options?.projectId,
       jointType: options?.jointType,
     }
@@ -337,6 +338,8 @@ export const processor = {
       projectId: image.projectId,
       jointType: image.jointType ?? existing.jointType,
       operatorContext: image.operatorContext,
+      cameraId: image.cameraId,
+      pipeDiameterMm: image.pipeDiameterMm,
       geometrySelectionProvenance: image.geometrySelectionProvenance ?? existing.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
       executionMode: existing.executionSource === 'LOCAL_PREVIEW_UNVERIFIED' ? 'local-preview' : 'cloud',
     }
@@ -347,7 +350,7 @@ export const processor = {
         reprocessOptions = {
           ...reprocessOptions,
           calibrationProfile: parsed,
-          pipeDiameterMm: parsed.pipe_diameter_mm ?? parsed.pipeDiameterMm ?? undefined,
+          pipeDiameterMm: image.pipeDiameterMm ?? parsed.pipe_diameter_mm ?? parsed.pipeDiameterMm ?? undefined,
           calibrationSource: parsed.source,
           calibrationVerified: parsed.verified,
           calibrationReferenceId: parsed.calibration_reference_id ?? parsed.calibrationReferenceId,
