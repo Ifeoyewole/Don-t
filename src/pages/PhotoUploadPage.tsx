@@ -8,11 +8,13 @@ type Props = {
   projectId: string
   projectName: string
   manholeLabel: string
+  manholeId: string
   manholePipeDiameterMm?: number
   queue: InspectionImage[]
   events: string[]
   onBack: () => void
-  onAddFiles: (files: File[]) => Promise<void>
+  onAddFiles: (files: File[]) => Promise<InspectionImage[]>
+  onUpdateImageContext: (imageId: string, patch: Partial<InspectionImage>, origin: 'ai' | 'inspector' | 'system') => Promise<void>
   onRemoveFile: (imageId: string) => Promise<void>
   onClearQueue: () => Promise<void>
   onStartInspection: (operatorContext?: string, calibration?: CalibrationProfile, jointType?: JointGeometryType, provenance?: GeometrySelectionProvenance) => Promise<ProcessBatchResult>
@@ -30,7 +32,7 @@ const phaseLabel = (image: InspectionImage) => {
 
 type CalibrationSourceType = 'PROJECT_METADATA' | 'MANHOLE_METADATA' | 'PHYSICAL_REFERENCE' | 'TEST_RIG' | 'CAMERA_CALIBRATION'
 
-function getInitialCalibration(projId: string) {
+function getInitialCalibration(projId: string, manholeId: string) {
   if (!projId || typeof localStorage === 'undefined') {
     return {
       profile: null as CalibrationProfile | null,
@@ -42,7 +44,7 @@ function getInitialCalibration(projId: string) {
     }
   }
   try {
-    const stored = localStorage.getItem(`jointinspect_cal_${projId}`)
+    const stored = localStorage.getItem(`jointinspect_cal_${projId}_${manholeId}`)
     if (stored) {
       const parsed = JSON.parse(stored) as CalibrationProfile
       const dia = parsed.pipe_diameter_mm ?? parsed.pipeDiameterMm
@@ -74,11 +76,13 @@ export const PhotoUploadPage = ({
   projectId,
   projectName,
   manholeLabel,
+  manholeId,
   manholePipeDiameterMm,
   queue,
   events,
   onBack,
   onAddFiles,
+  onUpdateImageContext,
   onRemoveFile,
   onClearQueue,
   onStartInspection,
@@ -98,16 +102,17 @@ export const PhotoUploadPage = ({
   const [reportedDownlink, setReportedDownlink] = useState<number | null>(null)
 
   // Calibration Profile Setup - Fail-Safe Defaults initialized from project storage
-  const [calPipeDiameter, setCalPipeDiameter] = useState<number | ''>(() => getInitialCalibration(projectId).pipeDiameter || manholePipeDiameterMm || '')
-  const [calSource, setCalSource] = useState<CalibrationSourceType>(() => getInitialCalibration(projectId).pipeDiameter ? getInitialCalibration(projectId).source : manholePipeDiameterMm ? 'MANHOLE_METADATA' : 'PROJECT_METADATA')
-  const [calReferenceId, setCalReferenceId] = useState<string>(() => getInitialCalibration(projectId).referenceId)
-  const [calNotes, setCalNotes] = useState<string>(() => getInitialCalibration(projectId).notes)
-  const [savedProfile, setSavedProfile] = useState<CalibrationProfile | null>(() => getInitialCalibration(projectId).profile)
+  const [calPipeDiameter, setCalPipeDiameter] = useState<number | ''>(() => getInitialCalibration(projectId, manholeId).pipeDiameter || manholePipeDiameterMm || '')
+  const [calSource, setCalSource] = useState<CalibrationSourceType>(() => getInitialCalibration(projectId, manholeId).pipeDiameter ? getInitialCalibration(projectId, manholeId).source : manholePipeDiameterMm ? 'MANHOLE_METADATA' : 'PROJECT_METADATA')
+  const [calReferenceId, setCalReferenceId] = useState<string>(() => getInitialCalibration(projectId, manholeId).referenceId)
+  const [calNotes, setCalNotes] = useState<string>(() => getInitialCalibration(projectId, manholeId).notes)
+  const [calCameraId, setCalCameraId] = useState<string>(() => getInitialCalibration(projectId, manholeId).profile?.camera_id ?? '')
+  const [savedProfile, setSavedProfile] = useState<CalibrationProfile | null>(() => getInitialCalibration(projectId, manholeId).profile)
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('')
   const [saveErrorMsg, setSaveErrorMsg] = useState<string>('')
 
   useEffect(() => {
-    const init = getInitialCalibration(projectId)
+    const init = getInitialCalibration(projectId, manholeId)
     // Defer the state reset so the effect synchronizes the selected project
     // without triggering React's synchronous set-state-in-effect rule.
     queueMicrotask(() => {
@@ -116,6 +121,7 @@ export const PhotoUploadPage = ({
       setCalSource(diameterConflict ? 'MANHOLE_METADATA' : init.pipeDiameter !== '' ? init.source : manholePipeDiameterMm ? 'MANHOLE_METADATA' : init.source)
       setCalReferenceId(diameterConflict ? '' : init.referenceId)
       setCalNotes(diameterConflict ? '' : init.notes)
+      setCalCameraId(diameterConflict ? '' : init.profile?.camera_id ?? '')
       setSavedProfile(diameterConflict ? null : init.profile ? { ...init.profile, verified: false, verified_at: null, verifiedAt: null } : null)
       setJointType('CIRCULAR_OPENING')
       setGeometryProvenance('LEGACY_DEFAULT')
@@ -127,7 +133,7 @@ export const PhotoUploadPage = ({
       inspectorEditedContext.current = false
       inspectorEditedGeometry.current = false
     })
-  }, [projectId, manholeLabel, manholePipeDiameterMm])
+  }, [projectId, manholeId, manholePipeDiameterMm])
 
   useEffect(() => () => advisoryControllerRef.current?.abort(), [])
 
@@ -155,9 +161,11 @@ export const PhotoUploadPage = ({
       verified_at: null,
       verifiedAt: null,
       notes: calNotes.trim() || undefined,
+      camera_id: calCameraId.trim() || null,
+      cameraId: calCameraId.trim() || null,
     }
     try {
-      localStorage.setItem(`jointinspect_cal_${projectId}`, JSON.stringify(profile))
+      localStorage.setItem(`jointinspect_cal_${projectId}_${manholeId}`, JSON.stringify(profile))
       setSavedProfile(profile)
       setSaveSuccessMsg('Calibration reference saved. The server must verify it before authoritative millimetres are available.')
       setTimeout(() => {
@@ -484,7 +492,7 @@ export const PhotoUploadPage = ({
               ) : null}
             </div>
             <p style={{ fontSize: '0.72rem', opacity: 0.7, marginTop: '0.4rem' }}>
-              {manholePipeDiameterMm && !getInitialCalibration(projectId).pipeDiameter
+              {manholePipeDiameterMm && !getInitialCalibration(projectId, manholeId).pipeDiameter
                 ? `Diameter prefilled from manhole specifications (${manholePipeDiameterMm} mm), NOT inferred by AI. `
                 : ''}
               Save the calibration reference once for this project. The backend verifies trusted references before issuing authoritative millimetres.
