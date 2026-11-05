@@ -281,7 +281,7 @@ export interface InspectionImage {
   operatorContext?: string
   operatorContextEdited?: boolean
   cameraId?: string
-  pipeDiameterMm?: number
+  pipeDiameterMm?: number | null
   suggestedJointType?: JointGeometryType
   suggestedInspectionContext?: string
   possibleGapVisible?: boolean | null
