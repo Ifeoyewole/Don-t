@@ -89,15 +89,9 @@ export const PhotoUploadPage = ({
 }: Props) => {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [operatorContext, setOperatorContext] = useState('')
-  const [jointType, setJointType] = useState<JointGeometryType>('CIRCULAR_OPENING')
-  const [geometryProvenance, setGeometryProvenance] = useState<GeometrySelectionProvenance>('LEGACY_DEFAULT')
-  const [advisory, setAdvisory] = useState<InspectionContextSuggestion | null>(null)
-  const [advisoryBusy, setAdvisoryBusy] = useState(false)
-  const [advisoryError, setAdvisoryError] = useState('')
-  const advisoryControllerRef = useRef<AbortController | null>(null)
-  const inspectorEditedContext = useRef(false)
-  const inspectorEditedGeometry = useRef(false)
+  const [notesDrafts, setNotesDrafts] = useState<Record<string, string>>({})
+  const suggestionControllers = useRef(new Map<string, AbortController>())
+  const pendingWrites = useRef(new Set<Promise<void>>())
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [reportedDownlink, setReportedDownlink] = useState<number | null>(null)
 
@@ -123,19 +117,13 @@ export const PhotoUploadPage = ({
       setCalNotes(diameterConflict ? '' : init.notes)
       setCalCameraId(diameterConflict ? '' : init.profile?.camera_id ?? '')
       setSavedProfile(diameterConflict ? null : init.profile ? { ...init.profile, verified: false, verified_at: null, verifiedAt: null } : null)
-      setJointType('CIRCULAR_OPENING')
-      setGeometryProvenance('LEGACY_DEFAULT')
-      setOperatorContext('')
-      advisoryControllerRef.current?.abort()
-      setAdvisory(null)
-      setAdvisoryError('')
-      setAdvisoryBusy(false)
-      inspectorEditedContext.current = false
-      inspectorEditedGeometry.current = false
+      for (const controller of suggestionControllers.current.values()) controller.abort()
+      suggestionControllers.current.clear()
+      setNotesDrafts({})
     })
   }, [projectId, manholeId, manholePipeDiameterMm])
 
-  useEffect(() => () => advisoryControllerRef.current?.abort(), [])
+  useEffect(() => () => { for (const controller of suggestionControllers.current.values()) controller.abort() }, [])
 
   const handleSaveCalibration = () => {
     setSaveErrorMsg('')
@@ -205,43 +193,43 @@ export const PhotoUploadPage = ({
   const throughputValue = reportedDownlink !== null ? `${reportedDownlink.toFixed(1)} Mbps` : `${queueCompletion}% queue progress`
   const throughputCaption = reportedDownlink !== null ? 'Reported device link' : 'Live queue throughput'
 
-  const analyzeForSuggestions = async (photo: File) => {
-    advisoryControllerRef.current?.abort()
+  const persistPhotoContext = (imageId: string, patch: Partial<InspectionImage>, origin: 'ai' | 'inspector' | 'system') => {
+    const write = onUpdateImageContext(imageId, patch, origin)
+    pendingWrites.current.add(write)
+    void write.catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not update image context.'))
+      .finally(() => pendingWrites.current.delete(write))
+    return write
+  }
+
+  const analyzeForSuggestions = async (image: InspectionImage, photo: File) => {
     const controller = new AbortController()
-    advisoryControllerRef.current = controller
-    setAdvisory(null)
-    setAdvisoryError('')
-    setAdvisoryBusy(true)
-    if (!inspectorEditedContext.current) setOperatorContext('')
-    if (!inspectorEditedGeometry.current) { setJointType('CIRCULAR_OPENING'); setGeometryProvenance('LEGACY_DEFAULT') }
+    suggestionControllers.current.set(image.id, controller)
+    await persistPhotoContext(image.id, { contextSuggestionStatus: 'pending' }, 'system')
     const timeout = window.setTimeout(() => controller.abort('timeout'), 45000)
     try {
       const result = await requestInspectionContextSuggestions(photo, controller.signal, manholePipeDiameterMm)
-      if (controller.signal.aborted || advisoryControllerRef.current !== controller) return
-      setAdvisory(result)
-      if (!result.processing_allowed || !result.image_quality_usable) {
-        setAdvisoryError(result.reason || 'No suitable pipe joint found. Check photo quality or enter context manually.')
-        return
-      }
-      // Auto-populate only fields the inspector has not touched. Every field stays editable.
-      if (result.suggested_joint_type && !inspectorEditedGeometry.current) {
-        setJointType(result.suggested_joint_type)
-        setGeometryProvenance('EVIDENCE_SUGGESTED')
-      }
-      if (result.suggested_inspection_context && !inspectorEditedContext.current) {
-        setOperatorContext((current) => current.trim() ? current : result.suggested_inspection_context || '')
-      }
-    } catch (error) {
-      if (advisoryControllerRef.current === controller && (!controller.signal.aborted || controller.signal.reason === 'timeout')) {
-        setAdvisoryError(controller.signal.reason === 'timeout'
-          ? 'AI suggestion timed out. You can continue with manual entry.'
-          : error instanceof Error ? error.message : 'Suggestions unavailable; enter context manually.')
-      }
+      if (controller.signal.aborted) return
+      const allowed = result.processing_allowed && result.image_quality_usable
+      await persistPhotoContext(image.id, {
+        contextSuggestionStatus: allowed ? 'ready' : 'review_required',
+        contextSuggestionMessage: result.reason,
+        contextSuggestionModel: result.model,
+        suggestedJointType: allowed ? result.suggested_joint_type ?? undefined : undefined,
+        suggestedInspectionContext: allowed ? result.suggested_inspection_context ?? undefined : undefined,
+        possibleGapVisible: allowed ? result.possible_gap_visible : null,
+        jointType: allowed ? result.suggested_joint_type ?? undefined : undefined,
+        operatorContext: allowed ? result.suggested_inspection_context ?? undefined : undefined,
+      }, 'ai')
+    } catch (err) {
+      if (controller.signal.aborted && controller.signal.reason !== 'timeout') return
+      await persistPhotoContext(image.id, {
+        contextSuggestionStatus: 'unavailable',
+        contextSuggestionMessage: controller.signal.reason === 'timeout' ? 'Suggestion timed out; choose geometry manually.' :
+          err instanceof Error ? err.message : 'AI suggestion unavailable. You can still enter context manually.',
+      }, 'system')
     } finally {
       window.clearTimeout(timeout)
-      if (advisoryControllerRef.current === controller) {
-        setAdvisoryBusy(false)
-      }
+      suggestionControllers.current.delete(image.id)
     }
   }
 
@@ -251,12 +239,20 @@ export const PhotoUploadPage = ({
     setError('')
     try {
       const selected = Array.from(files)
-      await onAddFiles(selected)
-      // Only the first photo is used as an image-only suggestion; avoid extra API costs for every frame.
-      if (online && selected[0]) {
-        void analyzeForSuggestions(selected[0])
-      } else if (!online) {
-        setAdvisoryError('Cloud suggestions require a connection; manual editing remains available.')
+      const added = await onAddFiles(selected)
+      if (online) {
+        // Two image-only requests at a time, to limit network and Vertex usage.
+        void (async () => {
+          for (let i = 0; i < added.length; i += 2) {
+            await Promise.all(added.slice(i, i + 2).map((image, offset) =>
+              analyzeForSuggestions(image, selected[i + offset])))
+          }
+        })().catch((err: unknown) => setError(err instanceof Error ? err.message : 'Suggestion preflight interrupted.'))
+      } else {
+        for (const image of added) void persistPhotoContext(image.id, {
+          contextSuggestionStatus: 'unavailable',
+          contextSuggestionMessage: 'Offline: enter geometry and notes manually.',
+        }, 'system')
       }
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Could not add selected files.')
@@ -266,11 +262,28 @@ export const PhotoUploadPage = ({
     }
   }
 
+  const saveNote = (imageId: string, textValue: string) => {
+    void persistPhotoContext(imageId, { operatorContext: textValue }, 'inspector')
+    setNotesDrafts((current) => {
+      const next = { ...current }
+      delete next[imageId]
+      return next
+    })
+  }
+
   const handleStart = async () => {
     setBusy(true)
     setError('')
     try {
-      await onStartInspection(operatorContext.trim() || undefined, savedProfile ?? undefined, jointType, geometryProvenance)
+      for (const [imageId, note] of Object.entries(notesDrafts)) {
+        await persistPhotoContext(imageId, { operatorContext: note }, 'inspector')
+      }
+      await Promise.all([...pendingWrites.current])
+      const readyToMeasure = queue.filter((image) => image.queueStatus === 'queued' || image.queueStatus === 'failed')
+      if (readyToMeasure.some((image) => image.analysisMode !== 'EVIDENCE_ONLY' && !image.jointType)) {
+        throw new Error('Choose a geometry or evidence-only review for every photo before processing.')
+      }
+      await onStartInspection(undefined, savedProfile ?? undefined)
     } catch (processingError) {
       setError(processingError instanceof Error ? processingError.message : 'Processing failed.')
     } finally {
