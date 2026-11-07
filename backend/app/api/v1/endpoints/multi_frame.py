@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from backend.app.core.cv.circular_detector import measure_circular_gap
 from backend.app.core.cv.confidence import confidence_engine
+from backend.app.core.cv.calibration_authority import get_verified_calibration
 from backend.app.core.cv.fusion import MultiFrameFusion, MultiFrameFusionResult
 from backend.app.schemas.domain import (
     CalibrationSource,
@@ -54,7 +55,10 @@ async def measure_multi_frame_burst(
     files: List[UploadFile] = File(..., description="List of consecutive CCTV video frames (2 to 30 frames)."),
     pipe_diameter_mm: Optional[float] = Form(None, gt=0.0, le=5000.0),
     calibration_source: Optional[CalibrationSource] = Form(None),
-    calibration_verified: bool = Form(False),
+    calibration_verified: bool = Form(False),  # Legacy browser hint; NEVER grants measurement authority.
+    calibration_reference_id: Optional[str] = Form(None, max_length=160),
+    project_id: Optional[str] = Form(None, max_length=160),
+    camera_id: Optional[str] = Form(None, max_length=160),
     max_gap_mm: Optional[float] = Form(None, gt=0.0, le=500.0),
 ) -> MultiFrameMeasurementResponse:
     """Analyze consecutive CCTV frames, reject transient outlier spikes, and emit robust median measurement."""
@@ -69,19 +73,18 @@ async def measure_multi_frame_burst(
             detail="Multi-frame measurement exceeds maximum burst sequence limit of 30 frames.",
         )
 
-    verified_sources = {
-        CalibrationSource.PROJECT_METADATA,
-        CalibrationSource.MANHOLE_METADATA,
-        CalibrationSource.PHYSICAL_REFERENCE,
-        CalibrationSource.CAMERA_CALIBRATION,
-        CalibrationSource.TEST_RIG,
-    }
-    is_calibrated = (
-        calibration_source in verified_sources
-        and calibration_verified is True
-        and pipe_diameter_mm is not None
-        and pipe_diameter_mm > 0.0
+    # No client input, including the legacy "calibration_verified=true" flag,
+    # can issue physical scale authority. Match a server-owned, camera-scoped
+    # record, exactly as the single-image endpoint does.
+    verified = get_verified_calibration(
+        reference_id=calibration_reference_id,
+        project_id=project_id,
+        source=calibration_source,
+        pipe_diameter_mm=pipe_diameter_mm,
+        camera_id=camera_id,
+        joint_type=JointType.CIRCULAR_OPENING.value,
     )
+    is_calibrated = verified is not None
 
     measured_gaps_px: List[float] = []
     measured_gaps_mm: List[float] = []
@@ -130,8 +133,16 @@ async def measure_multi_frame_burst(
             gap_px = res.mean_gap_px if res.mean_gap_px is not None else (res.debug_info.mean_gap_px if res.debug_info else None)
             if gap_px is not None and gap_px > 0.0:
                 measured_gaps_px.append(gap_px)
-                if is_calibrated and res.mean_gap_mm is not None:
-                    measured_gaps_mm.append(res.mean_gap_mm)
+                # Partial geometry or unavailable scale may still produce a
+                # pixel candidate, but not an authoritative mm observation.
+                if (
+                    is_calibrated
+                    and res.physical_measurement_available is True
+                    and res.geometry_tier == "ACCEPTABLE_GEOMETRY"
+                    and res.authoritative_gap_mm is not None
+                    and res.authoritative_gap_mm > 0
+                ):
+                    measured_gaps_mm.append(res.authoritative_gap_mm)
         except HTTPException:
             raise
         except Exception:
@@ -148,7 +159,9 @@ async def measure_multi_frame_burst(
     fusion_px = MultiFrameFusion.fuse_frame_measurements(measured_gaps_px)
     overall_conf = round(float(fusion_px.temporal_consistency_score * 0.95), 3)
 
-    if is_calibrated and measured_gaps_mm:
+    # Never fuse a cherry-picked mm subset if other accepted pixel frames
+    # lacked reliable geometry/scale. Keep the entire burst in review.
+    if is_calibrated and len(measured_gaps_mm) == len(measured_gaps_px) and measured_gaps_mm:
         fusion_mm = MultiFrameFusion.fuse_frame_measurements(measured_gaps_mm)
         fused_median_mm = fusion_mm.fused_mean_gap_mm
         fused_min_mm = fusion_mm.fused_min_gap_mm
@@ -157,7 +170,9 @@ async def measure_multi_frame_burst(
         physical_avail = True
         
         # Tolerance evaluation
-        if max_gap_mm is not None and fused_median_mm > max_gap_mm:
+        if max_gap_mm is None:
+            condition = None  # An absent tolerance is not evidence of NORMAL.
+        elif fused_median_mm > max_gap_mm:
             condition = JointConditionClass.OPEN_JOINT
         else:
             condition = JointConditionClass.NORMAL_JOINT
@@ -177,13 +192,19 @@ async def measure_multi_frame_burst(
         physical_avail = False
         condition = None  # Do not guess condition without calibration
         result_status = MeasurementResultStatus.REVIEW_REQUIRED
-        rejection_reason = "CALIBRATION_REQUIRED: Multi-frame sequence lacks verified calibration. Millimeters withheld."
+        rejection_reason = (
+            "CALIBRATION_REQUIRED: No matching server-owned calibration reference for this project/camera/geometry. "
+            "Client calibration_verified flags are ignored; millimetres withheld."
+            if not is_calibrated else
+            "GEOMETRY_REVIEW_REQUIRED: At least one measured frame lacks authoritative calibrated geometry. "
+            "No burst-level millimetres issued."
+        )
 
     return MultiFrameMeasurementResponse(
         joint_type=JointType.CIRCULAR_OPENING,
         pipe_diameter_mm=pipe_diameter_mm if is_calibrated else None,
         calibration_source=calibration_source,
-        calibration_verified=calibration_verified,
+        calibration_verified=is_calibrated,
         physical_measurement_available=physical_avail,
         num_frames_received=len(files),
         num_frames_accepted=fusion_px.num_accepted_frames,
