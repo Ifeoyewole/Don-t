@@ -39,7 +39,12 @@
 6. Establish an untouched development set. Previously reported scores remain exploratory where exposure or label coverage is uncertain.
 7. Create a bounded continuation configuration with periodic checkpoint uploads, source sampling balance and per-class support reporting. Pin manifest and checkpoint SHA-256, preprocessing, seed, budget and timeout.
 8. Evaluate all compatible candidates on identical supported records; tune fusion only on tuning data. Freeze the strongest preview candidate even if fusion adds no benefit. Do not use the final locked test during preparation.
-9. Preview must expose unsupported classes and limited sample support, preserve zero-guessing measurement rejection, and remain research-scoped until rights are suitable.
+9. Preview must expose unsupported classes, preserve zero-guessing measurement rejection
+   and remain **scientifically unvalidated** until independent tests pass.
+   Update 2026-11-07: the project owner reports that Inspect View's rights
+   holders already granted commercial production permission; documentation
+   of the agreement and its coverage is being recovered. The public
+   Sewer-ML license and other dataset restrictions remain unchanged.
 
 No training or deployment was started during this acquisition round. The next cycle is training preparation with these gates, not an unqualified merge of all downloaded images.
 
