@@ -45,6 +45,7 @@ def _candidate(
     contour: np.ndarray,
     offset: tuple[int, int],
     shape: tuple[int, int],
+    minimum_coverage: float,
 ) -> Optional[EllipseRing]:
     if len(contour) < 30:
         return None
@@ -78,7 +79,7 @@ def _candidate(
         (np.arctan2(v, u) + np.pi) / (2.0 * np.pi) * 36
     ).astype(int) % 36
     coverage = float(np.unique(angular_bins).size / 36.0)
-    if coverage < 0.69:
+    if coverage < minimum_coverage:
         return None
 
     return EllipseRing(
@@ -93,10 +94,14 @@ def _candidate(
 def audit_projected_pipe_rings(
     image_bgr: np.ndarray,
     roi_bbox: Optional[Tuple[int, int, int, int]],
+    *,
+    allow_partial: bool = False,
 ) -> EllipseAudit:
     """Find consistent nested projected ring outlines within a supplied ROI.
 
     Output is projected visual ring spacing in PIXELS, not axial joint opening.
+    Optional partial arcs are unconfirmed evidence and MUST be corroborated
+    in a separate frame before use by the research temporal audit.
     A ROI is mandatory. This method must not be used to authorize PASS or mm.
     """
     if image_bgr is None or image_bgr.size == 0 or image_bgr.ndim not in (2, 3):
@@ -121,7 +126,7 @@ def audit_projected_pipe_rings(
     candidates: list[EllipseRing] = []
     for contour in sorted(contours, key=cv2.contourArea, reverse=True)[:90]:
         try:
-            candidate = _candidate(contour, (x0, y0), gray.shape)
+            candidate = _candidate(contour, (x0, y0), gray.shape, 0.42 if allow_partial else 0.69)
         except cv2.error:
             continue
         if candidate is not None:
@@ -168,11 +173,13 @@ def audit_projected_pipe_rings(
         return _reject("no_consistent_nested_ellipse_pair")
 
     _, inner, outer, spacing = best
+    is_partial = min(inner.coverage, outer.coverage) < 0.69
     return EllipseAudit(
         method="roi_projected_ellipse_pair_v1",
-        status="PROJECTED_RING_EVIDENCE",
+        status="PARTIAL_RING_CANDIDATE" if is_partial else "PROJECTED_RING_EVIDENCE",
         inner_ring=inner,
         outer_ring=outer,
         projected_semiaxis_spacing_px=round(spacing, 2),
-        reason="consistent_projected_ring_boundaries_not_axial_gap",
+        reason=("partial_ring_requires_independent_frame" if is_partial
+                else "consistent_projected_ring_boundaries_not_axial_gap"),
     )
