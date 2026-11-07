@@ -25,7 +25,8 @@ Do not promote those weights either until their rights are independently cleared
 
 | Component | Reference | Code license | Purpose | Current disposition |
 |---|---|---|---|---|
-| MMSegmentation with SegFormer-B0 | https://github.com/open-mmlab/mmsegmentation | Apache-2.0 | Pixel-level opening and irregular concrete/material-boundary segmentation | Preferred first experiment, **untrained** |
+| Meta SAM 2.1 Hiera Tiny | https://github.com/facebookresearch/sam2 | Apache-2.0 **for both official code and checkpoints, explicitly stated by Meta** | Promptable segmentation of an inspector/Gemini ROI and tracking boundaries in adjacent video frames | **Preferred pretrained candidate; not yet downloaded/approved** |
+| MMSegmentation with SegFormer-B0 | https://github.com/open-mmlab/mmsegmentation | Apache-2.0 source code | JointInspect-trained pixel-level opening and irregular concrete/material-boundary segmentation | Preferred defect-specific train-from-scratch experiment, **untrained** |
 | YOLOX-S | https://github.com/Megvii-BaseDetection/YOLOX | Apache-2.0 | Bounding-box localization for lateral, crack, joint, root/deposit, etc. | Optional second detector, **untrained** |
 | MMDetection | https://github.com/open-mmlab/mmdetection | Apache-2.0 | Additional instance segmentation / detector alternative | Optional code reference; no integration |
 | ONNX Runtime | https://github.com/microsoft/onnxruntime | MIT | Exported runtime inferencing alongside existing FastAPI | Existing dependency, audit transitive packages |
@@ -34,6 +35,31 @@ Check the exact code commit, full LICENSE, NOTICE, patent/third-party files and
 dependency graph when integrating. The upstream repository's main code license
 does **not** automatically apply to downloadable pretrained model checkpoints,
 ImageNet/COCO training images, fine-tuned sewer models or separate datasets.
+
+### Strongest pretrained candidate — Meta SAM 2.1
+
+The official `facebookresearch/sam2` README at a pinned Git revision
+(`2b90b9f5ceec907a1c18123530e92e794ad901a4`) specifically grants
+Apache 2.0 licensing for **SAM 2 model checkpoints, training code and demo**.
+This is significantly more useful than a repository whose *code* alone is
+Apache/MIT while weight ownership is unclear.
+
+- Official checkpoint: https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_tiny.pt
+- Official license: https://github.com/facebookresearch/sam2/blob/2b90b9f5ceec907a1c18123530e92e794ad901a4/LICENSE
+- Third-party optional mask post-processing: BSD-3-Clause `LICENSE_cctorch`.
+- Training/data origins and dependency inventory still need review; SA-V
+  **dataset download permissions are separate** from the checkpoint license.
+  Do not import video datasets or unknown third-party model weights by association.
+- SAM 2 is a **promptable mask segmenter**, not a trained sewer defect
+  classifier. A good visual mask is not a proof of OPEN_JOINT, INFILTRATION,
+  PROTRUDING_LATERAL, or physical gap in mm.
+- Computational requirement: Python + PyTorch, potentially CUDA GPU for
+  practical latency. Test SAM 2.1 Tiny in a separate optional process; do not
+  silently bloat the CPU-only Cloud Run measurement service.
+- Phase 1: independent publisher/notice/weights SHA review; run local
+  opt-in promptable segmentation on operator-drawn ROI. Compare mask boundary
+  against inspector labels on actual pipe imagery. Keep commercial production
+  disabled until tests, complete rights record and release gate say otherwise.
 
 External commercial restrictions to avoid without suitable permissions:
 - Sewer-ML CC BY-NC-SA 4.0: not commercially cleared.
@@ -57,6 +83,12 @@ RESEARCH (restricted; not for commercial output):
   WRc pretrained baseline [rights pending] -- research comparison
 
 CLEAN-COMMERCIAL MODEL TRACK (disabled pending review):
+  Option A — publisher-licensed SAM 2.1 Tiny [Apache-2.0 official checkpoint]
+       -> inspector/Gemini-proposed ROI -> promptable mask [research evaluation]
+       -> original OpenCV traced boundaries
+       -> not a trained defect label; separate approved classifier needed
+
+  Option B — from-scratch, commercially screened custom defect model:
   Inspector/owned-rights images + accepted in-house synthetic targets
        -> independent source/label/license review
        -> train SegFormer-B0 from random initialization (NO pretrained weights)
@@ -111,9 +143,13 @@ Needed before training/promotion:
   upstream revision, license notice reference, artifact SHA256 metadata,
   from-scratch ancestry, no research-checkpoint fusion, approved source
   registry entries and explicit independent approval metadata.
-- `training/commercial_candidates/*.json` records disabled/no-weights
-  proposals. Running the model release gate on either must return a nonzero
-  exit code and a list of blockers.
+- `training/commercial_candidates/*.json` records **three disabled** proposals:
+  publisher-licensed SAM 2.1 Tiny, independently trainable MMSeg/SegFormer-B0,
+  and YOLOX-S. No weights are in this repository. Running the model release
+  gate on any candidate must return nonzero and show its unresolved blockers.
+  The current gate intentionally accepts ONLY from-scratch weights; a distinct
+  official-publisher-checkpoint allowance must be reviewed before authorizing
+  SAM 2.1, including pinned checksum, publisher grant and transitive licenses.
 
 Run:
 
