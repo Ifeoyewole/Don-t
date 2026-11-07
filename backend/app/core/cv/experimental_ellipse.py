@@ -173,7 +173,7 @@ def audit_projected_pipe_rings(
         return _reject("no_consistent_nested_ellipse_pair")
 
     _, inner, outer, spacing = best
-    is_partial = min(inner.coverage, outer.coverage) < 0.69
+    is_partial = min(inner.coverage, outer.coverage) < 0.90
     return EllipseAudit(
         method="roi_projected_ellipse_pair_v1",
         status="PARTIAL_RING_CANDIDATE" if is_partial else "PROJECTED_RING_EVIDENCE",
