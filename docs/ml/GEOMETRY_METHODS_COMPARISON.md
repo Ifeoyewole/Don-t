@@ -14,7 +14,7 @@ Date: 2026-11-07. Primary production branch examined:
 | [Co-UDlabs camera calibration](https://github.com/Co-UDlabs/sewer_defects/tree/coudlabs/coudlabs/src/camera_calibration) | Checkerboard calibration from multiple known-size target views; optional labelled box references | `CameraCalibrator` undistorts using stored intrinsics, with example camera profiles | Separate, strictly advisory **reprojection error/coverage audit** of real camera calibration captures; never assert that camera was calibrated just because a nominal diameter exists |
 | [Co-UDlabs size estimation](https://github.com/Co-UDlabs/sewer_defects/blob/coudlabs/coudlabs/src/object_size_estimation/distance_and_size.py) | Attempts image-space reference-object size ratios and focal length | Server-owned physical calibration record required; nominal diameter is NOT scale | Preserve JointInspect's stricter authority. Do **not** transfer reference sizes across unmatched depths/planes. Do not copy equations without validating camera geometry |
 | [scikit-image measure docs](https://scikit-image.org/docs/stable/api/skimage.measure.html) | Contours, ellipse/line fitting, robust inlier estimation via RANSAC | Current seam detector finds top gradient peaks and applies ROI + width bound, but can still pair unrelated edges inside ROI | Independent dark-band method requiring **two-sided contrast, continuity, width consistency and localized ROI**. Currently implemented using existing OpenCV/NumPy; no new dependency |
-| [OpenCV geometry](https://docs.opencv.org/4.x/d3/dc0/group__imgproc__shape.html) | Contours, fitting circles/ellipses, shape checks | Circular detector already uses HoughCircles with a contour/min-enclosing-circle fallback | Next research experiment: elliptical boundary coverage/residuals on off-axis views, tested against inspector-labelled rings before replacing circular detector |
+| [OpenCV geometry](https://docs.opencv.org/4.x/d3/dc0/group__imgproc__shape.html) | Contours, fitting circles/ellipses, shape checks | Circular detector already uses HoughCircles with a contour/min-enclosing-circle fallback | Experimental elliptical boundary fitting with coverage, residual and nested-ring checks on off-axis views; NOT production and NOT a measured axial gap |
 | [SAM 2](https://github.com/facebookresearch/sam2) | Promptable segmentation in still images and video | Experimental segmentation is already present; lacks validated edge/scale accuracy for all pipe types | Future optional assist for inspector-selected ROIs and multiple video frames **only after** cost/latency and contour accuracy benchmarks; no checkpoint imported |
 
 ### Specific JointInspect shortcomings
@@ -45,6 +45,7 @@ Date: 2026-11-07. Primary production branch examined:
   two-sided brightness check, robust centerline fit, MAD-like width dispersion,
   and reasoned rejection. It returns **pixel candidates only**, never mm, PASS
   or a defect label. Comparison with the production detector is explicit.
+- `backend/app/core/cv/experimental_ellipse.py`: original ROI-constrained ellipse fitting using existing OpenCV contours. Requires angular boundary coverage, low fit residual, compatible center/axes/orientation for nested rings. Returns **projected ring evidence**, NOT axial joint separation, mm, defect class or PASS. An ordinary socket, liner or distant opening may produce nested ellipses.
 - `backend/app/core/cv/experimental_calibration.py`:
   multi-view calibrated-target reprojection residuals with minimum view count,
   finite input checks and per-view quality threshold. Returns **review
@@ -52,6 +53,7 @@ Date: 2026-11-07. Primary production branch examined:
 - `backend/tests/test_experimental_geometry_comparison.py`:
   synthetic positive, negative, mislocalized, huge-gap and calibration-fit
   checks using original generated arrays, not external project images.
+- `scripts/benchmark_ellipse_geometry.py`: paired **circle vs ellipse** local benchmark. Both read the same ROI, and human ground truth is whether paired ring boundaries are visible—not whether an open-joint defect exists. Outputs labelled positive detections and false pair detections; no mm or photos published.
 - `scripts/benchmark_shadow_geometry.py`: local-only paired benchmark on
   consented images and inspector-supplied ROI/ground truth; reports positive
   coverage, false gap claims on negatives and pixel MAE on measured positives.
@@ -74,10 +76,11 @@ copied, no existing measurement response schema modified, no GCP deployment.
    the exact same labeled examples; report per material, camera and geometry.
    If results are inconclusive, keep research mode rather than changing live
    outputs. No accuracy guarantee based only on synthetic tests.
-4. Validate separate physical scale using controlled camera targets and depth/
+4. Compare ellipse-specific failures: side laterals mistaken for pipe joints, nested pipes at different depths, cropping, obscuring deposits, noncircular pipes, tiny lenses, blur, undistortion and different camera pitch. An ellipse pair is *not* an Open Joint label and projected semiaxis spacing is *not* axial separation. Reprojection fit/geometry still need review.
+5. Validate separate physical scale using controlled camera targets and depth/
    pose reference. A good reprojection RMS does not by itself prove an axial
    gap can be measured in mm in a different image.
-5. Any future production ensemble must fail-closed on disagreement, missing
+6. Any future production ensemble must fail-closed on disagreement, missing
    ROI or unsupported geometry, and must not introduce measured mm without
    trusted calibration and adequate geometry.
 
