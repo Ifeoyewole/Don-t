@@ -16,6 +16,7 @@ from hashlib import sha256
 from math import isfinite
 from typing import Optional, Sequence, Tuple
 
+import cv2
 import numpy as np
 
 from backend.app.core.cv.experimental_ellipse import audit_projected_pipe_rings
@@ -123,6 +124,7 @@ def audit_geometry_frames(
 
     seen_ids: set[str] = set()
     seen_hashes: set[str] = set()
+    seen_edge_masks: list[np.ndarray] = []
     frame_audits: list[FrameAudit] = []
     distinct_sequences: set[str] = set()
     temporal: list[tuple[int, float, float]] = []  # index, normalized gap, aspect
@@ -145,6 +147,20 @@ def audit_geometry_frames(
             frame_audits.append(FrameAudit(frame.frame_id, None, None, "INSUFFICIENT_EVIDENCE", None, None, None, "duplicate_image_bytes"))
             continue
         seen_hashes.add(digest)
+        # Adjacent frames must offer more than a brightness/contrast rewrite
+        # of the same contour. Use an inexpensive edge-shape fingerprint;
+        # this still does not establish 3-D pose or independent field truth.
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img
+        small = cv2.resize(gray, (192, 144), interpolation=cv2.INTER_AREA)
+        small = cv2.GaussianBlur(small, (3, 3), 0.8)
+        edge_mask = cv2.Canny(small, 50, 110, L2gradient=True)
+        if any(
+            np.count_nonzero(edge_mask != previous) / edge_mask.size < 0.003
+            for previous in seen_edge_masks
+        ):
+            frame_audits.append(FrameAudit(frame.frame_id, None, None, "INSUFFICIENT_EVIDENCE", None, None, None, "near_duplicate_edge_geometry"))
+            continue
+        seen_edge_masks.append(edge_mask)
         selected = _select_roi(frame.proposals, img, geometry)
         if selected is None:
             frame_audits.append(FrameAudit(frame.frame_id, None, None, "INSUFFICIENT_EVIDENCE", None, None, None, "no_valid_localized_roi"))
