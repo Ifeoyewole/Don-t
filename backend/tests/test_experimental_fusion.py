@@ -11,11 +11,11 @@ from backend.app.core.cv.experimental_fusion import (
 )
 
 
-def _ring_frame(partial: bool = False, shade: int = 180) -> np.ndarray:
+def _ring_frame(partial: bool = False, shade: int = 180, shift_x: int = 0) -> np.ndarray:
     image = np.full((480, 640, 3), shade, dtype=np.uint8)
     end = 240 if partial else 360
     for axes, color in [((180, 99), (30, 30, 30)), ((144, 79), (40, 40, 40))]:
-        cv2.ellipse(image, (320, 235), axes, 28, 0, end, color, 5)
+        cv2.ellipse(image, (320 + shift_x, 235), axes, 28, 0, end, color, 5)
     return image
 
 
@@ -48,7 +48,7 @@ def test_partial_ring_single_frame_requires_temporal_confirmation():
 def test_two_distinct_adjacent_partial_frames_can_support_visual_pair():
     frames = [
         _frame(1, _ring_frame(partial=True, shade=181)),
-        _frame(2, _ring_frame(partial=True, shade=182)),
+        _frame(2, _ring_frame(partial=True, shade=182, shift_x=4)),
     ]
     result = audit_geometry_frames(frames, "CIRCULAR_OPENING")
     assert result.status == "TEMPORAL_PARTIAL_RING_CANDIDATE"
@@ -61,6 +61,18 @@ def test_duplicate_image_cannot_count_as_second_frame():
     assert result.status == "REVIEW_REQUIRED"
     assert result.frame_audits[-1].reason == "duplicate_image_bytes"
 
+
+
+
+def test_brightness_only_rewrite_does_not_count_as_independent_frame():
+    first = _ring_frame(partial=True, shade=175)
+    second = _ring_frame(partial=True, shade=190)
+    result = audit_geometry_frames(
+        [_frame(1, first), _frame(2, second)],
+        "CIRCULAR_OPENING",
+    )
+    assert result.status == "REVIEW_REQUIRED"
+    assert result.frame_audits[-1].reason == "near_duplicate_edge_geometry"
 
 def test_unrelated_video_frames_cannot_confirm_partial_pair():
     first = _frame(1, _ring_frame(partial=True, shade=179), sequence="video-1")
