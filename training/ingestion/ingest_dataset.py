@@ -48,7 +48,17 @@ def ingest_directory(
     logger.info("Source Type: %s | Approval Status: %s", source.source_type, source.approval_status)
 
     # 1. License & Provenance pre-flight
-    lic_audit = audit_license(source.license_name)
+    lic_audit = audit_license(
+        source.license_name,
+        approved_owned_source=(
+            source.source_type in ("SYNTHETIC", "OWNED_REAL")
+            and source.approval_status == "APPROVED_PRODUCTION"
+            and source.provenance_verified
+            and source.commercial_training_allowed
+            and source.commercial_deployment_allowed
+        ),
+        rights_document_reference=source.rights_document_reference,
+    )
     prov_audit = audit_provenance(
         source_url=source.source_url,
         provider=source.provider,
@@ -96,8 +106,14 @@ def ingest_directory(
             source_id=source_id,
             source_original_id=img_path.stem,
             original_filename=img_path.name,
-            commercial_training_allowed=source.commercial_training_allowed and lic_audit.commercial_training_allowed,
-            production_eligible=source.production_eligible and lic_audit.is_commercial_valid and prov_audit.is_provenance_verified,
+            commercial_training_allowed=source.commercial_training_allowed and source.approval_status == "APPROVED_PRODUCTION" and lic_audit.commercial_training_allowed,
+            production_eligible=(
+                source.production_eligible
+                and source.approval_status == "APPROVED_PRODUCTION"
+                and source.commercial_deployment_allowed
+                and lic_audit.is_commercial_valid
+                and prov_audit.is_provenance_verified
+            ),
             license=source.license_name,
             attribution_required=source.attribution_required,
             ingestion_timestamp=datetime.now(timezone.utc).isoformat(),
