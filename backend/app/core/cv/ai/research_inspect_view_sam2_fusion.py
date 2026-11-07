@@ -139,6 +139,15 @@ def combine_inspect_view_and_sam2(
         return result("REVIEW_REQUIRED", "NOT_EVALUATED", None, "sam_mask_image_provenance_missing_or_mismatched")
     if sam2_evidence.mask is None or sam2_evidence.mask.shape != image_bgr.shape[:2]:
         return result("REVIEW_REQUIRED", "NOT_EVALUATED", None, "sam_mask_shape_mismatch")
+    active_y, active_x = np.where(sam2_evidence.mask > 0)
+    if active_y.size < 50:
+        return result("REVIEW_REQUIRED", "NOT_EVALUATED", None, "sam_mask_empty_or_too_small")
+    computed_box = (
+        int(active_x.min()), int(active_y.min()),
+        int(active_x.max()) + 1, int(active_y.max()) + 1,
+    )
+    if sam2_evidence.mask_bbox != computed_box:
+        return result("REVIEW_REQUIRED", "NOT_EVALUATED", None, "sam_mask_bbox_disagrees_with_pixels")
     proposal = sam2_evidence.to_roi_proposal(geometry)
     if proposal is None:
         return result("REVIEW_REQUIRED", "NOT_EVALUATED", None, "mask_roi_unavailable")
