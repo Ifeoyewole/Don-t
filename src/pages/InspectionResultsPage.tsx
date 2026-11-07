@@ -2,6 +2,7 @@ import { InspectionReadiness } from '../components/InspectionReadiness'
 import { useEffect, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
 import { classifyWrcEvidence } from '../lib/wrcEvidence'
+import { formatGapForUnit, getAuthorizedMillimetres, type GapDisplayUnit } from '../lib/measurementUnits'
 import type { CvMeasurementDebug, InspectionResult, ManholeInspectionSummary, MeasurementOverlayHints, MeasurementSource } from '../types/domain'
 
 type Props = {
@@ -60,11 +61,8 @@ const measurementLabel = (item: InspectionResult) => {
 
 const sourceLabel = (item: InspectionResult) => sourceLabels[item.measurementSource ?? 'cv']
 
-const measurementValueLabel = (item: InspectionResult) => {
-  if (item.authoritativeGapMm != null) return `${item.authoritativeGapMm.toFixed(1)} mm`
-  if (item.cvDebug?.gapPixels != null) return `${item.cvDebug.gapPixels.toFixed(1)} px — physical gap unavailable`
-  return 'Measurement unavailable'
-}
+const measurementValueLabel = (item: InspectionResult, unit: GapDisplayUnit) =>
+  formatGapForUnit(item, unit)
 
 const toSmoothPath = (points: Array<{ x: number; y: number }>) => {
   if (!points.length) {
@@ -153,12 +151,14 @@ const statusActionLabel = (status: InspectionResult['status']) => {
 
 const ResultCard = ({
   item,
+  displayUnit,
   onSaveNote,
   onRemeasure,
   onApplyOverride,
   onClearOverride,
 }: {
   item: InspectionResult
+  displayUnit: GapDisplayUnit
   onSaveNote: (inspectionId: string, note: string) => Promise<void>
   onRemeasure: (inspectionId: string) => Promise<void>
   onApplyOverride: (inspectionId: string, overrideValueMm: number, overrideReason: string) => Promise<void>
@@ -221,7 +221,7 @@ const ResultCard = ({
 
         <div className="inspection-gap-row">
           <span>{item.measurementSource === 'ai-review' ? 'Detected gap:' : item.measurementSource === 'ai-assisted' && !item.cvDebug?.pipeDetected ? 'Estimated gap:' : 'Measured gap:'}</span>
-          <strong>{measurementValueLabel(item)}</strong>
+          <strong>{measurementValueLabel(item, displayUnit)}</strong>
         </div>
 
         <div className="inspection-gap-row">
@@ -343,8 +343,7 @@ const ResultCard = ({
               <div>
                 <span style={{ color: '#64748b' }}>Detected Gap: </span>
                 <strong>
-                  {item.cvDebug?.gapPixels != null ? `${item.cvDebug.gapPixels.toFixed(1)} px` : 'NOT REPORTED'}
-                  {item.candidateGapMm != null ? ` (~${item.candidateGapMm.toFixed(1)} mm candidate)` : ''}
+                  {item.cvDebug?.gapPixels != null ? `${item.cvDebug.gapPixels.toFixed(1)} px — image evidence` : 'NOT REPORTED'}
                 </strong>
               </div>
             </div>
@@ -390,7 +389,7 @@ const ResultCard = ({
                 fontWeight: 700,
                 color: item.status === 'PASS' ? '#22c55e' : item.status === 'FAIL' ? '#ef4444' : '#f59e0b'
               }}>
-                {item.status} ({item.authoritativeGapMm != null ? `${item.authoritativeGapMm.toFixed(1)} mm` : 'Physical mm unavailable'})
+                {item.status} ({getAuthorizedMillimetres(item) != null ? formatGapForUnit(item, 'mm') : 'Physical mm unavailable'})
               </span>
             </div>
             <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '2px' }}>
@@ -576,6 +575,9 @@ export const InspectionResultsPage = ({
   const review = summary?.reviewCount ?? results.filter((item) => item.status === 'REVIEW').length
   const completion = total ? Math.round((results.length / total) * 100) : 0
   const latestProcessedAt = results[results.length - 1]?.processedAt
+  const [displayUnit, setDisplayUnit] = useState<GapDisplayUnit>(() =>
+    results.some((item) => getAuthorizedMillimetres(item) != null) ? 'mm' : 'px'
+  )
 
   useEffect(() => {
     console.log('ROUTE INSPECTION ID:', inspectionId)
@@ -655,6 +657,25 @@ export const InspectionResultsPage = ({
         </button>
       </div>
 
+      <div className="page-top-actions" style={{ alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        <label htmlFor="gap-display-unit" style={{ fontWeight: 600 }}>
+          Gap display units
+        </label>
+        <select
+          id="gap-display-unit"
+          aria-label="Gap display units"
+          value={displayUnit}
+          onChange={(event) => setDisplayUnit(event.target.value as GapDisplayUnit)}
+          style={{ borderRadius: '8px', padding: '8px 12px', background: '#0f172a', color: '#f8fafc', border: '1px solid #64748b' }}
+        >
+          <option value="px">px — image pixels</option>
+          <option value="mm">mm — verified physical</option>
+          <option value="m">m — verified physical</option>
+        </select>
+        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+          Display only. mm and m require backend-authorized calibration; engineering tolerances remain in mm.
+        </span>
+      </div>
       <p className="lead">Guidance only – not a formal adoption assessment.</p>
 
       <section className="inspection-results-grid">
@@ -663,6 +684,7 @@ export const InspectionResultsPage = ({
             <ResultCard
               key={item.id}
               item={item}
+              displayUnit={displayUnit}
               onSaveNote={onSaveNote}
               onRemeasure={onRemeasure}
               onApplyOverride={onApplyOverride}
