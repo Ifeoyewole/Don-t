@@ -666,7 +666,7 @@ export const InspectionResultsPage = ({
           aria-label="Gap display units"
           value={displayUnit}
           onChange={(event) => setDisplayUnit(event.target.value as GapDisplayUnit)}
-          style={{ borderRadius: '8px', padding: '8px 12px', background: '#0f172a', color: '#f8fafc', border: '1px solid #64748b' }}
+          style={{ borderRadius: '8px', padding: '8px 12px', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }}
         >
           <option value="px">px — image pixels</option>
           <option value="mm">mm — verified physical</option>
