@@ -90,8 +90,17 @@ def _sam2_predictor(checkpoint: Path) -> ImagePredictor:
     from sam2.build_sam import build_sam2
     from sam2.sam2_image_predictor import SAM2ImagePredictor
 
+    # Research-only, opt-in accelerator selection. Default remains CPU so
+    # existing standalone experiments and production behavior do not change.
+    import os
+    import torch
+    device = os.getenv("JOINTINSPECT_SAM2_DEVICE", "cpu")
+    if device not in ("cpu", "cuda"):
+        raise ValueError("Unsupported SAM2 device")
+    if device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("SAM2 GPU requested but unavailable")
     return SAM2ImagePredictor(
-        build_sam2(OFFICIAL_CONFIG, str(checkpoint), device="cpu")
+        build_sam2(OFFICIAL_CONFIG, str(checkpoint), device=device)
     )
 
 
