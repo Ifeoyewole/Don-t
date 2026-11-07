@@ -254,8 +254,12 @@ def test_api_multiframe_endpoint(synthetic_pipe_joint_image):
     body = res.json()
     assert body["num_frames_received"] == 2
     assert body["num_frames_accepted"] == 2
-    assert body["median_gap_mm"] > 0
-    assert body["result_status"] == MeasurementResultStatus.ACCEPTED_MEASUREMENT
+    # A client boolean and diameter are NOT calibration authority.
+    assert body["median_gap_px"] > 0
+    assert body["median_gap_mm"] is None
+    assert body["physical_measurement_available"] is False
+    assert body["calibration_verified"] is False
+    assert body["result_status"] == MeasurementResultStatus.REVIEW_REQUIRED
 
     # Prove removed alias returns 404
     files_legacy = [
