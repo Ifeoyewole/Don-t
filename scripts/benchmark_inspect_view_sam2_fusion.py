@@ -76,6 +76,8 @@ def analyze_local_image(
         frame_id=image_path.stem,
     )
     report = asdict(evidence)
+    # Distinguish a rejected mask from a missing SAM runtime in cloud reports.
+    report["sam2_reason"] = sam.reason
     report["commercial_production_permission_reported_for_inspect_view"] = True
     report["commercial_license_document_verified_by_tool"] = False
     report["physical_measurement_authorized"] = False

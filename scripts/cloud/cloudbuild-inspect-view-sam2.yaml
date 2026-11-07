@@ -1,0 +1,22 @@
+# Builds and pushes only. Does not start GPU inference.
+steps:
+- name: gcr.io/cloud-builders/docker
+  id: build-cloud-fusion-research
+  args:
+  - build
+  - -f
+  - scripts/cloud/inspect-view-sam2.Dockerfile
+  - -t
+  - europe-west2-docker.pkg.dev/$PROJECT_ID/joint-inspection-training/inspect-view-sam2-research:$BUILD_ID
+  - .
+- name: gcr.io/cloud-builders/docker
+  id: push-cloud-fusion-research
+  args:
+  - push
+  - europe-west2-docker.pkg.dev/$PROJECT_ID/joint-inspection-training/inspect-view-sam2-research:$BUILD_ID
+images:
+- europe-west2-docker.pkg.dev/$PROJECT_ID/joint-inspection-training/inspect-view-sam2-research:$BUILD_ID
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+timeout: 3600s

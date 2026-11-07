@@ -1,0 +1,28 @@
+# TEMPLATE ONLY. Replace placeholders, pin image digest, confirm T4 quota & IAM.
+# Merging does not create a Vertex AI job.
+workerPoolSpecs:
+- machineSpec:
+    machineType: n1-standard-8
+    acceleratorType: NVIDIA_TESLA_T4
+    acceleratorCount: 1
+  replicaCount: 1
+  diskSpec:
+    bootDiskType: pd-ssd
+    bootDiskSizeGb: 100
+  containerSpec:
+    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/inspect-view-sam2-research@sha256:REPLACE_VERIFIED_IMAGE_DIGEST
+    args:
+    - --project=joint-inspection-510310
+    - --image-uri=gs://joint-inspection-510310-data/REPLACE_REVIEWED_CCTV_IMAGE
+    - --image-sha=REPLACE_INDEPENDENTLY_COMPUTED_IMAGE_SHA256
+    - --inspect-uri=gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-masked-r5-20261104/best.pt
+    - --inspect-sha=659b56baa3e04c30b611c21de85d7ba00abeadc7e2c40dcf801a475719e74ed7
+    - --sam-uri=gs://joint-inspection-510310-data/models/sam2/publisher-quarantine/REPLACE_STAGE_BUILD_ID/sam2.1_hiera_tiny.pt
+    - --sam-sha=REPLACE_REVIEWED_OFFICIAL_SAM2_SHA256
+    - --geometry=VERTICAL_SEAM
+    - --roi
+    - REPLACE_X0
+    - REPLACE_Y0
+    - REPLACE_X1
+    - REPLACE_Y1
+    - --output-prefix=gs://joint-inspection-510310-data/models/inspect-view/research-results/sam2/REPLACE_UNIQUE_RUN_ID
