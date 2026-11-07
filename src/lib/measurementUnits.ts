@@ -40,6 +40,6 @@ export function formatGapForUnit(item: GapDisplayEvidence, unit: GapDisplayUnit)
     return 'Physical gap unavailable — verified calibration required'
   }
   return unit === 'mm'
-    ? `${mm.toFixed(1)} mm`
-    : `${(mm / 1000).toFixed(4)} m`
+    ? `${mm.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} mm`
+    : `${(mm / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 6 })} m`
 }
