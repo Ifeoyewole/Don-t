@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "model_id": "jointinspect-sam2.1-hiera-tiny-official-checkpoint-pending",
+  "architecture": {
+    "framework": "SAM 2",
+    "model_family": "SAM 2.1 Hiera Tiny",
+    "upstream": "https://github.com/facebookresearch/sam2",
+    "upstream_revision": "2b90b9f5ceec907a1c18123530e92e794ad901a4",
+    "code_license": "Apache-2.0",
+    "license_notice_reference": "https://github.com/facebookresearch/sam2/blob/2b90b9f5ceec907a1c18123530e92e794ad901a4/LICENSE",
+    "third_party_notice_reference": "https://github.com/facebookresearch/sam2/blob/2b90b9f5ceec907a1c18123530e92e794ad901a4/LICENSE_cctorch"
+  },
+  "weights": {
+    "origin": "OFFICIAL_PUBLISHER_APACHE2_CHECKPOINT_REVIEW_PENDING",
+    "sha256": null,
+    "official_publisher_checkpoint_url": "https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_tiny.pt",
+    "official_publisher_license_claim": "README explicitly licenses SAM 2 checkpoints under Apache 2.0",
+    "pretrained_weights_used": true,
+    "ancestor_model_ids": [
+      "facebookresearch/sam2:sam2.1_hiera_tiny.pt"
+    ],
+    "inspect_view_fusion_used": false
+  },
+  "training_source_ids": [],
+  "independent_rights_review": {
+    "status": "PENDING_REVIEW",
+    "reviewer": null,
+    "review_date": null,
+    "rights_evidence_reference": null
+  },
+  "enabled_for_production": false,
+  "notes": "Preferred publisher-licensed pretrained promptable segmentation candidate. Not a defect classifier. No checkpoint downloaded, SHA-256 verified, or package installed. Additional official license, dependencies, training dataset lineage and legal review required before commercial promotion. The existing gate restricts the first clean commercial pilot to independently trained weights until this provenance path is implemented and verified."
+}

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "model_id": "jointinspect-commercial-yolox-s-untrained",
+  "architecture": {
+    "framework": "YOLOX",
+    "model_family": "YOLOX-S",
+    "upstream": "https://github.com/Megvii-BaseDetection/YOLOX",
+    "upstream_revision": "6ddff4824372906469a7fae2dc3206c7aa4bbaee",
+    "code_license": "Apache-2.0",
+    "license_notice_reference": "https://github.com/Megvii-BaseDetection/YOLOX/blob/6ddff4824372906469a7fae2dc3206c7aa4bbaee/LICENSE"
+  },
+  "weights": {
+    "origin": "NOT_TRAINED",
+    "sha256": null,
+    "pretrained_weights_used": null,
+    "ancestor_model_ids": [],
+    "inspect_view_fusion_used": false
+  },
+  "training_source_ids": [],
+  "independent_rights_review": {
+    "status": "PENDING_REVIEW",
+    "reviewer": null,
+    "review_date": null,
+    "rights_evidence_reference": null
+  },
+  "enabled_for_production": false,
+  "notes": "Bounding-box detector, not pixel segmentation. No weights downloaded. Any official pretrained checkpoint requires a distinct weight/dataset provenance review."
+}
