@@ -39,6 +39,7 @@ class Sam2MaskEvidence:
     mask_quality_score: float | None
     mask: np.ndarray | None
     reason: str
+    image_sha256: str | None = None
 
     def to_roi_proposal(self, geometry: str) -> RoiProposal | None:
         """Make an existing experimental-fusion ROI from the candidate mask."""
@@ -183,6 +184,7 @@ def propose_sam2_mask(
             round(score, 4),
             mask,
             "prompted_mask_not_defect_or_metric_measurement",
+            hashlib.sha256(np.ascontiguousarray(image_bgr).tobytes()).hexdigest(),
         )
     except (ImportError, RuntimeError, ValueError, OSError, cv2.error):
         return _review(prompt_bbox, "sam2_dependency_or_inference_unavailable")
