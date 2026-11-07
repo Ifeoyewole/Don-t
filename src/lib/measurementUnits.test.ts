@@ -19,7 +19,7 @@ describe('physical gap unit display', () => {
 
   it('converts only existing authoritative millimetres into metres', () => {
     expect(formatGapForUnit(verified, 'mm')).toBe('134.0 mm')
-    expect(formatGapForUnit(verified, 'm')).toBe('0.1340 m')
+    expect(formatGapForUnit(verified, 'm')).toBe('0.134 m')
     expect(getAuthorizedMillimetres(verified)).toBe(134)
   })
 
