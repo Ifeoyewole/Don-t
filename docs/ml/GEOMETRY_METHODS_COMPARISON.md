@@ -46,6 +46,19 @@ Date: 2026-11-07. Primary production branch examined:
   and reasoned rejection. It returns **pixel candidates only**, never mm, PASS
   or a defect label. Comparison with the production detector is explicit.
 - `backend/app/core/cv/experimental_ellipse.py`: original ROI-constrained ellipse fitting using existing OpenCV contours. Requires angular boundary coverage, low fit residual, compatible center/axes/orientation for nested rings. Returns **projected ring evidence**, NOT axial joint separation, mm, defect class or PASS. An ordinary socket, liner or distant opening may produce nested ellipses.
+- `backend/app/core/cv/experimental_fusion.py`: combines independently localized
+  ROI candidates (inspector, Inspect View, Gemini, CV mask) PER FRAME.
+  The proposals are passed to the library by a caller; the library does
+  **not** request or infer model coordinates on its own. It tracks source,
+  rejects missing/invalid proposals, and handles **both** seam and projected
+  ellipse evidence. Partial elliptical arcs are marked provisional; two
+  distinct nearby frames from one video must agree on normalized projected
+  geometry before they count as temporal evidence. Duplicate frames and
+  brightness-only rewrites are rejected using image/edge fingerprints.
+  Even corroborated projected rings are NOT measured axial joint gaps.
+- `scripts/benchmark_fused_geometry.py`: run a short local inspection sequence
+  with per-frame ROIs from any supported source; produces JSON evidence without
+  uploading image bytes. Sample manifest and usage appear in its docstring.
 - `backend/app/core/cv/experimental_calibration.py`:
   multi-view calibrated-target reprojection residuals with minimum view count,
   finite input checks and per-view quality threshold. Returns **review
@@ -58,6 +71,12 @@ Date: 2026-11-07. Primary production branch examined:
   consented images and inspector-supplied ROI/ground truth; reports positive
   coverage, false gap claims on negatives and pixel MAE on measured positives.
   No cloud upload and no production inference change.
+
+**This is not a production AI-ROI integration**: the current Gemini semantic
+gate does not provide a validated bounding-box API for every geometry, and
+Inspect View is not validated for Open Joint. To wire live localization, a
+separate typed bounding-box contract, scale normalization and tests are
+required. The fusion work consumes explicit per-frame proposals as input.
 
 **No dependency added** to backend requirements, no third-party algorithms
 copied, no existing measurement response schema modified, no GCP deployment.
@@ -80,7 +99,13 @@ copied, no existing measurement response schema modified, no GCP deployment.
 5. Validate separate physical scale using controlled camera targets and depth/
    pose reference. A good reprojection RMS does not by itself prove an axial
    gap can be measured in mm in a different image.
-6. Any future production ensemble must fail-closed on disagreement, missing
+6. Partial-arc temporal votes require independent frame geometry—not merely
+   rewritten JPEGs or brightness-adjusted duplicates. Even correctly linked
+   frames are correlated evidence, not independent field ground truth. Inspect
+   how far the camera moved and whether parallax supports the same physical
+   interface. Videos of a side connection may still show nested rings without
+   any defective mainline joint.
+7. Any future production ensemble must fail-closed on disagreement, missing
    ROI or unsupported geometry, and must not introduce measured mm without
    trusted calibration and adequate geometry.
 
