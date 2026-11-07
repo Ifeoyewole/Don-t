@@ -4,7 +4,9 @@
 **Project:** `joint-inspection-510310`  
 **Model Name:** `sewer-condition-v1`  
 **Version:** `sewer-condition-v1.0.0-candidate`  
-**Production Status:** `production_approved: false` (Experimental Candidate / Advisory Mode)  
+**Production deployment:** Inspect View r5 later deployed on the production Cloud Run route.
+**Commercial-production permission:** `true` **as reported by project owner on 2026-11-07** after a rights-holder go-ahead; original agreement is being recovered for independent verification.
+**Engineering validation:** `production_approved: false` for this historical classifier evaluation (not a statement denying commercial permission).  
 **Primary Production Classifier:** WRc InceptionResNetV2 Baseline (`wrc-inceptionresnetv2-baseline-v1`)  
 
 ---
@@ -97,7 +99,10 @@ Inspection of the official Sewer-ML annotations (`SewerML_Train.csv`, `SewerML_V
 ### Track C: Physical Measurement Authority
 - Deterministic OpenCV edge-finding, Canny/Hough/Contour analysis, and calibrated physical reference target detection remain the sole authority for physical gap measurements.
 - Candidate visual models act exclusively as advisory defect classifiers (`advisory_mode`).
-- The Zero-Guessing invariant is strictly enforced: `production_approved: false`.
+- The Zero-Guessing invariant is strictly enforced: `production_approved: false`
+  in this historical **engineering-acceptance** assessment. A later
+  rights-holder commercial permission was reported by the project owner;
+  license status and measurement accuracy are independent.
 
 ---
 
