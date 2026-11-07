@@ -1,20 +1,30 @@
 # Commercial-first vision-model architecture and rights review
 
-**Status: RESEARCH / APPROVAL PENDING. Not a legal opinion.**
+**Status: Inspect View commercial production permission reported by the project owner (2026-11-07); agreement retrieval/independent verification pending. Separate model engineering-accuracy approval pending. Not a legal opinion.**
 
 Last verified against public upstream source license declarations: 2026-11-07.
 This report does not grant rights to third-party dataset images, model weights,
 logos, pretrained checkpoints, or code packaged by unrelated dependencies.
 A patent/license/chain-of-title professional review may still be necessary.
 
-## Critical finding: current Inspect View cannot simply become commercial
+## Inspect View commercial-use permission: project-owner reported
 
-The existing `training/releases/inspect_view_engineering_preview_v1.json`
-identifies a research ConvNeXt checkpoint, declares `production_approved=false`,
-and notes Sewer-ML-derived weights. Sewer-ML is CC BY-NC-SA 4.0; under the
-published license it is not an acceptable unlicensed input to a commercial
-training/deployment release. Blending this checkpoint into a new Apache-licensed
-model **does not clean its ancestry**.
+**Correction to the earlier blanket restriction:** The JointInspect project
+owner reports having obtained explicit commercial-production go-ahead from the
+Inspect View rights holders. The owner is seeking the rights-holder agreement
+again because the provider's server is unavailable. Record this as **reported
+commercial permission = true**, **agreement independently verified = pending**.
+
+The Inspect View r5 checkpoint is historically deployed to production Cloud
+Run, while `production_approved=false` in its release manifest is currently
+an **engineering quality/held-out-evaluation gate**, not a denial of that
+reported commercial permission. The public Sewer-ML dataset still advertises
+CC BY-NC-SA 4.0; the private grant's coverage of r5 weight ancestors, model
+derivatives, training and customer deployments must be reviewed against the
+actual document. Do not misrepresent the public license as changed.
+
+See [Inspect View commercial permission status](INSPECT_VIEW_COMMERCIAL_PERMISSION_STATUS.md).
+
 
 The current WRc InceptionResNetV2 software repository lists MIT source code,
 but `docs/ml/WRC_INCEPTION_BASELINE_AUDIT.md` explicitly records
@@ -62,7 +72,10 @@ Apache/MIT while weight ownership is unclear.
   disabled until tests, complete rights record and release gate say otherwise.
 
 External commercial restrictions to avoid without suitable permissions:
-- Sewer-ML CC BY-NC-SA 4.0: not commercially cleared.
+- Public Sewer-ML dataset: CC BY-NC-SA 4.0. Inspect View commercial-production
+  permission is **reported by its project owner**; verify the private license
+  exception covers the exact model ancestry before independently certifying
+  the permission in a third-party compliance audit.
   https://creativecommons.org/licenses/by-nc-sa/4.0/
 - Ultralytics YOLO: AGPL-3.0 or Enterprise under the publisher's stated
   proprietary deployment policy; do not substitute it for independently
@@ -78,8 +91,9 @@ External commercial restrictions to avoid without suitable permissions:
 ## Recommended two-track architecture
 
 ```
-RESEARCH (restricted; not for commercial output):
-  Inspect View r5 [Sewer-ML lineage] -- advisory class comparison
+INSPECT VIEW (commercial production permission reported by owner):
+  Inspect View r5 [Sewer-ML lineage; agreement retrieval pending] -- advisory class evidence
+  Model loaded historically on Cloud Run; missing-class engineering validation remains open
   WRc pretrained baseline [rights pending] -- research comparison
 
 CLEAN-COMMERCIAL MODEL TRACK (disabled pending review):
@@ -99,10 +113,13 @@ CLEAN-COMMERCIAL MODEL TRACK (disabled pending review):
        -> per-class confidence and human review
 ```
 
-Research results may guide **design/evaluation questions**, but do not copy
-noncommercial examples, distill from research checkpoints, use their outputs as
-commercial pseudo-labels, share their model weights, or train the commercial
-model on their derived feature embeddings.
+Inspect View and SAM 2.1 are intended to be **combined at the output level**:
+Inspect View supplies existing condition evidence, SAM 2.1 proposes masks,
+and original OpenCV measures image-space geometry. This does not require
+copying or redistributing training datasets. Commercial use of further
+fine-tuning, distillation, derivative weights or pseudo-labels from Inspect
+View must be within the actual rights-holder grant. Avoid mixing weight
+checkpoints or copying protected source data without the necessary terms.
 
 ## Data governance & human review
 
@@ -127,8 +144,9 @@ Needed before training/promotion:
 5. Run reproducible per-class/pipe/material evaluation and calibration; compare
    against the strongest permitted clean baseline. No model precision claims
    based only on synthetic examples or on Sewer-ML labels.
-6. Obtain documentary commercial rights approval referencing external private
-   evidence/ticket. Do not commit confidential contracts into the public repo.
+6. Recover and document the **reported already-granted** commercial rights
+   and exact scope from the rights holder; retain its independent verification
+   ticket privately. Do not commit confidential contracts into Git.
 7. Preserve license attribution/notice text when distributing covered code,
    and verify production image SBOM/transitive dependencies.
 

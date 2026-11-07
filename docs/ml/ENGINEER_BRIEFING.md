@@ -1,6 +1,10 @@
 # JointInspect engineer briefing
 
-Inspect View is integrated into the normal inspection workflow. For the clearest evidence, use focused internal pipe/sewer CCTV images with the joint or defect visible, adequate lighting, limited glare, and minimal obstruction.
+Inspect View is integrated into the normal inspection workflow.
+Its commercial production use has been **reported as authorized by the project
+owner** following a rights-holder conversation (2026-11-07); the agreement is
+being recovered for independent verification. This does not certify model
+accuracy or extend permission to third-party datasets. For the clearest evidence, use focused internal pipe/sewer CCTV images with the joint or defect visible, adequate lighting, limited glare, and minimal obstruction.
 
 The best-supported current model findings are joint displacement (F1 0.946, recall 98.0%, 443 development positives) and normal pipe condition (F1 0.933, recall 94.5%, 183 positives). These development results are preliminary and do not guarantee field performance. Normal pipe classification does not prove joint visibility, joint integrity or engineering acceptance.
 

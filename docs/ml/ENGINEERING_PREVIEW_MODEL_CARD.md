@@ -2,11 +2,21 @@
 
 Status: DEPLOYED FOR ENGINEERING RESEARCH; NO FUSION ACCEPTED.
 
-Purpose: internal research evaluation by engineers and collection of reviewed failure cases. Inspect View r5 is primary on the normal measurement endpoint; WRc artefacts are preserved. Sewer-ML-derived weights remain research-scoped pending suitable commercial rights.
+Purpose: engineering performance evaluation and collection of reviewed failure
+cases. Inspect View r5 is primary on the normal measurement endpoint; WRc
+artefacts are preserved. **Commercial production permission was reported by
+the project owner on 2026-11-07 following a rights-holder go-ahead.** The
+provider's server is unavailable and the agreement record is being recovered;
+its coverage of the exact Sewer-ML-derived r5 checkpoint is not independently
+verified here. See `INSPECT_VIEW_COMMERCIAL_PERMISSION_STATUS.md`.
+The remaining research label relates to **model accuracy and release gates**,
+not a claim that the owners refused commercial use.
 
 ## Candidate decision
 
-Preserve both ConvNeXt r4 and r5. On 679 identical development images with explicit annotation masks, r4 scored macro-F1/F2 0.471758/0.534945 and r5 0.473169/0.526865. Tuning-only class selection produced 0.474929/0.519951, failing the declared fusion gate. R5 is selected for the engineering research preview; it is not a production-approved frozen fusion. Engineer comparison should show both identities, never claim an improved fusion.
+Preserve both ConvNeXt r4 and r5. On 679 identical development images with explicit annotation masks, r4 scored macro-F1/F2 0.471758/0.534945 and r5 0.473169/0.526865. Tuning-only class selection produced 0.474929/0.519951, failing the declared fusion gate. R5 is selected for the deployed engineering-preview classifier. No better
+multi-model fusion has yet passed the locked evaluation gate; this technical
+status is independent of the reported commercial-use permission. Engineer comparison should show both identities, never claim an improved fusion.
 
 R5 artifact: `gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-masked-r5-20261104/best.pt`.
 R4 checksum: `37bd3a4ea4fa64aa269391c4606cbddc442e5f3fac6dfe6d414655f1c9efd053`.
