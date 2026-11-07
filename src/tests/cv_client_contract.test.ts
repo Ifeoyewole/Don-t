@@ -56,6 +56,7 @@ describe('authoritative cloud response mapper', () => {
   it('preserves a genuine zero-millimetre authoritative measurement', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
       authoritative_gap_mm: 0,
+      physical_measurement_available: true,
       overall_status: 'PASS',
       result_status: 'ACCEPTED_MEASUREMENT',
       confidence_breakdown: { overall_confidence: 0.81 },
@@ -63,6 +64,16 @@ describe('authoritative cloud response mapper', () => {
     const result = await measureWithFastApi(request)
     expect(result.originalGapMm).toBe(0)
     expect(result.authoritativeGapMm).toBe(0)
+  })
+
+  it('rejects contradictory physical millimetres when the backend reports no authority', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      authoritative_gap_mm: 134,
+      physical_measurement_available: false,
+      mean_gap_px: 134,
+      confidence_breakdown: { overall_confidence: 0.81 },
+    }), { status: 200 })))
+    await expect(measureWithFastApi(request)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
   })
 
   it('rejects missing or invalid confidence instead of manufacturing 90 percent', async () => {
