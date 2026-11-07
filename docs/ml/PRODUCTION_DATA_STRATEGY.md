@@ -6,7 +6,12 @@ JointInspect is engineered to solve pipe-joint assessment with zero artificial g
 
 1. **Zero Unverified Ingestion**: No dataset or image is permitted into the production training corpus without verified commercial rights.
 2. **Sewer-ML Status (`BENCHMARK_PERMISSION_PENDING`)**:
-   - The Sewer-ML academic dataset **MUST NOT** be used for production training, fine-tuning, pretraining, distillation, production RAG, embeddings, or production model weights.
+   - The Sewer-ML public CC BY-NC-SA grant alone does **not** permit these
+     commercial training activities. The project owner reports a separate
+     rights-holder commercial-production permission for **Inspect View**.
+     Do not automatically apply that assertion to the entire Sewer-ML dataset
+     or third-party derivatives; verify the written scope before releasing
+     other production weights or training datasets.
    - It is marked `BENCHMARK_PERMISSION_PENDING` with `production_eligible = false` and `training_allowed = false`.
    - Its adapter remains strictly isolated in the benchmark evaluation harness.
 3. **Fail-Closed Promotion Gate**:
