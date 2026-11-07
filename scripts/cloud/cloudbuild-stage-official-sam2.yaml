@@ -1,15 +1,31 @@
-# Download Meta's official publisher checkpoint inside Cloud Build, not Windows.
-# Quarantine staging only: checksum/provenance review still required.
+# Fetch SAM2 official publisher weights in Cloud Build only, never on Windows.
+# Stage in GCS quarantine; publishing rights / checkpoint provenance remain gated.
+# Two purpose-built images avoid depending on curl inside cloud-sdk's stable image.
 steps:
+- name: gcr.io/cloud-builders/curl
+  id: download-sam2-official
+  args:
+  - --fail
+  - --location
+  - --retry
+  - '3'
+  - --proto
+  - '=https'
+  - --proto-redir
+  - '=https'
+  - --tlsv1.2
+  - --output
+  - /workspace/sam2.1_hiera_tiny.pt
+  - https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_tiny.pt
 - name: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
-  id: stage-official-publisher-checkpoint
+  id: checksum-and-quarantine
+  waitFor: [download-sam2-official]
   entrypoint: bash
   args:
   - -ceu
   - |
-    curl --fail --location --retry 3 --proto '=https' --tlsv1.2 \
-      --output /workspace/sam2.1_hiera_tiny.pt \
-      https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_tiny.pt
+    set -o pipefail
+    test -s /workspace/sam2.1_hiera_tiny.pt
     sha256sum /workspace/sam2.1_hiera_tiny.pt | tee /workspace/publisher-checksum.txt
     gcloud storage cp --no-clobber /workspace/sam2.1_hiera_tiny.pt \
       gs://joint-inspection-510310-data/models/sam2/publisher-quarantine/$BUILD_ID/sam2.1_hiera_tiny.pt
@@ -17,5 +33,4 @@ steps:
       gs://joint-inspection-510310-data/models/sam2/publisher-quarantine/$BUILD_ID/publisher-checksum.txt
 options:
   logging: CLOUD_LOGGING_ONLY
-  machineType: E2_HIGHCPU_8
 timeout: 1800s
