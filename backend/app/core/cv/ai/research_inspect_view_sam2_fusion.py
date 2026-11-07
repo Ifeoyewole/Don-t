@@ -14,6 +14,7 @@ from the same image. No model is implicitly loaded or remotely invoked.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 import math
 from typing import Any, Optional
 
@@ -131,6 +132,13 @@ def combine_inspect_view_and_sam2(
         or image_bgr.size == 0
     ):
         return result("REVIEW_REQUIRED", "NOT_EVALUATED", None, "invalid_image")
+    # The mask must belong to the very same frame used for class and geometry
+    # evidence. Cross-frame masks could otherwise manufacture agreement.
+    digest = sha256(np.ascontiguousarray(image_bgr).tobytes()).hexdigest()
+    if sam2_evidence.image_sha256 != digest:
+        return result("REVIEW_REQUIRED", "NOT_EVALUATED", None, "sam_mask_image_provenance_missing_or_mismatched")
+    if sam2_evidence.mask is None or sam2_evidence.mask.shape != image_bgr.shape[:2]:
+        return result("REVIEW_REQUIRED", "NOT_EVALUATED", None, "sam_mask_shape_mismatch")
     proposal = sam2_evidence.to_roi_proposal(geometry)
     if proposal is None:
         return result("REVIEW_REQUIRED", "NOT_EVALUATED", None, "mask_roi_unavailable")
