@@ -41,7 +41,7 @@ def test_owned_license_requires_explicit_record_reference():
 
 
 def test_candidate_configs_are_blocked_and_do_not_bundle_weights():
-    for name in ("mmseg_segformer_b0.json", "yolox_s.json"):
+    for name in ("mmseg_segformer_b0.json", "yolox_s.json", "sam2_1_hiera_tiny.json"):
         candidate = json.loads((BASE / name).read_text(encoding="utf-8"))
         report = screen_model_manifest(candidate, registry())
         assert report["commercial_release_eligible"] is False
