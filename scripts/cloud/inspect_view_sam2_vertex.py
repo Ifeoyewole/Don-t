@@ -90,7 +90,8 @@ def evaluate(args) -> dict:
         duration = perf_counter() - started
         if not report.get("inspect_view_ready"):
             raise RuntimeError("Inspect View r5 inference did not load successfully")
-        if report.get("sam2_status") == "MODEL_UNAVAILABLE":
+        if (report.get("sam2_status") == "MODEL_UNAVAILABLE"
+                or report.get("sam2_reason") == "sam2_dependency_or_inference_unavailable"):
             raise RuntimeError("SAM2 checkpoint or predictor could not be loaded")
 
         report["cloud_run_context"] = {
