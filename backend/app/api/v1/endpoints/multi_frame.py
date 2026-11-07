@@ -1,8 +1,9 @@
 """Multi-frame video sequence measurement endpoint."""
 
 from typing import List, Optional
+import math
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from backend.app.core.cv.circular_detector import measure_circular_gap
 from backend.app.core.cv.confidence import confidence_engine
@@ -38,6 +39,21 @@ class MultiFrameMeasurementResponse(BaseModel):
     min_gap_mm: Optional[float] = Field(None, description="Minimum gap in mm if verified calibration present")
     max_gap_mm: Optional[float] = Field(None, description="Maximum gap in mm if verified calibration present")
     mad_mm: Optional[float] = Field(None, description="Median Absolute Deviation in mm if verified calibration present")
+
+    @computed_field(return_type=Optional[float])
+    @property
+    def median_gap_m(self) -> Optional[float]:
+        """Read-only metre display; only authoritative burst mm can be converted."""
+        value = self.median_gap_mm
+        if (
+            not self.physical_measurement_available
+            or value is None
+            or not math.isfinite(value)
+            or value < 0
+        ):
+            return None
+        return round(value / 1000.0, 6)
+
     temporal_consistency_score: float = Field(..., description="Temporal stability score (0.0 to 1.0)")
     outlier_frame_indices: List[int]
     result_status: MeasurementResultStatus

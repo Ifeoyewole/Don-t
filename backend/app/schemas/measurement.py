@@ -1,8 +1,9 @@
 """Measurement data contracts and computer vision response schemas."""
 
 from datetime import datetime, timezone
+import math
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 from backend.app.schemas.calibration import CalibrationProfile
 from backend.app.schemas.domain import (
     CalibrationSource,
@@ -254,6 +255,21 @@ class MeasurementResponse(BaseModel):
         default=None,
         description="Authoritative gap in millimeters ONLY if physical_measurement_available is True.",
     )
+
+    @computed_field(return_type=Optional[float])
+    @property
+    def authoritative_gap_m(self) -> Optional[float]:
+        """Read-only derived units; never convert pixels or provisional mm."""
+        gap = self.authoritative_gap_mm
+        if (
+            self.physical_measurement_available is not True
+            or gap is None
+            or not math.isfinite(gap)
+            or gap < 0
+        ):
+            return None
+        return round(gap / 1000.0, 6)
+
     engineering_result: ToleranceStatus = Field(
         default=ToleranceStatus.FAIL,
         description="Authoritative PASS/FAIL/REVIEW governed solely by engineering rules.",
