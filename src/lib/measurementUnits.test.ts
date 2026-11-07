@@ -23,6 +23,12 @@ describe('physical gap unit display', () => {
     expect(getAuthorizedMillimetres(verified)).toBe(134)
   })
 
+  it('retains small, authorized sub-millimetre values in metres', () => {
+    const tiny = { ...verified, authoritativeGapMm: 0.01 }
+    expect(formatGapForUnit(tiny, 'mm')).toBe('0.01 mm')
+    expect(formatGapForUnit(tiny, 'm')).toBe('0.00001 m')
+  })
+
   it('does not convert 134 image pixels to physical units', () => {
     const uncalibrated: GapDisplayEvidence = {
       executionSource: 'CLOUD_AUTHORITATIVE',
