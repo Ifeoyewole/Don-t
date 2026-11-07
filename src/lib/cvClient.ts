@@ -108,6 +108,7 @@ interface FastApiMeasurementPayload {
   max_gap_px?: number | null
   candidate_gap_mm?: number | null
   authoritative_gap_mm?: number | null
+  physical_measurement_available?: boolean
   engineering_result?: string
   authoritative_reason?: string
   ai_explanation?: string
@@ -274,7 +275,13 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
     }
 
     const data: FastApiMeasurementPayload = await response.json()
-    const reportedGapMm = data.authoritative_gap_mm
+    // Backend's explicit physical-authority flag is mandatory, in addition
+    // to the authoritative mm value. Untrusted or older responses cannot
+    // accidentally promote a pixel estimate to millimetres.
+    if (data.authoritative_gap_mm != null && data.physical_measurement_available !== true) {
+      throw new CloudMeasurementError('INVALID_RESPONSE', 'Backend reported physical millimetres without calibration authority')
+    }
+    const reportedGapMm = data.physical_measurement_available === true ? data.authoritative_gap_mm : null
     if (reportedGapMm != null && (!Number.isFinite(reportedGapMm) || reportedGapMm < 0)) {
       throw new CloudMeasurementError('INVALID_RESPONSE', 'Backend returned invalid authoritative mm')
     }
@@ -331,7 +338,9 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
     const cvDebug: CvMeasurementDebug = {
       pipeDetected: data.result_status !== 'REJECTED_UNRELIABLE',
       pipeDiameterMm: data.pipe_diameter_mm ?? request.pipeDiameterMm,
-      mmPerPixel: data.pixels_per_mm ? Number((1 / data.pixels_per_mm).toFixed(4)) : undefined,
+      mmPerPixel: data.physical_measurement_available === true && data.pixels_per_mm
+        ? Number((1 / data.pixels_per_mm).toFixed(4))
+        : undefined,
       innerRadiusPx: data.debug_info?.inner_radius_px ?? data.overlay_hints?.inner_circle?.radius_px,
       outerRadiusPx: data.debug_info?.outer_radius_px ?? data.overlay_hints?.outer_circle?.radius_px,
       visibleSectors: data.debug_info?.num_samples,
@@ -345,7 +354,7 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
       rejectionReason: data.rejection_reason,
       geometryTier: data.geometry_tier,
       candidateGapMm: data.candidate_gap_mm,
-      authoritativeGapMm: data.authoritative_gap_mm,
+      authoritativeGapMm: reportedGapMm,
       engineeringResult: data.engineering_result,
       authoritativeReason: data.authoritative_reason,
       aiExplanation: data.ai_explanation,
@@ -381,7 +390,7 @@ export async function measureWithFastApi(request: CvWorkerRequest): Promise<CvWo
       calibrationProfile: data.calibration_profile,
       geometryTier: data.geometry_tier,
       candidateGapMm: data.candidate_gap_mm,
-      authoritativeGapMm: data.authoritative_gap_mm,
+      authoritativeGapMm: reportedGapMm,
       engineeringResult: data.engineering_result,
       authoritativeReason: data.authoritative_reason,
       aiExplanation: data.ai_explanation,
