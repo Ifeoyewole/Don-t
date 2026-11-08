@@ -188,6 +188,9 @@ class VertexSemanticGateResult(BaseModel):
 
 
 class MeasurementResponse(BaseModel):
+    semantic_receipt_uri: Optional[str] = Field(
+        None, description="Optional restricted research-only GCS receipt for the already-run Gemini semantic gate."
+    )
     inspect_view_evidence: Optional[dict] = Field(None, description="Inspect View research evidence and unsupported class states")
     """Top-level structured response payload returned by measurement API."""
     joint_type: JointType = Field(..., description="Classified or requested joint type.")
