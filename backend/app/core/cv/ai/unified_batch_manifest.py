@@ -32,7 +32,7 @@ def checked_gcs_uri(uri: Any) -> str:
     if not isinstance(uri, str) or not uri.startswith(f"gs://{BUCKET}/"):
         raise ValueError("GCS URI must use the project data bucket")
     key = uri[len(f"gs://{BUCKET}/"):]
-    if (not key or len(key) > 1024 or any(c.isspace() or ord(c) < 32 for c in key)
+    if (not key or len(key) > 1024 or any(ord(c) < 32 or ord(c) == 127 for c in key)
             or any(part in ("", ".", "..") for part in key.split("/"))
             or "\\" in key or "?" in key or "#" in key):
         raise ValueError("Malformed or unsafe project GCS URI")
