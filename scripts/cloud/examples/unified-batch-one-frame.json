@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "manifest_id": "unified_v1_research_smoke_00308531",
+  "frames": [
+    {
+      "frame_id": "frame_00308531",
+      "image_uri": "gs://joint-inspection-510310-data/datasets/quarantine/sruibo-sewer-pipe-defects/7fafcbe676aad60f38d8fe39cde93cf599f8362e/Sewer pipe defects/images/train/00308531.png",
+      "image_sha256": "8e6f6a3496bd52392ec7a4605c9d66e687b060a22b36cb0fb1c0dc3d5451725d",
+      "geometry": "VERTICAL_SEAM",
+      "roi": [
+        127,
+        1,
+        218,
+        422
+      ],
+      "source_family": "UNVERIFIED_Sruibo_00308531",
+      "source_id": "SRuibo-Sewer-pipe-defects-00308531",
+      "rights_status": "RESEARCH_QUARANTINE",
+      "annotation_status": "UNVERIFIED_SOURCE_LABEL",
+      "source_label": "Unreviewed source image - hanging material candidate"
+    }
+  ]
+}
