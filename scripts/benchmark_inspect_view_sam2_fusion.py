@@ -32,6 +32,7 @@ from backend.app.core.cv.ai.research_inspect_view_sam2_fusion import (
     combine_inspect_view_and_sam2,
 )
 from backend.app.core.cv.ai.research_sam2_adapter import propose_sam2_mask
+from backend.app.core.cv.ai.unified_vision_v1 import build_unified_result
 
 
 def analyze_local_image(
@@ -76,6 +77,12 @@ def analyze_local_image(
         frame_id=image_path.stem,
     )
     report = asdict(evidence)
+    # One canonical, fail-closed decision for the same exact source image.
+    # Keep component fields for audits, not for independent product answers.
+    report["unified_result"] = build_unified_result(
+        report, inspect_view_payload=inspect_view,
+        image_sha256=hashlib.sha256(payload).hexdigest(),
+    )
     # Distinguish a rejected mask from a missing SAM runtime in cloud reports.
     report["sam2_reason"] = sam.reason
     report["commercial_production_permission_reported_for_inspect_view"] = True
