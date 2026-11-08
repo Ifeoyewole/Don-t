@@ -5,12 +5,15 @@ Status: **implementation branch; not promoted to production**.
 ## Goal
 
 Give the inspection application **one canonical research response** instead
-of presenting independent, potentially contradictory Inspect View, SAM2, and
+of presenting independent, potentially contradictory Inspect View, SAM2, Gemini 3.1 Pro, and
 OpenCV results as if they were equally authoritative diagnoses.
 
 This milestone **does not merge neural weights** or replace the validated
 separate models. The combined runner still loads Inspect View r5 (ConvNeXt),
 SAM2.1 Tiny, and OpenCV; it now also emits a conservative `unified_result`.
+Gemini 3.1 Pro already runs as the Vertex AI semantic gate in the normal
+measurement endpoint. This research contract can reuse its same-image result
+without making a second paid Gemini request.
 
 ## Unified result
 
@@ -25,6 +28,8 @@ audit and adds:
 - `unified_result.segmentation`: SAM2 mask bbox and model-quality score if
   the existing same-frame fusion checks accepted the mask
 - `unified_result.geometry`: OpenCV pixel candidate if supported; **never mm**
+- `unified_result.gemini`: optionally reused semantic domain gate, quality,
+  orientation suggestion, and whether processing was allowed
 - `unified_result.reasons`: explicit blockers and conflicts
 - `unified_result.image_sha256`: image byte digest for audit
 
@@ -38,6 +43,55 @@ if source data or a proposed mask appears suggestive. A promptable SAM mask
 does not establish defect identity; a pixel width without camera calibration
 does not establish physical separation.
 
+## Four-source architecture, including Gemini 3.1 Pro
+
+The intended unified research flow is: Gemini semantic scene/quality gate ->
+Inspect View defect candidates -> SAM2 segmentation -> OpenCV geometry ->
+one conservative research decision. It may execute components in parallel
+only after the original image identity is locked.
+
+The existing Cloud Run measurement API already uses
+`backend/app/core/cv/ai/vertex_semantic_gate.py` with model
+`gemini-3.1-pro-preview` in Vertex location `global`. It checks whether a
+joint is actually visible, detects unrelated or low-quality images, and
+isolates operator prompt instructions. This is advisory visual evidence;
+Gemini cannot grant an engineering PASS, select an unverified calibration
+or turn a SAM mask into a confirmed defect.
+
+The research runner does **not** call Gemini again. An optional
+server-created JSON receipt may contain the exact original image SHA-256
+and the existing `VertexSemanticGateResult` serialized as `semantic_gate`:
+
+```json
+{
+  "image_sha256": "<exact 64-hex original-image SHA-256>",
+  "semantic_gate": {
+    "model": "gemini-3.1-pro-preview",
+    "domain_status": "PIPE_JOINT_INSPECTION",
+    "pipe_visible": true, "joint_visible": true,
+    "quality": "OK", "processing_allowed": true,
+    "prompt_image_conflict": false,
+    "suggested_joint_type": "VERTICAL_SEAM"
+  }
+}
+```
+
+Use a **trusted backend-generated receipt**, not untrusted operator text.
+A matching SHA prevents accidental mixing of images but does not prove
+who created the receipt. The existing backend gate remains authoritative
+for blocking invalid measurements.
+
+The local benchmark accepts `--gemini-receipt-json` for existing evidence.
+The cloud research runner additionally accepts the optional pair
+`--gemini-receipt-uri` and `--gemini-receipt-sha`, fetching the receipt
+inside the ephemeral cloud worker and verifying file and original-image
+hashes. Neither executes another Gemini request. Invalid or blocked
+Gemini evidence suppresses research defect and pixel candidates; missing
+Gemini evidence is explicitly `gemini.status=NOT_PROVIDED`.
+
+A live four-source unified request still requires future integration into
+the normal backend orchestration; this research PR makes no production
+endpoint changes and does not imply Gemini ran in the previous GPU smoke.
 ## Tests
 
 ```powershell
