@@ -10,27 +10,27 @@ OpenCV results as if they were equally authoritative diagnoses.
 
 This milestone **does not merge neural weights** or replace the validated
 separate models. The combined runner still loads Inspect View r5 (ConvNeXt),
-SAM2.1 Tiny, and OpenCV; it now also emits a conservative \`unified_result\`.
+SAM2.1 Tiny, and OpenCV; it now also emits a conservative `unified_result`.
 
 ## Unified result
 
-\`report.json\` continues to contain the original per-model evidence for
+`report.json` continues to contain the original per-model evidence for
 audit and adds:
 
-- \`unified_result.decision\`: always \`REVIEW_REQUIRED\` for this research version
-- \`unified_result.defect\`: \`UNDETERMINED\`, not an invented diagnosis
-- \`unified_result.primary_advisory\`: best threshold-gated, supported,
+- `unified_result.decision`: always `REVIEW_REQUIRED` for this research version
+- `unified_result.defect`: `UNDETERMINED`, not an invented diagnosis
+- `unified_result.primary_advisory`: best threshold-gated, supported,
   exploratory defect suggestion, if any (NOT a final classification)
-- \`unified_result.advisory_candidates\`: all exploratory supported suggestions
-- \`unified_result.segmentation\`: SAM2 mask bbox and model-quality score if
+- `unified_result.advisory_candidates`: all exploratory supported suggestions
+- `unified_result.segmentation`: SAM2 mask bbox and model-quality score if
   the existing same-frame fusion checks accepted the mask
-- \`unified_result.geometry\`: OpenCV pixel candidate if supported; **never mm**
-- \`unified_result.reasons\`: explicit blockers and conflicts
-- \`unified_result.image_sha256\`: image byte digest for audit
+- `unified_result.geometry`: OpenCV pixel candidate if supported; **never mm**
+- `unified_result.reasons`: explicit blockers and conflicts
+- `unified_result.image_sha256`: image byte digest for audit
 
 Candidates require an Inspect View payload whose image SHA and model version
-match the source and fusion report. A candidate must be \`detected=true\`
-under Inspect View's *existing* per-class threshold and \`EXPLORATORY\` in
+match the source and fusion report. A candidate must be `detected=true`
+under Inspect View's *existing* per-class threshold and `EXPLORATORY` in
 both the preview and fusion gates.
 
 OPEN_JOINT, INFILTRATION and PROTRUDING_LATERAL remain unvalidated, even
@@ -40,9 +40,9 @@ does not establish physical separation.
 
 ## Tests
 
-\`\`\`powershell
+```powershell
 python -m pytest backend/tests/test_unified_vision_v1.py backend/tests/test_research_inspect_view_sam2_fusion.py -q
-\`\`\`
+```
 
 No trained weights, CCTV source images, GPU or credentials are needed for
 the contract tests.
