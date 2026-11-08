@@ -1,8 +1,8 @@
-"""JointInspect Unified Vision v1: one fail-closed research decision from three sources.
+"""JointInspect Unified Vision v1: one fail-closed decision from four sources.
 
 This is a *decision contract*, not a merged neural checkpoint. Inspect View
 supplies exploratory class evidence; SAM2 supplies promptable masks; OpenCV
-supplies candidate pixel geometry. No single source may upgrade another into
+supplies candidate pixel geometry; Gemini 3.1 Pro supplies a semantic domain\nassessment. No single source may upgrade another into
 a verified defect, a calibrated gap, or an engineering acceptance decision.
 
 Pure Python, independent of Torch/CV and safe to test without model weights.
@@ -10,7 +10,6 @@ Pure Python, independent of Torch/CV and safe to test without model weights.
 
 from __future__ import annotations
 
-import hashlib
 import math
 from typing import Any, Mapping
 
@@ -47,6 +46,7 @@ def build_unified_result(
     *,
     inspect_view_payload: Mapping[str, Any] | None,
     image_sha256: str,
+    gemini_receipt: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Resolve one research advisory for the exact image.
 
@@ -73,6 +73,52 @@ def build_unified_result(
     if not preview_bound:
         reasons.append("INSPECT_VIEW_UNAVAILABLE_OR_IMAGE_PROVENANCE_UNVERIFIED")
 
+    # Reuse an existing Vertex AI Gemini 3.1 Pro semantic-gate result; DO NOT
+    # issue a second paid provider call here. Only an image-hash-matched,
+    # server-created receipt is eligible. Gemini's text is never a command,
+    # defect label, calibration source or engineering verdict.
+    semantic_status = "NOT_PROVIDED"
+    semantic_model = None
+    semantic_domain = None
+    semantic_geometry_suggestion = None
+    if gemini_receipt is not None:
+        if (
+            not isinstance(gemini_receipt, Mapping)
+            or gemini_receipt.get("image_sha256") != image_sha256
+            or not isinstance(gemini_receipt.get("semantic_gate"), Mapping)
+        ):
+            semantic_status = "UNVERIFIED"
+            reasons.append("GEMINI_IMAGE_PROVENANCE_MISSING_OR_MISMATCHED")
+        else:
+            gate = gemini_receipt["semantic_gate"]
+            semantic_model = gate.get("model")
+            semantic_domain = gate.get("domain_status")
+            if semantic_model != "gemini-3.1-pro-preview":
+                semantic_status = "UNVERIFIED"
+                reasons.append("GEMINI_MODEL_ID_UNVERIFIED")
+            elif (
+                semantic_domain != "PIPE_JOINT_INSPECTION"
+                or gate.get("processing_allowed") is not True
+                or gate.get("pipe_visible") is not True
+                or gate.get("joint_visible") is not True
+                or gate.get("prompt_image_conflict") is not False
+                or gate.get("quality") != "OK"
+            ):
+                semantic_status = "BLOCKED"
+                reasons.append("GEMINI_SEMANTIC_DOMAIN_OR_QUALITY_GATE_BLOCKED")
+            else:
+                semantic_status = "ADVISORY_DOMAIN_ACCEPTED"
+                suggestion = gate.get("suggested_joint_type")
+                if suggestion in ("VERTICAL_SEAM", "HORIZONTAL_SEAM", "CIRCULAR_OPENING"):
+                    semantic_geometry_suggestion = suggestion
+                    if suggestion != fusion.get("geometry"):
+                        reasons.append("GEMINI_GEOMETRY_SUGGESTION_CONFLICT")
+
+    # If a Gemini receipt is submitted and it fails, expose only a safe
+    # review status. The separate legacy backend already blocks non-joint
+    # scenes; this contract mirrors that rule without changing production.
+    semantic_blocks = gemini_receipt is not None and semantic_status != "ADVISORY_DOMAIN_ACCEPTED"
+
     # The fusion adapter has already checked the mask's image digest, shape,
     # bbox/pixels, and score. Do not surface a mask from a rejected fusion.
     fused = fusion.get("status") in ALLOWED_FUSION_STATUSES
@@ -94,6 +140,8 @@ def build_unified_result(
         and math.isfinite(px) and px > 0
         else None
     )
+    if semantic_blocks:
+        pixel_candidate = None
     if pixel_candidate is None:
         reasons.append("NO_SUPPORTED_PIXEL_GEOMETRY")
 
@@ -130,6 +178,9 @@ def build_unified_result(
                     "probability": round(float(raw["probability"]), 6),
                     "classification_status": "EXPLORATORY",
                 })
+    if semantic_blocks:
+        candidate_rows.clear()
+        normal_detected = False
     candidate_rows.sort(key=lambda item: (-item["probability"], item["label"]))
     if len(candidate_rows) > 1:
         reasons.append("MULTIPLE_EXPLORATORY_DEFECT_CANDIDATES")
@@ -168,6 +219,14 @@ def build_unified_result(
             "calibration_verified": False,
         },
         "inspect_view_version": fusion.get("inspect_view_version") if preview_bound else None,
+        "gemini": {
+            "status": semantic_status,
+            "model": semantic_model,
+            "domain_status": semantic_domain,
+            "processing_allowed": semantic_status == "ADVISORY_DOMAIN_ACCEPTED",
+            "suggested_joint_type": semantic_geometry_suggestion,
+            "semantic_evidence_authoritative": False,
+        },
         "reasons": reasons,
         "engineering_result": None,
     }
