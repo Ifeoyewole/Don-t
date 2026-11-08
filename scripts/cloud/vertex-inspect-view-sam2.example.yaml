@@ -1,4 +1,6 @@
-# TEMPLATE ONLY. Replace placeholders, pin image digest, confirm T4 quota & IAM.
+# TEMPLATE ONLY. Container digest and cloud-staged checkpoints are now pinned.
+# Do NOT launch until authorized image/ROI/SHA, T4 access, rights and IAM are verified.
+# Recorded SAM checkpoint SHA is cloud-computed, not independent publisher provenance.
 # Merging does not create a Vertex AI job.
 workerPoolSpecs:
 - machineSpec:
@@ -10,15 +12,15 @@ workerPoolSpecs:
     bootDiskType: pd-ssd
     bootDiskSizeGb: 100
   containerSpec:
-    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/inspect-view-sam2-research@sha256:REPLACE_VERIFIED_IMAGE_DIGEST
+    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/inspect-view-sam2-research@sha256:c00815b73e2f6ed315fd1b4f5603d99a907a6811982695a352938466498b0d4c
     args:
     - --project=joint-inspection-510310
     - --image-uri=gs://joint-inspection-510310-data/REPLACE_REVIEWED_CCTV_IMAGE
     - --image-sha=REPLACE_INDEPENDENTLY_COMPUTED_IMAGE_SHA256
     - --inspect-uri=gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-masked-r5-20261104/best.pt
     - --inspect-sha=659b56baa3e04c30b611c21de85d7ba00abeadc7e2c40dcf801a475719e74ed7
-    - --sam-uri=gs://joint-inspection-510310-data/models/sam2/publisher-quarantine/REPLACE_STAGE_BUILD_ID/sam2.1_hiera_tiny.pt
-    - --sam-sha=REPLACE_REVIEWED_OFFICIAL_SAM2_SHA256
+    - --sam-uri=gs://joint-inspection-510310-data/models/sam2/publisher-quarantine/ecc6e8ce-4fb5-464a-a70d-20283a0e98c8/sam2.1_hiera_tiny.pt
+    - --sam-sha=7402e0d864fa82708a20fbd15bc84245c2f26dff0eb43a4b5b93452deb34be69
     - --geometry=VERTICAL_SEAM
     - --roi
     - REPLACE_X0
