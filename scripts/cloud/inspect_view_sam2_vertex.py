@@ -67,6 +67,8 @@ def evaluate(args) -> dict:
         raise RuntimeError("GPU unavailable; fail closed rather than silently using CPU")
     checked_sha(args.sam_sha)
     checked_sha(args.image_sha)
+    if bool(args.gemini_receipt_uri) != bool(args.gemini_receipt_sha):
+        raise ValueError("Gemini receipt URI and independent SHA-256 must be supplied together")
     split_gs(args.output_prefix.rstrip("/") + "/report.json")
     client = storage.Client(project=args.project)
 
@@ -79,6 +81,11 @@ def evaluate(args) -> dict:
         stage_verified(client, args.inspect_uri, inspect, args.inspect_sha)
         stage_verified(client, args.sam_uri, sam, args.sam_sha)
 
+        gemini_receipt_path = None
+        if args.gemini_receipt_uri:
+            gemini_receipt_path = base / "gemini_receipt.json"
+            stage_verified(client, args.gemini_receipt_uri, gemini_receipt_path,
+                           args.gemini_receipt_sha, max_bytes=64 * 1024)
         os.environ["JOINTINSPECT_PREVIEW_MODEL_PATH"] = str(inspect)
         os.environ["JOINTINSPECT_SAM2_DEVICE"] = "cuda"
         started = perf_counter()
@@ -86,6 +93,7 @@ def evaluate(args) -> dict:
             image, geometry=args.geometry, bbox=tuple(args.roi),
             checkpoint_path=sam, checkpoint_sha256=args.sam_sha,
             inspect_view_local=True,
+            gemini_receipt_json=gemini_receipt_path,
         )
         duration = perf_counter() - started
         if not report.get("inspect_view_ready"):
@@ -104,6 +112,9 @@ def evaluate(args) -> dict:
             "inspect_view_sha256": args.inspect_sha.lower(),
             "sam2_model_uri": args.sam_uri, "sam2_sha256": args.sam_sha.lower(),
             "model_weights_on_operator_pc": False,
+            "gemini_existing_receipt_used": gemini_receipt_path is not None,
+            # No additional Gemini API call is made in this worker.
+            "gemini_second_api_call": False,
         }
         out = base / "report.json"
         out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -128,6 +139,10 @@ def main() -> None:
         "VERTICAL_SEAM", "HORIZONTAL_SEAM", "CIRCULAR_OPENING"), required=True)
     parser.add_argument("--roi", nargs=4, type=int, required=True,
                         metavar=("X0", "Y0", "X1", "Y1"))
+    parser.add_argument("--gemini-receipt-uri", default=None,
+                        help="Optional prior same-image Gemini semantic gate receipt stored in GCS")
+    parser.add_argument("--gemini-receipt-sha", default=None,
+                        help="Independent SHA-256 of the optional receipt JSON object")
     print(json.dumps(evaluate(parser.parse_args()), sort_keys=True))
 
 
