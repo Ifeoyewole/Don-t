@@ -24,6 +24,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from typing import Callable
 
 import cv2
 import numpy as np
@@ -45,6 +46,7 @@ def analyze_local_image(
     inspect_view_local: bool = False,
     inspect_view_json: Path | None = None,
     gemini_receipt_json: Path | None = None,
+    sam2_predictor_factory: Callable | None = None,
 ) -> tuple[dict, np.ndarray | None]:
     if inspect_view_local and inspect_view_json is not None:
         raise ValueError("Choose one Inspect View source (local model OR matching JSON)")
@@ -72,6 +74,7 @@ def analyze_local_image(
         enabled=checkpoint_path is not None and checkpoint_sha256 is not None,
         checkpoint_path=checkpoint_path,
         expected_sha256=checkpoint_sha256,
+        predictor_factory=sam2_predictor_factory,
     )
     evidence = combine_inspect_view_and_sam2(
         image, geometry=geometry, inspect_view_payload=inspect_view, sam2_evidence=sam,
