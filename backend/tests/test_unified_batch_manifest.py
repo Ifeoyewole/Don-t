@@ -61,7 +61,7 @@ def test_reviewed_ground_truth_is_separate_from_rights_review():
     ("frame_id", "../escape"),
     ("image_uri", "gs://foreign-bucket/photo.png"),
     ("image_uri", ROOT + "/../photos.png"),
-    ("image_uri", ROOT + "/a space/photo.png"),
+    ("image_uri", ROOT + "/a\tbad/photo.png"),
 ])
 def test_invalid_frame_fields_fail_before_gpu(change):
     key, value = change
