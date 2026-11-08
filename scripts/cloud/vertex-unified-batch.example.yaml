@@ -1,0 +1,31 @@
+# Research-only example. DO NOT submit without replacing placeholders and
+# verifying rights, ROIs, source SHA, IAM and the new rebuilt image digest.
+# Container command overrides the single-image research ENTRYPOINT.
+serviceAccount: joint-inspection-trainer@joint-inspection-510310.iam.gserviceaccount.com
+scheduling:
+  strategy: SPOT
+  timeout: 7200s
+workerPoolSpecs:
+- machineSpec:
+    machineType: n1-standard-4
+    acceleratorType: NVIDIA_TESLA_T4
+    acceleratorCount: 1
+  replicaCount: 1
+  diskSpec:
+    bootDiskType: pd-ssd
+    bootDiskSizeGb: 100
+  containerSpec:
+    imageUri: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/inspect-view-sam2-research@sha256:REPLACE_NEW_BATCH_IMAGE_DIGEST
+    command: [python, -m, scripts.cloud.inspect_view_sam2_batch_vertex]
+    args:
+    - --project=joint-inspection-510310
+    - --manifest-uri=gs://joint-inspection-510310-data/models/inspect-view/research-manifests/REPLACE_MANIFEST.json
+    - --manifest-sha=REPLACE_MANIFEST_SHA256
+    - --inspect-uri=gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-masked-r5-20261104/best.pt
+    - --inspect-sha=659b56baa3e04c30b611c21de85d7ba00abeadc7e2c40dcf801a475719e74ed7
+    - --sam-uri=gs://joint-inspection-510310-data/models/sam2/publisher-quarantine/ecc6e8ce-4fb5-464a-a70d-20283a0e98c8/sam2.1_hiera_tiny.pt
+    - --sam-sha=7402e0d864fa82708a20fbd15bc84245c2f26dff0eb43a4b5b93452deb34be69
+    - --output-prefix=gs://joint-inspection-510310-data/models/inspect-view/research-results/unified-batch/REPLACE_UNIQUE_RUN_ID
+    - --limit=80
+    # For batches WITH signed Gemini receipts only (after configuring IAM):
+    # - --gemini-hmac-secret-resource=projects/567370443508/secrets/REPLACE_SECRET_NAME/versions/latest
