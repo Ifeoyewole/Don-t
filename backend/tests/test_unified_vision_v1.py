@@ -146,3 +146,98 @@ def test_invalid_source_sha_fails_closed():
     fusion, preview = _inputs()
     with pytest.raises(ValueError):
         build_unified_result(fusion, inspect_view_payload=preview, image_sha256="bad")
+
+
+def _gemini_receipt(**overrides):
+    gate = {
+        "model": "gemini-3.1-pro-preview",
+        "domain_status": "PIPE_JOINT_INSPECTION",
+        "pipe_visible": True,
+        "joint_visible": True,
+        "processing_allowed": True,
+        "prompt_image_conflict": False,
+        "quality": "OK",
+        "suggested_joint_type": "VERTICAL_SEAM",
+        "observation": "Visible joint candidate; no measured gap",
+    }
+    gate.update(overrides)
+    return {"image_sha256": SHA, "semantic_gate": gate}
+
+
+def test_gemini_accepts_semantic_scope_without_upgrading_defect_or_mm():
+    fusion, preview = _inputs()
+    result = build_unified_result(
+        fusion, inspect_view_payload=preview,
+        image_sha256=SHA, gemini_receipt=_gemini_receipt(),
+    )
+    assert result["gemini"]["model"] == "gemini-3.1-pro-preview"
+    assert result["gemini"]["status"] == "ADVISORY_DOMAIN_ACCEPTED"
+    assert result["primary_advisory"]["label"] == "SURFACE_DAMAGE"
+    assert result["defect"] == "UNDETERMINED"
+    assert result["engineering_result"] is None
+    assert result["gemini"]["semantic_evidence_authoritative"] is False
+
+
+@pytest.mark.parametrize("overrides", [
+    {"domain_status": "UNRELATED_IMAGE", "processing_allowed": False,
+     "pipe_visible": False, "joint_visible": False},
+    {"domain_status": "PIPE_INTERIOR_NO_JOINT", "processing_allowed": True,
+     "joint_visible": False},
+    {"quality": "BLURRY"},
+    {"prompt_image_conflict": True},
+    {"processing_allowed": False},
+])
+def test_gemini_rejections_suppress_defect_and_geometry_candidates(overrides):
+    fusion, preview = _inputs()
+    fusion.update(status="MULTI_MODEL_RESEARCH_EVIDENCE",
+                  cv_status="PIXEL_PROFILE_CANDIDATE", cv_pixel_candidate=17.2)
+    result = build_unified_result(
+        fusion, inspect_view_payload=preview, image_sha256=SHA,
+        gemini_receipt=_gemini_receipt(**overrides),
+    )
+    assert result["gemini"]["status"] == "BLOCKED"
+    assert result["primary_advisory"] is None
+    assert result["geometry"]["pixel_candidate"] is None
+    assert result["decision"] == "REVIEW_REQUIRED"
+
+
+def test_gemini_image_hash_mismatch_suppresses_candidates():
+    fusion, preview = _inputs()
+    receipt = _gemini_receipt()
+    receipt["image_sha256"] = "b" * 64
+    result = build_unified_result(fusion, inspect_view_payload=preview,
+                                  image_sha256=SHA, gemini_receipt=receipt)
+    assert result["gemini"]["status"] == "UNVERIFIED"
+    assert result["primary_advisory"] is None
+    assert "GEMINI_IMAGE_PROVENANCE_MISSING_OR_MISMATCHED" in result["reasons"]
+
+
+def test_gemini_model_mismatch_suppresses_candidates():
+    fusion, preview = _inputs()
+    result = build_unified_result(
+        fusion, inspect_view_payload=preview, image_sha256=SHA,
+        gemini_receipt=_gemini_receipt(model="unknown-model"),
+    )
+    assert result["gemini"]["status"] == "UNVERIFIED"
+    assert result["primary_advisory"] is None
+
+
+def test_gemini_geometry_conflict_is_review_not_an_override():
+    fusion, preview = _inputs()
+    result = build_unified_result(
+        fusion, inspect_view_payload=preview, image_sha256=SHA,
+        gemini_receipt=_gemini_receipt(suggested_joint_type="CIRCULAR_OPENING"),
+    )
+    assert result["gemini"]["suggested_joint_type"] == "CIRCULAR_OPENING"
+    assert result["geometry"]["type"] == "VERTICAL_SEAM"
+    assert "GEMINI_GEOMETRY_SUGGESTION_CONFLICT" in result["reasons"]
+    assert result["decision"] == "REVIEW_REQUIRED"
+
+
+def test_no_gemini_receipt_is_explicit_not_included():
+    fusion, preview = _inputs()
+    result = build_unified_result(
+        fusion, inspect_view_payload=preview, image_sha256=SHA,
+    )
+    assert result["gemini"]["status"] == "NOT_PROVIDED"
+    assert result["gemini"]["processing_allowed"] is False
