@@ -39,6 +39,19 @@ Each CSV row deliberately leaves source media URI, source-family identity,
 joint geometry, reviewer ROI and adjudicated ground truth blank. Those must be
 filled through actual image inspection before GPU execution.
 
+When a human inspector has supplied those values, change only the reviewed
+rows' review_status to READY_FOR_RESEARCH. You can then convert the completed
+CSV into a strict GPU manifest, without manually rewriting dozens of JSON
+objects:
+
+~~~powershell
+python -m scripts.cloud.create_unified_batch_manifest --worklist ".\unified-review-worklist.csv" --manifest-id research_review_batch_001 --out ".\unified-batch-reviewed.json" --limit 80
+~~~
+
+Unready rows are skipped; invalid ROI, unverified family, duplicate image hash
+or missing rights metadata fails closed. Do **not** mark a row ready unless
+the inspected image URI and reviewer ROI have been independently confirmed.
+
 ## Step 2 — Create a reviewed GPU batch manifest
 
 The one-frame smoke template is in:
@@ -165,5 +178,5 @@ images are automatically promoted into commercial training.
 Test without GPU or secrets:
 
 ~~~powershell
-python -m pytest backend/tests/test_unified_batch_manifest.py backend/tests/test_signed_gemini_receipt.py backend/tests/test_unified_batch_research_reporting.py backend/tests/test_unified_vision_v1.py -q
+python -m pytest backend/tests/test_unified_batch_manifest.py backend/tests/test_signed_gemini_receipt.py backend/tests/test_unified_batch_research_reporting.py backend/tests/test_create_unified_batch_manifest.py backend/tests/test_unified_vision_v1.py -q
 ~~~
