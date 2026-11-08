@@ -1,14 +1,16 @@
 from datetime import datetime, timezone
 import asyncio
+import hmac
 import logging
 import os
 import time
 from typing import Optional
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile, status
 
 logger = logging.getLogger(__name__)
 
 from backend.app.config import get_settings
+from backend.app.core.cv.ai.gemini_receipt_export import export_existing_gate_receipt
 from backend.app.core.cv.ai.image_quality import validate_image_quality
 from backend.app.core.cv.ai.joint_classifier import JointClassifier
 from backend.app.core.cv.ai.joint_segmenter import JointSegmenter
@@ -128,6 +130,10 @@ async def measure_joint_gap(
         ge=0.20,
         le=0.95,
     ),
+    research_receipt_token: Optional[str] = Header(
+        None, alias="X-JointInspect-Research-Receipt-Token",
+        description="Optional restricted research-only opt-in for existing Gemini receipt export.",
+    ),
 ) -> MeasurementResponse:
     """Execute end-to-end AI/CV pipe joint measurement pipeline with strict authority boundaries:
 
@@ -178,6 +184,23 @@ async def measure_joint_gap(
         vertex_gate = get_vertex_semantic_gate()
         semantic_res = await asyncio.to_thread(vertex_gate.evaluate, image_bgr, operator_context=operator_context)
 
+        # Opt-in ONLY for authenticated research requests. Reuse the result
+        # already computed above; never call Gemini twice or change gating.
+        semantic_receipt_uri = None
+        enabled = os.getenv("JOINTINSPECT_GEMINI_RECEIPT_EXPORT_ENABLED", "false").lower() == "true"
+        configured_research_token = os.getenv("JOINTINSPECT_GEMINI_RECEIPT_EXPORT_TOKEN", "")
+        if (enabled and configured_research_token and research_receipt_token
+                and hmac.compare_digest(configured_research_token, research_receipt_token)):
+            try:
+                signing_key = os.getenv("JOINTINSPECT_GEMINI_RECEIPT_HMAC_KEY", "")
+                semantic_receipt_uri = await asyncio.to_thread(
+                    export_existing_gate_receipt, content,
+                    semantic_res.model_dump(mode="json"), signing_secret=signing_key,
+                )
+            except Exception as exc:
+                # Do not log credentials, source content, or full provider errors.
+                logger.warning("Research Gemini receipt export unavailable: %s", type(exc).__name__)
+
         # Domain gating: block unrelated scenes, non-joint pipe interiors, degraded images, or when Vertex is unavailable
         if not semantic_res.processing_allowed:
             if semantic_res.domain_status == DomainStatus.UNRELATED_IMAGE:
@@ -225,6 +248,7 @@ async def measure_joint_gap(
                 overlay_hints=OverlayHints(),
                 debug_info=None,
                 semantic_gate=semantic_res,
+                semantic_receipt_uri=semantic_receipt_uri,
                 calibration_source=calibration_source,
                 calibration_profile=cal_profile,
                 geometry_tier="REJECTED_UNRELIABLE",
@@ -261,6 +285,7 @@ async def measure_joint_gap(
                 overlay_hints=OverlayHints(),
                 debug_info=None,
                 semantic_gate=semantic_res,
+                semantic_receipt_uri=semantic_receipt_uri,
                 calibration_source=calibration_source,
                 calibration_profile=cal_profile,
                 geometry_tier="REJECTED_UNRELIABLE",
@@ -354,6 +379,7 @@ async def measure_joint_gap(
                 overlay_hints=OverlayHints(),
                 debug_info=None,
                 semantic_gate=semantic_res,
+                semantic_receipt_uri=semantic_receipt_uri,
                 calibration_source=calibration_source,
                 calibration_profile=cal_profile,
                 geometry_tier="REJECTED_UNRELIABLE",
@@ -648,6 +674,7 @@ async def measure_joint_gap(
             response.authoritative_gap_mm = None
             response.engineering_result = ToleranceStatus.REVIEW
 
+        response.semantic_receipt_uri = semantic_receipt_uri
         return response
 
     except HTTPException:
