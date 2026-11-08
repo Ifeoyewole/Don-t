@@ -44,6 +44,7 @@ def analyze_local_image(
     checkpoint_sha256: str | None,
     inspect_view_local: bool = False,
     inspect_view_json: Path | None = None,
+    gemini_receipt_json: Path | None = None,
 ) -> tuple[dict, np.ndarray | None]:
     if inspect_view_local and inspect_view_json is not None:
         raise ValueError("Choose one Inspect View source (local model OR matching JSON)")
@@ -79,9 +80,17 @@ def analyze_local_image(
     report = asdict(evidence)
     # One canonical, fail-closed decision for the same exact source image.
     # Keep component fields for audits, not for independent product answers.
+    # Optional server-created receipt reuses the existing backend Gemini call.
+    # Never invoke Vertex AI again from this GPU/CPU benchmark.
+    gemini_receipt = None
+    if gemini_receipt_json is not None:
+        gemini_receipt = json.loads(gemini_receipt_json.read_text(encoding="utf-8"))
+        if not isinstance(gemini_receipt, dict):
+            raise ValueError("Gemini receipt must be a JSON object")
     report["unified_result"] = build_unified_result(
         report, inspect_view_payload=inspect_view,
         image_sha256=hashlib.sha256(payload).hexdigest(),
+        gemini_receipt=gemini_receipt,
     )
     # Distinguish a rejected mask from a missing SAM runtime in cloud reports.
     report["sam2_reason"] = sam.reason
@@ -116,6 +125,8 @@ def main() -> None:
     parser.add_argument("--sam-sha256", default=None)
     parser.add_argument("--inspect-view-local", action="store_true")
     parser.add_argument("--inspect-view-json", type=Path, default=None)
+    parser.add_argument("--gemini-receipt-json", type=Path, default=None,
+                        help="Optional server-created same-image Gemini semantic receipt; no new API call")
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--overlay", type=Path)
     args = parser.parse_args()
@@ -127,6 +138,7 @@ def main() -> None:
         checkpoint_sha256=args.sam_sha256,
         inspect_view_local=args.inspect_view_local,
         inspect_view_json=args.inspect_view_json,
+        gemini_receipt_json=args.gemini_receipt_json,
     )
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
