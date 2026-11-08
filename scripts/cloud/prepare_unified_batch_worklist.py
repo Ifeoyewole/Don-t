@@ -20,7 +20,7 @@ COLUMNS = (
     "width", "height", "split", "duplicate_status",
     "image_uri_TO_VERIFY", "roi_x0", "roi_y0", "roi_x1", "roi_y1",
     "geometry_TO_REVIEW", "source_family_TO_VERIFY", "rights_review",
-    "annotation_review", "reviewed_ground_truth_label",
+    "annotation_review", "reviewed_ground_truth_label", "review_id",
 )
 
 
@@ -88,7 +88,7 @@ def select_candidates(registries: list[dict[str, Any]], *, target: int = 80) -> 
                 "source_family_TO_VERIFY": "",
                 "rights_review": "RESEARCH_QUARANTINE",
                 "annotation_review": "UNVERIFIED_SOURCE_LABEL",
-                "reviewed_ground_truth_label": "",
+                "reviewed_ground_truth_label": "", "review_id": "",
             })
     # Intentionally do NOT select an "OPEN_JOINT" class from generic joint
     # labels: those need manual annotation from actual imagery.
