@@ -48,3 +48,7 @@ Tests: **274 backend tests passed**, including audit, task routing, signed recei
 Production remains on `pipe-joint-api-00015-fej`; no APIs, gates, weights, IAM or runtime settings changed. Inspect View weights and these datasets remain research-scoped. No commercial release or production PASS is authorized.
 
 Artifact upload verified: **81 create-only objects**, 13,899,846 bytes including the upload manifest. `upload_manifest.json` SHA-256: `9138fa9f03880dff6340d18f45ac265580ba81ef93754f65452f903d4f153a33`.
+
+## Software review handoff
+
+PR: https://github.com/Ifeoyewole/Don-t/pull/32 (open; review requested from the repository owner). Implementation commit: `f04ba4894fc2ae31f233d5ca48f05fddc4ed9de7`. GitHub backend, ML contract and initial frontend checks passed; final PR checks are available on the PR. The initial non-conventional PR title was corrected without weakening validation. This software-review request is not approval of dataset labels, ROIs, lineage, rights or GPU spend. Do not merge or rebuild the research worker until required review and checks pass.
