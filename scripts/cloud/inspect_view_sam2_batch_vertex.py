@@ -56,6 +56,7 @@ def build_summary(
     reasons = Counter(
         reason for r in records for reason in r.get("reasons", [])
     )
+    tasks = Counter(r.get("task_type", "JOINT_GEOMETRY") for r in records)
     return {
         "schema_version": "1.0",
         "research_only": True,
@@ -66,6 +67,7 @@ def build_summary(
         "container_model": gpu_model,
         "count": len(records),
         "run_status_counts": dict(sorted(status.items())),
+        "research_task_counts": dict(sorted(tasks.items())),
         "rights_counts": dict(sorted(rights.items())),
         "source_label_counts_unverified": dict(sorted(source_labels.items())),
         "reason_counts": dict(sorted(reasons.items())),
@@ -115,6 +117,7 @@ def evaluate(args) -> dict[str, Any]:
         _sam2_predictor, _verified_checkpoint,
     )
     from scripts.benchmark_inspect_view_sam2_fusion import analyze_local_image
+    from scripts.task_aware_unified_review import analyze_nonjoint_image
 
     if not torch.cuda.is_available():
         raise RuntimeError("Batch requires a CUDA GPU; do not silently fall back")
@@ -170,11 +173,13 @@ def evaluate(args) -> dict[str, Any]:
                 overlay_file = frame_dir / "overlay.png"
                 failure = None
                 report = None
+                task = frame["task_type"]
                 try:
                     stage_verified(
                         client, frame["image_uri"], img_file, frame["image_sha256"],
                         max_bytes=MAX_IMAGE_BYTES,
                     )
+                    verified_gemini = None
                     if "gemini_receipt_uri" in frame:
                         stage_verified(
                             client, frame["gemini_receipt_uri"], receipt_path,
@@ -182,20 +187,36 @@ def evaluate(args) -> dict[str, Any]:
                         )
                         # Fail this frame on forged, stale, or mismatched receipts,
                         # rather than treating an unsigned receipt as provider truth.
-                        _receipt_from_file(
+                        verified_gemini = _receipt_from_file(
                             receipt_path, frame_sha256=frame["image_sha256"],
                             signing_secret=key,
                         )
-                    report, overlay = analyze_local_image(
-                        img_file, geometry=frame["geometry"], bbox=tuple(frame["roi"]),
-                        checkpoint_path=sam_ckpt, checkpoint_sha256=args.sam_sha,
-                        inspect_view_local=True,
-                        gemini_receipt_json=receipt_path if receipt_path.is_file() else None,
-                        sam2_predictor_factory=lambda _: predictor,
-                    )
+                    if task == "JOINT_GEOMETRY":
+                        report, overlay = analyze_local_image(
+                            img_file, geometry=frame["geometry"],
+                            bbox=tuple(frame["roi"]),
+                            checkpoint_path=sam_ckpt, checkpoint_sha256=args.sam_sha,
+                            inspect_view_local=True,
+                            gemini_receipt_json=(
+                                receipt_path if verified_gemini is not None else None
+                            ),
+                            sam2_predictor_factory=lambda _: predictor,
+                        )
+                        report["unified_result"]["task_type"] = "JOINT_GEOMETRY"
+                    else:
+                        # NEVER force a non-joint frame into seam/ring geometry.
+                        report, overlay = analyze_nonjoint_image(
+                            img_file, task_type=task,
+                            bbox=tuple(frame["roi"]),
+                            checkpoint_path=sam_ckpt,
+                            checkpoint_sha256=args.sam_sha,
+                            sam2_predictor_factory=lambda _: predictor,
+                            verified_gemini_receipt=verified_gemini,
+                        )
                     report["batch_evidence"] = {
                         "manifest_id": manifest["manifest_id"],
                         "frame_id": fid,
+                        "task_type": task,
                         "image_sha256": frame["image_sha256"],
                         "source_id": frame["source_id"],
                         "source_family": frame["source_family"],
@@ -231,6 +252,7 @@ def evaluate(args) -> dict[str, Any]:
                 unified = (report or {}).get("unified_result") or safe_failure("FRAME_ERROR")
                 record = {
                     "frame_id": fid,
+                    "task_type": task,
                     "source_id": frame["source_id"],
                     "source_family": frame["source_family"],
                     "rights_status": frame["rights_status"],
@@ -247,7 +269,8 @@ def evaluate(args) -> dict[str, Any]:
                     "elapsed_seconds": round(perf_counter() - frame_start, 3),
                 }
                 records.append(record)
-                print(json.dumps({"frame_id": fid, "run_status": record["run_status"],
+                print(json.dumps({"frame_id": fid, "task_type": task,
+                                  "run_status": record["run_status"],
                                   "decision": record["decision"]}), flush=True)
 
             summary = build_summary(
