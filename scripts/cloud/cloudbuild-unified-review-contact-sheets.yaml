@@ -1,0 +1,21 @@
+# Metadata-only, CPU-side contact sheets. No Vertex AI, Gemini or GPU call.
+# Each image must match a quarantined registry and independently computed SHA-256.
+steps:
+- name: python:3.12-slim
+  id: verify-image-paths-and-render-review-sheets
+  entrypoint: bash
+  args:
+  - -ec
+  - |
+    python -m pip install --no-cache-dir google-cloud-storage==3.4.1 pillow==12.0.0
+    python -m scripts.cloud.create_unified_review_contact_sheets \
+      --project="$PROJECT_ID" \
+      --worklist-uri="${_WORKLIST_URI}" \
+      --output-prefix="${_OUTPUT_PREFIX}"
+substitutions:
+  _WORKLIST_URI: gs://joint-inspection-510310-data/datasets/quarantine/review-worklists/REPLACE.csv
+  _OUTPUT_PREFIX: gs://joint-inspection-510310-data/datasets/quarantine/review-sheets/REPLACE-UNIQUE
+options:
+  logging: GCS_ONLY
+  machineType: E2_HIGHCPU_8
+timeout: 1800s
