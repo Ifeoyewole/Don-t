@@ -117,6 +117,81 @@ def cached_annotation_format(old: dict) -> dict:
                 ('YOLO_BOUNDING_BOX' if old['annotation_box_count'] else 'EMPTY')}
 
 
+def verified_video_key(row: dict) -> tuple | None:
+    """Only explicit evidence-backed lineage, never a filename or visual hash."""
+    family, evidence = row.get('verified_source_video_id'), row.get('source_lineage_evidence_id')
+    if row.get('source_family_verified') is True and isinstance(family,str) and family.strip() and isinstance(evidence,str) and evidence.strip():
+        return family, evidence
+    return None
+
+
+def source_relation(left: dict, right: dict) -> str:
+    key = verified_video_key(left)
+    if key and key == verified_video_key(right): return 'CONFIRMED_SHARED_SOURCE_VIDEO'
+    if (left.get('source_family_hint') and left.get('dataset_name') == right.get('dataset_name')
+            and left.get('source_family_hint') == right.get('source_family_hint')):
+        return 'UNVERIFIED_FILENAME_FAMILY_HINT'
+    return 'UNESTABLISHED'
+
+
+def reusable_image_fields(old: Any, source: dict, uri: str, generation: str) -> dict | None:
+    """A cache may supply image evidence only, never permissions or annotations."""
+    if not isinstance(old,dict): return None
+    sha = source['sha256']
+    if (old.get('integrity_status') != 'VERIFIED' or old.get('expected_sha256') != sha
+        or old.get('actual_sha256') != sha or not re.fullmatch('[a-f0-9]{64}',sha)
+        or old.get('image_uri') != uri or old.get('image_generation') != generation
+        or old.get('original_image_path') != source['original_image_path']
+        or old.get('width') != source['width'] or old.get('height') != source['height']
+        or any(not isinstance(old.get(k),str) or not re.fullmatch('[a-f0-9]{16}',old[k]) for k in ('dhash','phash'))
+        or type(old.get('image_bytes')) is not int or not 0 < old['image_bytes'] <= MAX_BYTES):
+        return None
+    keys=('image_uri','image_generation','image_bytes','actual_sha256','width','height','dhash','phash','integrity_status')
+    result={k:old[k] for k in keys}
+    result.update(sha256_matches_registry=True, dimensions_match_registry=True,
+                  dhash_matches_registry=old['dhash']==source.get('dhash'),image_evidence_reused_generation_pinned=True)
+    return result
+
+
+def audit_annotation(source: dict, classes: list[str], blob: Any, old: Any, reader= None) -> dict:
+    """Always hash/decode current generation-pinned bytes. Cache cannot self-attest."""
+    invalid_cache=old is not None and not isinstance(old,dict)
+    if invalid_cache: old=None
+    result={'original_annotation_path':source['original_annotation_path'],
+            'annotation_structure_valid':False,'annotation_labels_match_registry':False,
+            'annotation_sha256':None,'decoded_annotation_labels':[], 'annotation_box_count':0,
+            'annotation_polygon_count':0,'observed_annotation_format':'MISSING',
+            'annotation_cache_status':'INVALIDATED' if old else 'NOT_USED',
+            'annotation_cache_invalidation_reasons':[]}
+    if invalid_cache:
+        result['annotation_cache_status']='INVALIDATED'
+        result['annotation_cache_invalidation_reasons']=['INVALID_CACHE_ENTRY']
+    if blob is None:
+        result['annotation_status']='MISSING';result['annotation_cache_invalidation_reasons']=['MISSING_ANNOTATION']
+        return result
+    payload=(reader or download)(blob,1024*1024)
+    result.update(annotation_uri=f'gs://{BUCKET}/{blob.name}',annotation_generation=str(blob.generation),
+                  annotation_sha256=hashlib.sha256(payload).hexdigest(),annotation_status='READ')
+    try: result.update(check_yolo(payload.decode('utf-8'),classes))
+    except UnicodeDecodeError:
+        result['annotation_status']='INVALID_ENCODING';result['observed_annotation_format']='INVALID'
+    result['annotation_labels_match_registry']=result['decoded_annotation_labels']==sorted(set(source.get('source_labels',[])))
+    if old:
+        checks={
+            'SOURCE_ANNOTATION_IDENTITY':old.get('original_annotation_path')==source['original_annotation_path'] and old.get('annotation_uri')==result['annotation_uri'],
+            'GENERATION':old.get('annotation_generation')==result['annotation_generation'],
+            'ANNOTATION_SHA256':old.get('annotation_sha256')==result['annotation_sha256'],
+            'DECODED_LABELS':old.get('decoded_annotation_labels')==result['decoded_annotation_labels'],
+            'REGISTRY_LABELS':old.get('original_labels')==source.get('source_labels',[]),
+            'STRUCTURAL_STATUS':old.get('annotation_structure_valid') is True and result['annotation_structure_valid'] is True,
+            'LABEL_CONSISTENCY':old.get('annotation_labels_match_registry') is True and result['annotation_labels_match_registry'] is True,
+            'FORMAT':old.get('observed_annotation_format')==result['observed_annotation_format'],
+        }
+        result['annotation_cache_invalidation_reasons']=[k for k,v in checks.items() if not v]
+        result['annotation_cache_status']='VERIFIED' if all(checks.values()) else 'INVALIDATED'
+    return result
+
+
 def duplicate_pairs(rows: list[dict]) -> list[dict]:
     pairs = []
     for i, left in enumerate(rows):
@@ -128,9 +203,12 @@ def duplicate_pairs(rows: list[dict]) -> list[dict]:
             exact = left['actual_sha256'] == right['actual_sha256']
             dh = (int(left['dhash'], 16) ^ int(right['dhash'], 16)).bit_count()
             ph = (int(left['phash'], 16) ^ int(right['phash'], 16)).bit_count()
-            if exact or dh <= 6 or ph <= 8:
+            relation=source_relation(left,right)
+            near=not exact and (dh <= 6 or ph <= 8)
+            if exact or near or relation=='CONFIRMED_SHARED_SOURCE_VIDEO':
                 pairs.append({'left_id': left['record_id'], 'right_id': right['record_id'],
-                    'status': 'SHA256_EXACT' if exact else 'NEAR_DUPLICATE_CANDIDATE_UNVERIFIED',
+                    'status': 'SHA256_EXACT' if exact else 'NEAR_DUPLICATE_CANDIDATE_UNVERIFIED' if near else 'SOURCE_RELATION_ONLY',
+                    'source_relation':relation,
                     'dhash_distance': dh, 'phash_distance': ph,
                     'cross_dataset': left['dataset_name'] != right['dataset_name'],
                     'cross_split': left['original_split'] != right['original_split']})
@@ -146,8 +224,13 @@ def leakage_groups(rows: list[dict], pairs: list[dict]) -> None:
     def join(a, b):
         a, b = root(a), root(b)
         parents[max(a, b)] = min(a, b)
-    hints = {}
+    hints, verified = {}, {}
     for row in rows:
+        video=verified_video_key(row)
+        row['family_evidence_status']='CONFIRMED_SHARED_SOURCE_VIDEO' if video else 'UNVERIFIED_FILENAME_FAMILY_HINT' if row.get('source_family_hint') else 'LINEAGE_UNKNOWN'
+        if video:
+            if video in verified: join(row['record_id'],verified[video])
+            verified[video]=row['record_id']
         hint = row.get('source_family_hint')
         if hint:
             # Hints are conservative grouping constraints, never verified lineage.
@@ -217,13 +300,6 @@ def run(client, out: Path, workers: int = 4, reuse: Path | None = None) -> dict:
             raise ValueError('Registry snapshot changed; a new full audit is required')
         cached = {(r['dataset_name'],r['original_image_path'],r['expected_sha256']):r
                   for r in map(json.loads,(reuse/'dataset_inventory.jsonl').read_text().splitlines())}
-        for dataset, reg in registries.items():
-            for row in reg['records']:
-                old = cached.get((dataset,row['original_image_path'],row['sha256']))
-                name = resolve_name(reg,row['original_image_path'],SOURCE_PREFIXES[dataset],list(objects[dataset]))
-                if (not old or not name or old.get('integrity_status')!='VERIFIED'
-                    or old.get('image_generation')!=str(objects[dataset][name].generation)):
-                    raise ValueError('Cached image generation changed; a new full byte audit is required')
     tasks = [(dataset, i, row) for dataset, reg in registries.items() for i, row in enumerate(reg['records'])]
     def audit(task):
         dataset, index, source = task
@@ -249,9 +325,9 @@ def run(client, out: Path, workers: int = 4, reuse: Path | None = None) -> dict:
             if not name: raise ValueError('Missing or ambiguous image object')
             blob = objects[dataset][name]
             old = cached.get((dataset,source['original_image_path'],source['sha256']))
-            if old:
-                result.update(old)
-                result['image_evidence_reused_generation_pinned'] = True
+            image_cache=reusable_image_fields(old,source,f'gs://{BUCKET}/{name}',str(blob.generation))
+            if image_cache:
+                result.update(image_cache)
             else:
                 payload = download(blob)
                 actual_sha = hashlib.sha256(payload).hexdigest()
@@ -264,16 +340,7 @@ def run(client, out: Path, workers: int = 4, reuse: Path | None = None) -> dict:
                 result['integrity_status'] = 'VERIFIED' if result['sha256_matches_registry'] and result['dimensions_match_registry'] else 'REGISTRY_MISMATCH'
             annotation = resolve_name(reg, source['original_annotation_path'], prefix, names)
             result['registry_annotation_type'] = source.get('annotation_type')
-            if (old and old['annotation_structure_valid'] and annotation
-                and old.get('annotation_generation') == str(objects[dataset][annotation].generation)
-                and old.get('original_labels') == source.get('source_labels')):
-                result.update(cached_annotation_format(old))
-            elif annotation:
-                label_blob = objects[dataset][annotation]; raw = download(label_blob, 1024 * 1024)
-                result.update(annotation_uri=f'gs://{BUCKET}/{annotation}', annotation_generation=str(label_blob.generation),
-                              annotation_sha256=hashlib.sha256(raw).hexdigest())
-                result.update(check_yolo(raw.decode('utf-8'), reg['original_classes']))
-                result['annotation_labels_match_registry'] = result['decoded_annotation_labels'] == sorted(set(result['original_labels']))
+            result.update(audit_annotation(source,reg['original_classes'],objects[dataset].get(annotation),old))
             result['exact_baseline_sha256_match'] = result['actual_sha256'] in baseline_sha
             result['baseline_dhash_collision_unverified'] = result['dhash'] in baseline_dhash
         except Exception as exc:
@@ -287,7 +354,7 @@ def run(client, out: Path, workers: int = 4, reuse: Path | None = None) -> dict:
             if thumb is not None: thumbs[row['record_id']] = thumb
             if len(rows) % 100 == 0: print(json.dumps({'audited': len(rows), 'total': len(tasks)}), flush=True)
     pairs = duplicate_pairs(rows); leakage_groups(rows, pairs)
-    seen = set(); candidate_ids = {p[k] for p in pairs if p['status'] != 'SHA256_EXACT' for k in ('left_id', 'right_id')}
+    seen = set(); candidate_ids = {p[k] for p in pairs if p['status'] == 'NEAR_DUPLICATE_CANDIDATE_UNVERIFIED' for k in ('left_id', 'right_id')}
     for row in rows:
         sha = row.get('actual_sha256'); row['exact_duplicate_within_imports'] = bool(sha and sha in seen)
         if sha: seen.add(sha)
@@ -295,8 +362,8 @@ def run(client, out: Path, workers: int = 4, reuse: Path | None = None) -> dict:
         row['technical_classification_candidate'] = bool(row['integrity_status'] == 'VERIFIED' and not row['exact_duplicate_within_imports'] and not row.get('exact_baseline_sha256_match'))
         # Classification candidate is not approval for the current reviewed-ROI batch runner.
     (out / 'dataset_inventory.jsonl').write_text(''.join(json.dumps(r, sort_keys=True) + '\n' for r in rows))
-    write_csv(out / 'duplicate_candidates.csv', pairs, ['left_id','right_id','status','dhash_distance','phash_distance','cross_dataset','cross_split'])
-    write_csv(out / 'source_family_audit.csv', rows, ['record_id','dataset_name','original_media_id','source_family_hint','source_family_verified','lineage_status','original_split','conservative_leakage_group','candidate_group_crosses_original_splits'])
+    write_csv(out / 'duplicate_candidates.csv', pairs, ['left_id','right_id','status','source_relation','dhash_distance','phash_distance','cross_dataset','cross_split'])
+    write_csv(out / 'source_family_audit.csv', rows, ['record_id','dataset_name','original_media_id','source_family_hint','source_family_verified','lineage_status','family_evidence_status','original_split','conservative_leakage_group','candidate_group_crosses_original_splits'])
     mappings = [{'dataset_name': dataset, 'original_label': label, 'occurrences': sum(label in r.get('source_labels', []) for r in reg['records']),
         'proposed_jointinspect_label': MAPPINGS.get(label), 'mapping_status': 'PROVISIONAL' if label in MAPPINGS else 'UNSUPPORTED',
         'independently_verified_positives': 0, 'active_infiltration_confirmed': False,
@@ -308,17 +375,19 @@ def run(client, out: Path, workers: int = 4, reuse: Path | None = None) -> dict:
     # Private contact sheets for all images. Never draw invented ROIs or approve them.
     from PIL import Image, ImageDraw
     sheet_dir = out / 'contact-sheets'; sheet_dir.mkdir()
-    for start in range(0, 0 if reuse else len(rows), 20):
+    can_reuse_sheets=bool(reuse and all(r.get('image_evidence_reused_generation_pinned') for r in rows))
+    for start in range(0, 0 if can_reuse_sheets else len(rows), 20):
         sheet = Image.new('RGB', (1100, 1190), 'white'); draw = ImageDraw.Draw(sheet)
         draw.text((12, 10), 'QUARANTINE: unverified labels / lineage. No ROI approval.', fill='black')
         for pos, row in enumerate(rows[start:start+20]):
             x, y = (pos % 4) * 275 + 12, (pos // 4) * 230 + 40
             if row['record_id'] in thumbs: sheet.paste(thumbs[row['record_id']], (x, y))
+            else: draw.text((x,y+50),'Unchanged image: consult prior sheet',fill='black')
             draw.text((x, y+174), row['record_id'] + ' ' + str(row.get('source_family_hint') or 'UNKNOWN'), fill='black')
             draw.text((x, y+190), '|'.join(row['original_labels'])[:38], fill='black')
             draw.text((x, y+206), row['expected_sha256'][:16], fill='black')
         sheet.save(sheet_dir / f'page-{start//20+1:03d}.jpg', quality=85)
-    if reuse:
+    if can_reuse_sheets:
         import shutil
         shutil.copytree(reuse/'contact-sheets', sheet_dir, dirs_exist_ok=True)
     summary = {'status': 'COMPLETED' if all(r['integrity_status']=='VERIFIED' for r in rows) else 'BLOCKED_INFRASTRUCTURE',
@@ -328,6 +397,8 @@ def run(client, out: Path, workers: int = 4, reuse: Path | None = None) -> dict:
         'image_evidence_reused_generation_pinned': sum(r.get('image_evidence_reused_generation_pinned',False) for r in rows),
         'observed_annotation_formats': dict(Counter(r.get('observed_annotation_format') for r in rows)),
         'annotation_polygon_count': sum(r.get('annotation_polygon_count',0) for r in rows),
+        'annotation_cache_status_counts':dict(Counter(r.get('annotation_cache_status') for r in rows)),
+        'missing_annotations':sum(r.get('annotation_status')=='MISSING' for r in rows),
         'annotation_structurally_valid': sum(r['annotation_structure_valid'] for r in rows),
         'annotation_label_mismatches': sum(r.get('annotation_labels_match_registry') is False for r in rows),
         'dhash_registry_mismatches': sum(r.get('dhash_matches_registry') is False for r in rows),
@@ -335,7 +406,7 @@ def run(client, out: Path, workers: int = 4, reuse: Path | None = None) -> dict:
         'exact_duplicate_redundant_records': sum(r['exact_duplicate_within_imports'] for r in rows),
         'exact_baseline_sha256_matches': sum(r.get('exact_baseline_sha256_match',False) for r in rows),
         'baseline_dhash_candidates': sum(r.get('baseline_dhash_collision_unverified',False) for r in rows),
-        'near_duplicate_candidate_pairs': sum(p['status']!='SHA256_EXACT' for p in pairs),
+        'near_duplicate_candidate_pairs': sum(p['status']=='NEAR_DUPLICATE_CANDIDATE_UNVERIFIED' for p in pairs),
         'near_duplicate_candidate_records': len(candidate_ids),
         'cross_dataset_candidate_pairs': sum(p['cross_dataset'] for p in pairs),
         'cross_split_candidate_pairs': sum(p['cross_split'] for p in pairs),

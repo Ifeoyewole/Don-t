@@ -52,3 +52,29 @@ Production remains on `pipe-joint-api-00015-fej`; no APIs, gates, weights, IAM o
 Artifact upload verified: **81 create-only objects**, 13,899,846 bytes including the upload manifest. `upload_manifest.json` SHA-256: `9138fa9f03880dff6340d18f45ac265580ba81ef93754f65452f903d4f153a33`.
 
 CPU readiness supplement: both pinned checkpoints were independently SHA-256 verified and instantiated on CPU (r5: 15 heads, 27,831,663 parameters; SAM2.1 Tiny: 38,962,498 parameters). No forward pass or dataset-image inference ran. Temporary weight copies were removed. Evidence: `gs://joint-inspection-510310-data/models/inspect-view/research-results/unified-audit/20261109T164513Z-85af07dc/supplements/cpu-model-load.json` (SHA-256 `6ed3237bb7b3929f8dbf6cbc3d1df667daa9598d84e167b9b426d470e81997b8`). This is one additional object beyond the 81-object core audit snapshot and does not establish GPU-stage success.
+
+## PR #32 cache hardening follow-up
+
+Every resumed annotation is now read from its current pinned GCS generation,
+SHA-256 hashed and decoded again. Cache comparison includes the exact source
+annotation path/URI, generation, hash, decoded labels, registry labels, format
+and structural/label-consistency flags. Missing files clear old evidence rather
+than inheriting a cached success. Image cache reuse copies an explicit image-only
+allowlist and re-reads invalid or generation-changed entries; no rights, training
+eligibility or annotation approvals are inherited from the cache.
+
+The full 1,034-record annotation pass was repeated with this implementation:
+all 1,034 annotation files remain structurally valid, no files are missing and
+no registry-label mismatches exist. All 1,034 legacy annotation cache entries
+were invalidated because their source-identity evidence was incomplete, then
+replaced with freshly checked evidence. Image generations were unchanged and
+all image checks were reused. Perceptual findings remain 1,135 candidate pairs,
+not verified video relationships. Confirmed video lineage requires explicit
+reviewed video identity AND a matching lineage-evidence identifier. Filename
+hints remain unverified conservative grouping constraints.
+
+Full backend suite: 294 tests passed, including integration regressions for
+missing/modified annotations, generation changes, invalid caches and leakage.
+The connected main branch currently auto-deploys to production; merging is
+blocked by the current no-production-deployment instruction until a separately
+approved deployment pause or equivalent verified safeguard exists.
