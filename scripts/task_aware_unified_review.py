@@ -45,6 +45,7 @@ def analyze_nonjoint_image(
     checkpoint_sha256: str,
     sam2_predictor_factory: Callable,
     verified_gemini_receipt: Mapping[str, Any] | None = None,
+    mask_output_path: Path | None = None,
 ) -> tuple[dict[str, Any], np.ndarray | None]:
     """One frame / one task-specific report, without joint geometry functions."""
     if task_type not in NONJOINT_TASKS:
@@ -96,6 +97,10 @@ def analyze_nonjoint_image(
         "physical_measurement_authorized": False,
         "unified_result": unified,
     }
+    if mask_output_path is not None:
+        from scripts.cloud.research_runtime_diagnostics import write_verified_candidate_mask
+        report['mask_artifact']=write_verified_candidate_mask(
+            sam,image,mask_output_path,unified['segmentation']['status']=='CANDIDATE_REVIEW')
     overlay = None
     if pixels_verified and unified["segmentation"]["status"] == "CANDIDATE_REVIEW":
         overlay = image.copy()

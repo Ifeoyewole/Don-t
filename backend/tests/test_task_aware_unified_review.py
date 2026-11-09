@@ -98,6 +98,7 @@ def test_nonjoint_runner_never_runs_open_cv_joint_geometry(monkeypatch, tmp_path
         image_path, task_type=task, bbox=(140, 30, 320, 250),
         checkpoint_path=tmp_path / "sam.pt",
         checkpoint_sha256="b"*64,
+        mask_output_path=tmp_path / "candidate.png",
         sam2_predictor_factory=lambda _: object(),
     )
     result = report["unified_result"]
@@ -105,6 +106,8 @@ def test_nonjoint_runner_never_runs_open_cv_joint_geometry(monkeypatch, tmp_path
     assert result["decision"] == "REVIEW_REQUIRED"
     assert result["defect"] == "UNDETERMINED"
     assert result["segmentation"]["status"] == "CANDIDATE_REVIEW"
+    assert (tmp_path / 'candidate.png').exists()
+    assert report['mask_artifact']['defect_identity_verified'] is False
     assert report["sam2_mask_pixels_verified"] is True
     assert result["geometry"]["status"] == "NOT_APPLICABLE_FOR_TASK"
     assert result["geometry"]["physical_gap_mm"] is None
