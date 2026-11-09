@@ -75,9 +75,9 @@ def _fixtures():
     )
     worklist_key = "datasets/quarantine/review-worklists/test.csv"
     rows = "\n".join([
-        "candidate_bucket,dataset_name,source_image_path,source_media_id,"
+        "review_status,candidate_bucket,dataset_name,source_image_path,source_media_id,"
         "image_sha256,image_uri_TO_VERIFY,source_family_TO_VERIFY,roi_x0",
-        "JOINT_DISPLACEMENT_CANDIDATE,Sewer Defects Public,"
+        "NEEDS_HUMAN_REVIEW,JOINT_DISPLACEMENT_CANDIDATE,Sewer Defects Public,"
         f"train/images/PI005299_f11640_jpg.rf.abcdef.jpg,"
         f"PI005299_f11640_jpg.rf.abcdef,{sha},,,",
     ]) + "\n"
