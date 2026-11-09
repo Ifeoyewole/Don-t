@@ -100,3 +100,14 @@ def test_worklist_handles_no_infiltration_without_fabricating_it():
 def test_registry_eligibility_is_explicitly_quarantine():
     with pytest.raises(ValueError):
         select_candidates([{"commercial_training_eligible": True, "records": []}])
+
+
+def test_nonjoint_authenticated_receipt_is_counted_without_changing_joint_gate():
+    records=[{'run_status':'REVIEW_REQUIRED','rights_status':'RESEARCH_QUARANTINE',
+              'annotation_status':'UNVERIFIED_SOURCE_LABEL','gemini_status':status}
+             for status in ['ADVISORY_DOMAIN_ACCEPTED','RESEARCH_PIPE_INTERIOR_ACCEPTED','NOT_PROVIDED']]
+    summary=build_summary('mixed',records,image_digest='a'*64,
+                         output_prefix='gs://joint-inspection-510310-data/test',gpu_model='research')
+    assert summary['gemini_receipt_accepted_count']==2
+    assert summary['gemini_status_counts']=={'ADVISORY_DOMAIN_ACCEPTED':1,'NOT_PROVIDED':1,'RESEARCH_PIPE_INTERIOR_ACCEPTED':1}
+    assert summary['f1'] is None and summary['recall'] is None
