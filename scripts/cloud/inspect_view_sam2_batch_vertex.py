@@ -177,6 +177,9 @@ def evaluate(args) -> dict[str, Any]:
                 receipt_path = frame_dir / "receipt.json"
                 report_path = frame_dir / "report.json"
                 overlay_file = frame_dir / "overlay.png"
+                mask_file = frame_dir / "mask.png"
+                diagnostics_file = frame_dir / "runtime_diagnostics.json"
+                failure_file = frame_dir / "failure.json"
                 failure = None
                 report = None
                 task = frame["task_type"]
@@ -207,6 +210,7 @@ def evaluate(args) -> dict[str, Any]:
                                 receipt_path if verified_gemini is not None else None
                             ),
                             sam2_predictor_factory=lambda _: predictor,
+                            mask_output_path=mask_file,
                         )
                         report["unified_result"]["task_type"] = "JOINT_GEOMETRY"
                     else:
@@ -217,6 +221,7 @@ def evaluate(args) -> dict[str, Any]:
                             checkpoint_path=sam_ckpt,
                             checkpoint_sha256=args.sam_sha,
                             sam2_predictor_factory=lambda _: predictor,
+                            mask_output_path=mask_file,
                             verified_gemini_receipt=verified_gemini,
                         )
                     report["batch_evidence"] = {
@@ -233,6 +238,11 @@ def evaluate(args) -> dict[str, Any]:
                             if frame["annotation_status"] == "REVIEWED_GROUND_TRUTH" else None,
                         "commercial_training_eligible": False,
                     }
+                    if mask_file.exists():
+                        upload_create_only(client,mask_file,f"{output}/frames/{fid}/mask.png","image/png")
+                    from scripts.cloud.research_runtime_diagnostics import runtime_diagnostics
+                    diagnostics_file.write_text(json.dumps(runtime_diagnostics(),indent=2))
+                    upload_create_only(client,diagnostics_file,f"{output}/frames/{fid}/runtime_diagnostics.json","application/json")
                     report_path.write_text(json.dumps(report, indent=2) + "\n", "utf-8")
                     upload_create_only(
                         client, report_path, f"{output}/frames/{fid}/report.json",
@@ -250,7 +260,12 @@ def evaluate(args) -> dict[str, Any]:
                     # Do not leak secret values or arbitrary GCS object paths in
                     # error outputs. Keep running to yield a complete audit.
                     failure = type(exc).__name__
+                    failure_file.write_text(json.dumps({'frame_id':fid,'failure_type':failure,'task_type':task,'research_only':True}))
+                    upload_create_only(client,failure_file,f"{output}/frames/{fid}/failure.json","application/json")
                 finally:
+                    mask_file.unlink(missing_ok=True)
+                    diagnostics_file.unlink(missing_ok=True)
+                    failure_file.unlink(missing_ok=True)
                     img_file.unlink(missing_ok=True)
                     receipt_path.unlink(missing_ok=True)
                     overlay_file.unlink(missing_ok=True)

@@ -47,6 +47,7 @@ def analyze_local_image(
     inspect_view_json: Path | None = None,
     gemini_receipt_json: Path | None = None,
     sam2_predictor_factory: Callable | None = None,
+    mask_output_path: Path | None = None,
 ) -> tuple[dict, np.ndarray | None]:
     if inspect_view_local and inspect_view_json is not None:
         raise ValueError("Choose one Inspect View source (local model OR matching JSON)")
@@ -105,6 +106,10 @@ def analyze_local_image(
         "is reported by the project owner, not established by this script. "
         "Mask pixels do not prove a pipe defect or millimetre gap."
     )
+    if mask_output_path is not None:
+        from scripts.cloud.research_runtime_diagnostics import write_verified_candidate_mask
+        report['mask_artifact']=write_verified_candidate_mask(
+            sam,image,mask_output_path,report['unified_result']['segmentation']['status']=='CANDIDATE_REVIEW')
     canvas = None
     if sam.status == "MASK_CANDIDATE_RESEARCH" and sam.mask is not None:
         canvas = image.copy()
