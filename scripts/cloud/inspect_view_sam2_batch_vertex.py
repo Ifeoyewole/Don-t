@@ -73,7 +73,13 @@ def build_summary(
         "reason_counts": dict(sorted(reasons.items())),
         "sam2_candidate_count": sum(r.get("segmentation_status") == "CANDIDATE_REVIEW" for r in records),
         "pixel_geometry_candidate_count": sum(r.get("pixel_candidate") is not None for r in records),
-        "gemini_receipt_accepted_count": sum(r.get("gemini_status") == "ADVISORY_DOMAIN_ACCEPTED" for r in records),
+        "gemini_receipt_accepted_count": sum(
+            r.get("gemini_status") in {"ADVISORY_DOMAIN_ACCEPTED", "RESEARCH_PIPE_INTERIOR_ACCEPTED"}
+            for r in records
+        ),
+        "gemini_status_counts": dict(sorted(Counter(
+            r.get("gemini_status", "NOT_PROVIDED") for r in records
+        ).items())),
         "annotation_reviewed_count": sum(r.get("annotation_status") == "REVIEWED_GROUND_TRUTH" for r in records),
         "f1": None,
         "precision": None,
