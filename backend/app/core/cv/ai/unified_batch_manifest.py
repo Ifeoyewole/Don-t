@@ -15,12 +15,13 @@ MAX_MANIFEST_BYTES = 256 * 1024
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_IMAGE_PIXELS = 16_000_000
 _GEOMETRIES = frozenset({"VERTICAL_SEAM", "HORIZONTAL_SEAM", "CIRCULAR_OPENING"})
+TASK_TYPES = frozenset({"JOINT_GEOMETRY", "OBJECT_SEGMENTATION", "INFILTRATION_REVIEW"})
 _RIGHTS = frozenset({"RESEARCH_QUARANTINE", "RIGHTS_REVIEWED_RESEARCH"})
 _LABEL_STATUS = frozenset({"UNVERIFIED_SOURCE_LABEL", "REVIEWED_GROUND_TRUTH"})
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$")
 _HEX_SHA = re.compile(r"^[a-f0-9]{64}$")
 _FRAME_FIELDS = frozenset({
-    "frame_id", "image_uri", "image_sha256", "geometry", "roi",
+    "frame_id", "image_uri", "image_sha256", "geometry", "roi", "task_type",
     "source_family", "source_id", "rights_status", "annotation_status",
     "source_label", "reviewed_label", "review_id",
     "gemini_receipt_uri", "gemini_receipt_sha256",
@@ -73,7 +74,7 @@ def validate_batch_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(item, dict) or set(item) - _FRAME_FIELDS:
             raise ValueError(f"Invalid fields on frame {index}")
         required = {
-            "frame_id", "image_uri", "image_sha256", "geometry", "roi",
+            "frame_id", "image_uri", "image_sha256", "roi",
             "source_family", "source_id", "rights_status", "annotation_status",
         }
         if not required <= set(item):
@@ -87,8 +88,14 @@ def validate_batch_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
             raise ValueError("Exact duplicate frames are not allowed in one batch")
         seen_hashes.add(digest)
         image_uri = checked_gcs_uri(item["image_uri"])
-        if item["geometry"] not in _GEOMETRIES:
-            raise ValueError(f"Unsupported geometry on {fid}")
+        task = item.get("task_type", "JOINT_GEOMETRY")  # v1 manifest compatibility
+        if not isinstance(task, str) or task not in TASK_TYPES:
+            raise ValueError(f"Unsupported research task on {fid}")
+        if task == "JOINT_GEOMETRY":
+            if item.get("geometry") not in _GEOMETRIES:
+                raise ValueError(f"Joint-geometry task requires a real geometry on {fid}")
+        elif "geometry" in item:
+            raise ValueError(f"Non-joint task forbids artificial seam/ring geometry on {fid}")
         roi = item["roi"]
         if (not isinstance(roi, list) or len(roi) != 4
                 or any(type(v) is not int for v in roi)
@@ -102,6 +109,7 @@ def validate_batch_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
         if annotation not in _LABEL_STATUS:
             raise ValueError(f"Annotation review status required for {fid}")
         clean_item = dict(item)
+        clean_item["task_type"] = task
         clean_item["source_family"] = _nonempty(item["source_family"], "source_family")
         clean_item["source_id"] = _nonempty(item["source_id"], "source_id")
         if annotation == "REVIEWED_GROUND_TRUTH":
