@@ -1,0 +1,15 @@
+{
+  "status": "BLOCKED_INFRASTRUCTURE",
+  "production_changes_applied": false,
+  "resources_created": [],
+  "secret_resource_to_approve": "projects/567370443508/secrets/jointinspect-research-semantic-hmac",
+  "secret_version": null,
+  "signer_identity": null,
+  "verifier_identity": "joint-inspection-trainer@joint-inspection-510310.iam.gserviceaccount.com",
+  "minimum_secret_role": "roles/secretmanager.secretAccessor on the single approved research secret",
+  "research_model": "gemini-3.1-pro-preview",
+  "research_location": "global",
+  "automatic_provider_retries": 0,
+  "live_gemini_budget": null,
+  "operator_action": "Approve isolated signer/secret/IAM and a bounded image-specific Gemini scope; never edit production auth"
+}
