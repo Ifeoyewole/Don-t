@@ -15,6 +15,7 @@ RUN git clone https://github.com/facebookresearch/sam2.git /opt/sam2 \
   && python -m pip install --no-cache-dir --no-deps -e /opt/sam2
 COPY backend/ /workspace/backend/
 COPY scripts/benchmark_inspect_view_sam2_fusion.py /workspace/scripts/benchmark_inspect_view_sam2_fusion.py
+COPY scripts/task_aware_unified_review.py /workspace/scripts/task_aware_unified_review.py
 COPY scripts/cloud/inspect_view_sam2_vertex.py /workspace/scripts/cloud/inspect_view_sam2_vertex.py
 COPY scripts/cloud/inspect_view_sam2_batch_vertex.py /workspace/scripts/cloud/inspect_view_sam2_batch_vertex.py
 ENTRYPOINT ["python", "-m", "scripts.cloud.inspect_view_sam2_vertex"]
