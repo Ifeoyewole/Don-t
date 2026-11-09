@@ -223,6 +223,14 @@ const ResultCard = ({
           <span>{item.measurementSource === 'ai-review' ? 'Detected gap:' : item.measurementSource === 'ai-assisted' && !item.cvDebug?.pipeDetected ? 'Estimated gap:' : 'Measured gap:'}</span>
           <strong>{measurementValueLabel(item, displayUnit)}</strong>
         </div>
+        <div className="report-scale-summary">
+          <strong>Physical measurement reference</strong>
+          <p>Pipe internal diameter: {item.calibrationProfile?.pipe_diameter_mm ?? item.calibrationProfile?.pipeDiameterMm ?? 'Not confirmed'}{(item.calibrationProfile?.pipe_diameter_mm ?? item.calibrationProfile?.pipeDiameterMm) ? ' mm' : ''}</p>
+          <p>Camera: {item.calibrationProfile?.camera_id ?? item.calibrationProfile?.cameraId ?? 'Not recorded'}</p>
+          <p>Source: {item.calibrationProfile?.source ?? 'No verified reference'} · Reference: {item.calibrationProfile?.calibration_reference_id ?? 'Not recorded'}</p>
+          {getAuthorizedMillimetres(item) == null && <p>To obtain mm: return to Upload and select the confirmed pipe size, actual camera and registered reference. A circular opening needs matching visible pipe geometry. A close-up needs an engineer-registered, image-specific measured reference at the joint plane. Save the reference, then remeasure; nominal diameter alone cannot establish scale.</p>}
+          <details><summary>Technical pixel evidence</summary><p>{item.cvDebug?.gapPixels != null ? `${item.cvDebug.gapPixels.toFixed(1)} px (not a physical measurement)` : 'No usable pixel measurement'}</p></details>
+        </div>
 
         <div className="inspection-gap-row">
           <span>Status:</span>
@@ -569,15 +577,22 @@ export const InspectionResultsPage = ({
   onClearOverride,
   onNext,
 }: Props) => {
+  const [expanded, setExpanded] = useState(false)
+  useEffect(() => {
+    if (!expanded) return
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setExpanded(false) }
+    document.addEventListener('keydown', onKey)
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = previous }
+  }, [expanded])
   const total = summary?.totalJoints ?? results.length
   const pass = summary?.passCount ?? results.filter((item) => item.status === 'PASS').length
   const fail = summary?.failCount ?? results.filter((item) => item.status === 'FAIL').length
   const review = summary?.reviewCount ?? results.filter((item) => item.status === 'REVIEW').length
   const completion = total ? Math.round((results.length / total) * 100) : 0
   const latestProcessedAt = results[results.length - 1]?.processedAt
-  const [displayUnit, setDisplayUnit] = useState<GapDisplayUnit>(() =>
-    results.some((item) => getAuthorizedMillimetres(item) != null) ? 'mm' : 'px'
-  )
+  const [displayUnit, setDisplayUnit] = useState<GapDisplayUnit>('mm')
 
   useEffect(() => {
     console.log('ROUTE INSPECTION ID:', inspectionId)
@@ -596,8 +611,12 @@ export const InspectionResultsPage = ({
   }
 
   return (
-    <div className="page-grid results-page">
-      <InspectionReadiness />
+    <div className={`page-grid results-page${expanded ? ' report-expanded' : ''}`}>
+      <div className="report-toolbar">
+        <div><p className="eyebrow">Inspection report</p><strong>{projectName} · {manholeLabel}</strong></div>
+        <button className="button button-secondary" type="button" aria-pressed={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Exit expanded report' : 'Expand report'}</button>
+      </div>
+      <details className="report-guidance"><summary>Model coverage and engineering guidance</summary><InspectionReadiness /></details>
       <div className="page-status-strip">
         <span>{online ? 'Online - measurements saved locally' : 'Offline - measurements stored on device'}</span>
         <span>

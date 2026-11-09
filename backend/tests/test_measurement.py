@@ -1,6 +1,7 @@
 """Automated Unit and Integration Tests for Computer Vision Measurement Backend."""
 
 import io
+import hashlib
 import cv2
 import numpy as np
 import pytest
@@ -20,13 +21,19 @@ import json
 from backend.app.core.cv.calibration_authority import clear_calibration_cache
 
 @pytest.fixture
-def authorized_calibration(monkeypatch):
+def authorized_calibration(monkeypatch, synthetic_vertical_seam_image):
+    _, encoded = cv2.imencode(".jpg", synthetic_vertical_seam_image)
     monkeypatch.setenv("JOINTINSPECT_VERIFIED_CALIBRATIONS_JSON", json.dumps([{
         "reference_id": "TEST-RIG-100",
         "project_id": "integration-test",
         "camera_id": "TEST-CAMERA-01",
         "pipe_diameter_mm": 100.0,
         "source": "TEST_RIG",
+        "reference_length_mm": 10.0,
+        "reference_span_px": 40.0,
+        "image_sha256": hashlib.sha256(encoded.tobytes()).hexdigest(),
+        "image_width": 400,
+        "image_height": 400,
         "validated_joint_types": ["CIRCULAR_OPENING", "VERTICAL_SEAM"],
     }]))
     clear_calibration_cache()
@@ -207,6 +214,7 @@ def test_measure_vertical_seam_gap(synthetic_vertical_seam_image):
         synthetic_vertical_seam_image,
         joint_type=JointType.VERTICAL_SEAM,
         pipe_diameter_mm=100.0,
+        calibrated_pixels_per_mm=4.0,
         num_scanlines=20,
         return_debug_image=True,
     )
@@ -224,6 +232,7 @@ def test_measure_horizontal_seam_gap(synthetic_horizontal_seam_image):
         synthetic_horizontal_seam_image,
         joint_type=JointType.HORIZONTAL_SEAM,
         pipe_diameter_mm=100.0,
+        calibrated_pixels_per_mm=4.0,
         num_scanlines=20,
         return_debug_image=True,
     )

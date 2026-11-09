@@ -147,6 +147,7 @@ def measure_seam_gap(
     return_debug_image: bool = False,
     joint_mask: Optional[np.ndarray] = None,
     roi_bbox: Optional[Tuple[int, int, int, int]] = None,
+    calibrated_pixels_per_mm: Optional[float] = None,
 ) -> MeasurementResponse:
     """Execute seam gap measurement across weld/butt joint interfaces.
 
@@ -283,7 +284,11 @@ def measure_seam_gap(
     max_gap_px = float(np.max(filtered_gaps_px))
 
     # Step 5: Calibration Authority Assessment
-    has_calibration = pipe_diameter_mm is not None and pipe_diameter_mm > 0
+    has_calibration = (
+        pipe_diameter_mm is not None and np.isfinite(pipe_diameter_mm) and pipe_diameter_mm > 0
+        and calibrated_pixels_per_mm is not None
+        and np.isfinite(calibrated_pixels_per_mm) and calibrated_pixels_per_mm > 0
+    )
     pixels_per_mm: Optional[float] = None
     mean_gap_mm: Optional[float] = None
     min_gap_mm: Optional[float] = None
@@ -297,9 +302,9 @@ def measure_seam_gap(
     physical_measurement_available = False
 
     if has_calibration:
-        # Verified physical scale only; unverified heuristic defaults eliminated
-        reference_px = float(w if is_vertical else h) * 0.65
-        pixels_per_mm = float(reference_px / float(pipe_diameter_mm))
+        # A close-up does not show the pipe diameter. Never infer scale from
+        # a fraction of image width; the endpoint supplies a trusted reference.
+        pixels_per_mm = float(calibrated_pixels_per_mm)
         gaps_mm = [gap_px / pixels_per_mm for gap_px in filtered_gaps_px]
         gaps_arr = np.array(gaps_mm)
         std_gap_mm = float(np.std(gaps_arr))
@@ -346,7 +351,7 @@ def measure_seam_gap(
             overall_status = evaluate_overall_status(line_statuses)
             engineering_result = overall_status
             authoritative_reason = (
-                f"Seam scale calibrated ({pipe_diameter_mm:.1f} mm). "
+                f"Seam scale calibrated ({pixels_per_mm:.4f} px/mm; pipe {pipe_diameter_mm:.1f} mm). "
                 f"Measured mean seam gap: {authoritative_gap_mm} mm evaluated as {overall_status.value}."
             )
         else:

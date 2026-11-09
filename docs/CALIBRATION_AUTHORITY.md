@@ -53,3 +53,30 @@ Production operators must register verified calibration references through
 the deployment's protected configuration, using genuine calibration evidence
 and camera IDs. No test or example data should be treated as production
 calibration authority.
+
+## Image-specific measured reference for close-up seams
+
+Close-ups must not convert pipe diameter using an assumed fraction of image
+width. The seam detector now requires a measured scale from a server-owned
+record. Keep the existing project, source, internal pipe diameter, camera and
+validated joint type fields, and supply all of:
+
+- `reference_length_mm`: measured physical length of the reference at the joint plane.
+- `reference_span_px`: corresponding span in the rectified original image, along the measurement direction.
+- `image_sha256`: SHA-256 of the exact uploaded file bytes.
+- `image_width` and `image_height`: rectified image resolution in pixels.
+
+The trusted scale is `reference_span_px / reference_length_mm` pixels/mm.
+An engineer must verify the reference plane, camera correction, perspective
+and span before placing the record in the protected calibration configuration.
+Do not use a ruler on a different plane or an arbitrary image-width fraction.
+Changing the image bytes, crop or resolution invalidates this seam reference.
+A camera-intrinsics profile alone does not establish metric scale.
+
+Diameter, camera and geometry still have to match the existing registry checks.
+Circular openings continue to use verified internal diameter and detected pipe
+geometry; each photo can have its own diameter. Old diameter-only seam records
+now produce pixel diagnostics with no authoritative mm. Existing saved reports
+are not rewritten; explicitly remeasure after registering a genuine reference.
+The read-only reference preflight matches record identity; actual image binding
+and reliable geometry are checked during measurement.

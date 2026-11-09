@@ -24,6 +24,27 @@ class VerifiedCalibration:
     pipe_diameter_mm: float
     camera_id: Optional[str] = None
     validated_joint_types: tuple[str, ...] = ('CIRCULAR_OPENING',)
+    reference_length_mm: Optional[float] = None
+    reference_span_px: Optional[float] = None
+    image_sha256: Optional[str] = None
+    image_width: Optional[int] = None
+    image_height: Optional[int] = None
+
+    def scale_for_image(self, sha256: str, width: int, height: int) -> Optional[float]:
+        """Measured span is in rectified image pixels, at the joint plane.
+
+        Exact uploaded bytes and resolution bind this scale to one photograph.
+        These values are server-owned, never accepted as browser attestation.
+        """
+        if (not self.image_sha256 or self.image_sha256 != sha256
+                or self.image_width != width or self.image_height != height):
+            return None
+        values = (self.reference_length_mm, self.reference_span_px)
+        if any(v is None or not math.isfinite(v) or v <= 0 for v in values):
+            return None
+        if self.reference_span_px > math.hypot(width, height):
+            return None
+        return self.reference_span_px / self.reference_length_mm
 
 
 def _close(a: float, b: float) -> bool:
@@ -51,6 +72,11 @@ def _records() -> tuple[VerifiedCalibration, ...]:
                     source=CalibrationSource(str(item["source"])),
                     pipe_diameter_mm=float(item["pipe_diameter_mm"]),
                     camera_id=(str(item["camera_id"]).strip() if item.get("camera_id") else None),
+                    reference_length_mm=float(item['reference_length_mm']) if item.get('reference_length_mm') is not None else None,
+                    reference_span_px=float(item['reference_span_px']) if item.get('reference_span_px') is not None else None,
+                    image_sha256=str(item['image_sha256']) if item.get('image_sha256') else None,
+                    image_width=int(item['image_width']) if item.get('image_width') is not None else None,
+                    image_height=int(item['image_height']) if item.get('image_height') is not None else None,
                     validated_joint_types=tuple(
                         x for x in item.get("validated_joint_types", ["CIRCULAR_OPENING"])
                         if x in {"CIRCULAR_OPENING", "HORIZONTAL_SEAM", "VERTICAL_SEAM"}

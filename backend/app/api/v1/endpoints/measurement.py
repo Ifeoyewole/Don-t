@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timezone
 import asyncio
 import hmac
@@ -322,7 +323,14 @@ async def measure_joint_gap(
             camera_id=camera_id,
             joint_type=joint_type.value,
         )
-        is_calibrated = verified_calibration is not None
+        seam_scale = None
+        if verified_calibration is not None and joint_type != JointType.CIRCULAR_OPENING:
+            seam_scale = verified_calibration.scale_for_image(
+                hashlib.sha256(content).hexdigest(), rectified_bgr.shape[1], rectified_bgr.shape[0]
+            )
+        is_calibrated = verified_calibration is not None and (
+            joint_type == JointType.CIRCULAR_OPENING or seam_scale is not None
+        )
         verified_diameter_mm = pipe_diameter_mm if is_calibrated else None
 
         # Step 5: Mask-Constrained OpenCV Geometry Engine (Zero Guessing with Evidence Tiers)
@@ -346,6 +354,7 @@ async def measure_joint_gap(
                     pipe_diameter_mm=verified_diameter_mm,
                     tolerance_spec=tolerance_spec,
                     num_scanlines=scanlines,
+                    calibrated_pixels_per_mm=seam_scale,
                     return_debug_image=return_debug_image,
                     joint_mask=seg_res.mask if seg_res.detected else None,
                     roi_bbox=seg_res.bbox if seg_res.detected else None,

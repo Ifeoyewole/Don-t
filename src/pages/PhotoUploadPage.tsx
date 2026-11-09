@@ -381,10 +381,17 @@ export const PhotoUploadPage = ({
             </label>
           </section>
 
+          <section className="network-card measurement-setup-guide">
+            <strong>Choose a reliable mm reference</strong>
+            <p><b>Visible circular pipe:</b> confirm the internal diameter from the pipe specification or a physical measurement, then use its registered camera/reference. Each photo can have a different pipe size.</p>
+            <p><b>Close-up or straight seam:</b> include a measured target at the same plane as the joint. An engineer must register its physical length, pixel span in the rectified original, original-image SHA-256 and resolution with the camera/reference. Pipe diameter alone cannot scale a close-up.</p>
+            <p>Use the per-photo diameter and camera fields below. Without verified scale, inspection can continue for visual review, but the report will withhold mm. Reference registration remains server-controlled.</p>
+          </section>
+
           {/* Project Reusable Calibration Profile */}
           <section className="network-card calibration-setup-card">
             <div className="network-head">
-              <strong>Calibration</strong>
+              <strong>Millimetre measurement setup</strong>
               <span className="status-pill is-review">
                 {referenceStatus?.reference_verified ? 'REFERENCE MATCHED' : savedProfile ? 'UNVERIFIED REFERENCE' : 'CALIBRATION REQUIRED'}
               </span>
