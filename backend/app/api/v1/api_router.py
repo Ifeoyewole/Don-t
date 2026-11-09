@@ -5,6 +5,7 @@ from backend.app.api.v1.endpoints import (
     calibration,
     context_suggestions,
     engineering_preview,
+    sewer_research,
     health,
     measurement,
     multi_frame,
@@ -22,3 +23,5 @@ api_router.include_router(multi_frame.router, prefix="/cv", tags=["Multi-Frame M
 api_router.include_router(calibration.router, prefix="/cv", tags=["Calibration"])
 
 api_router.include_router(engineering_preview.router, prefix="/cv", tags=["Engineering Preview"])
+
+api_router.include_router(sewer_research.router, prefix="/cv", tags=["Unified Sewer Research"])
