@@ -1,0 +1,20 @@
+{
+  "mode": "commercial_candidate",
+  "status": "PREPARED_NOT_AUTHORIZED_NOT_TRAINED",
+  "architecture": "convnext_tiny",
+  "pretrained_checkpoint": null,
+  "device": "cpu",
+  "labels": ["NORMAL", "OPEN_JOINT", "FAULTY_JOINT", "JOINT_DISPLACEMENT", "JOINT_MISALIGNMENT", "DEFORMATION", "RUPTURE", "BROKEN_PIPE", "BLOCKAGE", "OBSTACLE", "INFILTRATION", "SURFACE_DAMAGE", "CORROSION", "PROTRUDING_LATERAL", "GEOMETRY_UNCERTAIN"],
+  "priority_classes": ["OPEN_JOINT", "INFILTRATION", "PROTRUDING_LATERAL"],
+  "eligibility_registry_sha256": null,
+  "training_budget_approval": null,
+  "seed": 20261109,
+  "image_size": 224,
+  "batch_size": 16,
+  "learning_rate": 0.0001,
+  "epochs": 5,
+  "max_runtime_seconds": 7200,
+  "automatic_retries": 0,
+  "output_gcs_prefix": null,
+  "segmentation_evaluation": "REQUIRES_INDEPENDENTLY_REVIEWED_PIXEL_MASKS"
+}
