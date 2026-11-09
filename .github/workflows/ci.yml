@@ -95,6 +95,8 @@ jobs:
           python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu \
             pytest requests pillow numpy==1.26.4 pyyaml google-cloud-storage \
             torch==2.5.1 torchvision==0.20.1
+      - name: Commercial training preparation CPU contracts
+        run: python -m pytest backend/tests/test_commercial_training_preparation.py -q
       - name: Python syntax validation
         run: python -m compileall -q scripts/sewer_ml_pipeline
       - name: Import and ML contract tests
