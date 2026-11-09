@@ -89,7 +89,7 @@ def validate_batch_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
         seen_hashes.add(digest)
         image_uri = checked_gcs_uri(item["image_uri"])
         task = item.get("task_type", "JOINT_GEOMETRY")  # v1 manifest compatibility
-        if task not in TASK_TYPES:
+        if not isinstance(task, str) or task not in TASK_TYPES:
             raise ValueError(f"Unsupported research task on {fid}")
         if task == "JOINT_GEOMETRY":
             if item.get("geometry") not in _GEOMETRIES:
