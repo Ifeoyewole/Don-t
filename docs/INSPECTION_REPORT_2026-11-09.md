@@ -29,3 +29,27 @@ passed; lint, production build and API TypeScript checks passed. Existing Vite
 OpenCV externalization and bundle-size warnings remain. Backend image build
 `c42602c6-51f9-479f-b39f-31291e831474` is in progress. Previous live backend
 revision `pipe-joint-api-00013-wel` remains active until tagged smoke checks pass.
+
+## Live rollout
+
+Implementation commit `b7ade31ed6b865345ec86802b1c86489e347aad6` was pushed directly
+to Ifeoyewole/Don-t main; no PR was opened. Its Git-triggered Vercel production
+deployment `dpl_DVC9BDMh7Rkqnrnbx2roQtsUQyin` is READY on the existing aliases.
+Live normal-report browser checks with synthetic records kept entirely in the
+test browser passed at 390, 1024 and 1440px: no overflow/clipping or page errors,
+mm selected, verified fixture displayed in mm, expansion and Escape working.
+These are layout tests, not evidence of field measurement accuracy.
+
+Cloud Build `c42602c6-51f9-479f-b39f-31291e831474` succeeded with image digest
+`sha256:b92c647b6a17a250bf3259b744e84da8d6b42743fb59299e7403295ee0f739ba`.
+Cloud Run revision `pipe-joint-api-00015-fej` now serves 100% traffic;
+`pipe-joint-api-00013-wel` remains the rollback revision. Runtime health confirmed
+Inspect View r5 loaded and Gemini 3.1 Pro Preview/global configured. Tagged and
+normal public gateway synthetic-image tests rejected a generated non-pipe image
+with no authoritative mm and engineering REVIEW. A made-up calibration reference
+was correctly rejected by the new read-only registry endpoint.
+
+Next action: obtain genuine camera/reference calibration evidence for the
+engineers' pipe sizes, register the validated records through protected
+configuration, then explicitly remeasure field photos. No production reference
+or millimetre value was fabricated. Old saved reports remain unchanged.
