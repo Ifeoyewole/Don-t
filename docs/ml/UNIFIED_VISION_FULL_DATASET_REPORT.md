@@ -25,3 +25,5 @@ Tests: **274 backend tests passed**, including audit, task routing, signed recei
 Production remains on `pipe-joint-api-00015-fej`; no APIs, gates, weights, IAM or runtime settings changed. Inspect View weights and these datasets remain research-scoped. No commercial release or production PASS is authorized.
 
 Artifact upload verified: **81 create-only objects**, 13,899,846 bytes including the upload manifest. `upload_manifest.json` SHA-256: `9138fa9f03880dff6340d18f45ac265580ba81ef93754f65452f903d4f153a33`.
+
+CPU readiness supplement: both pinned checkpoints were independently SHA-256 verified and instantiated on CPU (r5: 15 heads, 27,831,663 parameters; SAM2.1 Tiny: 38,962,498 parameters). No forward pass or dataset-image inference ran. Temporary weight copies were removed. Evidence: `gs://joint-inspection-510310-data/models/inspect-view/research-results/unified-audit/20261109T164513Z-85af07dc/supplements/cpu-model-load.json` (SHA-256 `6ed3237bb7b3929f8dbf6cbc3d1df667daa9598d84e167b9b426d470e81997b8`). This is one additional object beyond the 81-object core audit snapshot and does not establish GPU-stage success.
