@@ -18,7 +18,7 @@ COLUMNS = (
     "review_status", "candidate_bucket", "dataset_name", "source",
     "source_image_path", "source_media_id", "source_labels", "image_sha256",
     "width", "height", "split", "duplicate_status",
-    "image_uri_TO_VERIFY", "roi_x0", "roi_y0", "roi_x1", "roi_y1",
+    "image_uri_TO_VERIFY", "task_type_TO_REVIEW", "roi_x0", "roi_y0", "roi_x1", "roi_y1",
     "geometry_TO_REVIEW", "source_family_TO_VERIFY", "rights_review",
     "annotation_review", "reviewed_ground_truth_label", "review_id",
 )
@@ -83,6 +83,7 @@ def select_candidates(registries: list[dict[str, Any]], *, target: int = 80) -> 
                 "split": r.get("split"),
                 "duplicate_status": r.get("duplicate_status"),
                 "image_uri_TO_VERIFY": "",
+                "task_type_TO_REVIEW": "",
                 "roi_x0": "", "roi_y0": "", "roi_x1": "", "roi_y1": "",
                 "geometry_TO_REVIEW": "",
                 "source_family_TO_VERIFY": "",
