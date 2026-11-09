@@ -39,15 +39,24 @@ def convert_worklist(
         except (KeyError, TypeError, ValueError):
             raise ValueError(f"Row {index + 1}: fill all four integer ROI coordinates") from None
         geometry = row.get("geometry_TO_REVIEW", "").strip()
+        # Explicit reviewer task only; never infer from source defect labels.
+        task = (row.get("task_type_TO_REVIEW") or "JOINT_GEOMETRY").strip()
         frame = {
+            "task_type": task,
             "frame_id": "frame_" + sha[:24],
             "image_uri": uri, "image_sha256": sha,
-            "geometry": geometry, "roi": roi,
+            "roi": roi,
             "source_family": family,
             "source_id": f"{row.get('dataset_name', '')}:{row.get('source_media_id', '')}",
             "rights_status": row.get("rights_review", "").strip(),
             "annotation_status": row.get("annotation_review", "").strip(),
         }
+        if task == "JOINT_GEOMETRY":
+            frame["geometry"] = geometry
+        elif geometry:
+            raise ValueError(
+                f"Row {index + 1}: non-joint task must not specify seam geometry"
+            )
         if row.get("source_labels"):
             frame["source_label"] = row["source_labels"][:128]
         if frame["annotation_status"] == "REVIEWED_GROUND_TRUTH":
