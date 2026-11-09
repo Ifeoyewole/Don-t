@@ -236,3 +236,16 @@ def test_actual_iswds_postprocessed_export_contract_without_invented_labels():
     result=SewerFusion(classifier=classifier,detector=detector,segmenter=segment).infer(payload())
     assert result['baseline_comparison']['actual_mask_count']==1
     assert result['preliminary_findings']==[]
+
+
+def test_real_onnxruntime_executes_tiny_synthetic_export_contract():
+    import base64
+    ort=pytest.importorskip("onnxruntime")
+    # Constant-only synthetic graph; no pretrained model or accuracy evidence.
+    data=base64.b64decode('CAk60AIKMBIGbGFiZWxzIghDb25zdGFudCocCgV2YWx1ZSoQCAEIARAHSggFAAAAAAAAAKABBAo5EgVib3hlcyIIQ29uc3RhbnQqJgoFdmFsdWUqGggBCAEIBBABShAAAEhCAACgQQAAFkMAAMhCoAEECiwSBnNjb3JlcyIIQ29uc3RhbnQqGAoFdmFsdWUqDAgBCAEQAUoEZmZmP6ABBBIXU1lOVEhFVElDX0NPTlRSQUNUX09OTFlaIwoGaW1hZ2VzEhkKFwgBEhMKAxIBTgoCCAMKAwiABQoDCIAFWiQKEW9yaWdfdGFyZ2V0X3NpemVzEg8KDQgHEgkKAxIBTgoCCAJiGAoGbGFiZWxzEg4KDAgHEggKAggBCgIIAWIbCgVib3hlcxISChAIARIMCgIIAQoCCAEKAggEYhgKBnNjb3JlcxIOCgwIARIICgIIAQoCCAFCBAoAEA0=')
+    session=ort.InferenceSession(data,providers=["CPUExecutionProvider"])
+    detector=SewerOnnxDetector(session)
+    result=SewerFusion(classifier=classifier,detector=detector,segmenter=segment).infer(payload())
+    assert result["baseline_comparison"]["actual_mask_count"]==1
+    assert result["components"]["sewer_detector"]["detections"][0]["source_class_id"]==5
+    assert result["physical_gap_mm"] is None
