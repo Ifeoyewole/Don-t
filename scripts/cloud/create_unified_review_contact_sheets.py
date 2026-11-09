@@ -10,12 +10,11 @@ Run through scripts/cloud/cloudbuild-unified-review-contact-sheets.yaml.
 from __future__ import annotations
 
 import argparse
-from collections import Counter, defaultdict
+from collections import Counter
 from csv import DictReader, DictWriter
 import hashlib
 from io import BytesIO, StringIO
 import json
-from pathlib import PurePosixPath
 import re
 from typing import Any, Mapping
 
@@ -174,6 +173,10 @@ def make_pages(
 def generate(client: Any, *, worklist_uri: str, output_prefix_uri: str) -> dict[str, Any]:
     worklist_key = checked_uri(worklist_uri)
     output_key = checked_uri(output_prefix_uri + "/marker.json")[:-len("/marker.json")]
+    if not worklist_key.startswith("datasets/quarantine/review-worklists/"):
+        raise ValueError("Worklist must be under private quarantine review-worklists")
+    if not output_key.startswith("datasets/quarantine/review-sheets/"):
+        raise ValueError("Output must stay under private quarantine review-sheets")
     worklist_bytes = _download(client, worklist_key, limit=MAX_WORKLIST_BYTES)
     worklist_text = worklist_bytes.decode("utf-8-sig")
     reader = DictReader(StringIO(worklist_text))
@@ -231,7 +234,9 @@ def generate(client: Any, *, worklist_uri: str, output_prefix_uri: str) -> dict[
             item["geometry_TO_REVIEW"] = ""
             verified.append(item)
             thumbnails[digest] = image
-        except (OSError, ValueError, KeyError) as exc:
+        except Exception as exc:
+            # Record only the error type, never private object contents or
+            # provider exception text. Continue to produce reviewable output.
             errors.append({"row": i + 1, "reason": type(exc).__name__})
 
     if not verified:
