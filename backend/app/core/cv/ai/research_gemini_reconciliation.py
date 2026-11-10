@@ -240,6 +240,10 @@ class VertexEvidenceReconciler:
         bundle_sha = hashlib.sha256(serialized).hexdigest()
         key = hashlib.sha256((contract_sha()+image_sha+bundle_sha).encode()).hexdigest()
         region_ids = {r['region_id'] for r in evidence['regions']}
+        mask_regions = evidence.get('provided_mask_region_ids', [])
+        if (len(mask_regions) != len(masks) or len(set(mask_regions)) != len(mask_regions)
+                or any(type(i) is not int or i not in region_ids for i in mask_regions)):
+            raise ValueError('Explicit region identity required for every supplied mask')
         binding = dict(image_sha=image_sha, bundle_sha=bundle_sha, pass_index=pass_index,
                        width=width, height=height, region_ids=region_ids)
         cached = self.store.get('analysis/'+key+'.json')
@@ -263,7 +267,7 @@ class VertexEvidenceReconciler:
                      {'text': 'ANNOTATED OVERLAY'}, {'inlineData': {'mimeType': 'image/png',
                        'data': base64.b64encode(overlay_png).decode()}}]
             for index, mask in enumerate(masks):
-                parts.extend([{'text': 'ACTUAL SAM2 MASK '+str(index)}, {'inlineData': {
+                parts.extend([{'text': 'ACTUAL SAM2 MASK FOR REGION ID '+str(mask_regions[index])}, {'inlineData': {
                     'mimeType': 'image/png', 'data': base64.b64encode(mask).decode()}}])
             raw, usage = self.transport({'contents': [{'role': 'user', 'parts': parts}],
                 'generationConfig': {'responseMimeType': 'application/json',

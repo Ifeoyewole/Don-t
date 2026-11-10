@@ -86,6 +86,7 @@ def test_original_overlay_masks_and_all_component_evidence_reach_vertex():
     parts = calls[0]['contents'][0]['parts']
     assert base64.b64decode(parts[2]['inlineData']['data']) == payload()
     assert len([p for p in parts if 'inlineData' in p]) >= 3
+    assert any(p.get('text') == 'ACTUAL SAM2 MASK FOR REGION ID 0' for p in parts)
     text = parts[0]['text']
     assert all(k in text for k in ['inspect_view', 'sewer_detector', 'foreground_area_px', 'mask_sha256'])
     assert result['gemini_analyses'][0]['usage'] == {}

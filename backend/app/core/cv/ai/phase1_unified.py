@@ -59,6 +59,8 @@ class Phase1Unified:
         return {'image_sha256': result['image_sha256'], 'dimensions': result['dimensions'],
                 'mime_type': mime, 'task': result['task'], 'components': result['components'],
                 'regions': regions, 'declared_context_unverified': metadata,
+                'provided_mask_region_ids': [r['region_id'] for r in result['regions']
+                                             if 'mask_png_base64' in r][:4],
                 'previous_frame_advisory': previous, 'calibration_authority': 'UNVERIFIED',
                 'production_authority': False, 'physical_measurements': None}
 

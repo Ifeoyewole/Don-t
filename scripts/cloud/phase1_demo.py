@@ -116,7 +116,7 @@ def main():
             summary['peak_process_rss_kib'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
             save('summary.json', summary)
             print(json.dumps(summary), flush=True)
-    if summary['status'].startswith('FAILED'):
+    if summary['status'] != 'INTEGRATED_REAL_PATH_COMPLETED_NOT_ENGINEERING_ACCEPTANCE':
         raise SystemExit(1)
 
 
