@@ -69,7 +69,7 @@ Projected mask-band width and visible ring spacing are not verified axial joint 
     document = '''<!doctype html><html lang="en"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/><title>JointInspect Phase 1 demonstration</title>
 <style>*{box-sizing:border-box}body{font:16px/1.55 system-ui,sans-serif;background:#eef3fa;color:#17243a;margin:0}
-main{max-width:1200px;margin:auto;padding:24px}h1,h2,h3{color:#074aaa}.banner,.status{background:#fff0c8;padding:12px;border-radius:8px}
+main{max-width:1200px;margin:auto;padding:24px;overflow-wrap:anywhere}h1,h2,h3{color:#074aaa}.banner,.status{background:#fff0c8;padding:12px;border-radius:8px}
 section{background:white;padding:24px;margin:24px 0;border-radius:12px;overflow-wrap:anywhere}
 .pair,.masks{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px}
 .masks{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}figure{margin:0;min-width:0}img{width:100%;height:auto;object-fit:contain}
