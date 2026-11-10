@@ -115,6 +115,11 @@ def boundary_evidence(image, mask, bbox, geometry):
             widths = np.asarray([p['separation_px'] for p in pairs])
             median = float(np.median(widths))
             mad = float(np.median(np.abs(widths-median)))
+            result['sampled_mask_band_width_px'] = {
+                'sample_count': len(pairs), 'median': round(median, 3),
+                'mad': round(mad, 3), 'min': round(float(widths.min()), 3),
+                'max': round(float(widths.max()), 3),
+                'meaning': 'DESCRIPTIVE_MASK_WIDTHS_NOT_A_JOINT_GAP_MEASUREMENT'}
             if mad <= .35*median:
                 return dict(result, status='PRELIMINARY_SEGMENTED_BAND_SEPARATION',
                             candidate_separation_px=round(median, 3), width_mad_px=round(mad, 3),

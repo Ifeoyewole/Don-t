@@ -99,4 +99,5 @@ def cloud_phase1_service():
         store = GcsCreateOnlyStore(client.bucket('joint-inspection-510310-data'), prefix)
         reconciler = VertexEvidenceReconciler(gate=make_isolated_gate(), store=store,
                                               scope=scope, secret=fusion.receipt_secret)
-    return Phase1Unified(fusion=fusion, reconciler=reconciler)
+    maximum = scope.get('max_analysis_passes', 2) if reconciler else 2
+    return Phase1Unified(fusion=fusion, reconciler=reconciler, max_analysis_passes=maximum)

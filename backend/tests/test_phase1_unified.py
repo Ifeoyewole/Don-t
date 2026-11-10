@@ -12,6 +12,7 @@ import pytest
 from backend.app.core.cv.ai.phase1_unified import Phase1Unified
 from backend.app.core.cv.ai.research_gemini_reconciliation import (
     VertexEvidenceReconciler, contract_sha, safe_analysis,
+    vertex_response_schema,
 )
 from backend.app.core.cv.ai.research_joint_boundaries import boundary_evidence
 from backend.app.core.cv.ai.research_sewer_fusion import SewerFusion
@@ -152,6 +153,25 @@ def test_global_slots_bound_changed_bundle_requests():
     assert len(calls) == 1
 
 
+def test_vertex_wire_schema_uses_supported_subset_and_resolves_refs():
+    import json
+    schema = vertex_response_schema()
+    serialized = json.dumps(schema)
+    assert schema['type'] == 'OBJECT'
+    assert '$ref' not in serialized and '$defs' not in serialized
+    assert 'maxLength' not in serialized and 'additionalProperties' not in serialized
+    assert schema['properties']['scene']['properties']['joint_visible']['type'] == 'BOOLEAN'
+
+
+def test_operator_scope_can_disable_the_targeted_pass():
+    calls = []
+    def transport(body):
+        calls.append(body)
+        return interpretation(proposal=True), {}
+    result = Phase1Unified(fusion=fusion(), reconciler=reconciler(transport=transport), max_analysis_passes=1).infer(payload())
+    assert len(calls) == 1 and result['phase1']['model_passes'] == 1
+
+
 @pytest.mark.parametrize('change', ['unknown_region', 'outside_roi', 'measurement', 'extra_field', 'confidence'])
 def test_invalid_provider_analysis_rejected(change):
     raw = interpretation()
@@ -204,3 +224,41 @@ def test_research_gemini_unavailable_keeps_models_and_masks():
     assert result['baseline_comparison']['actual_mask_count'] > 0
     assert result['gemini']['status'] == 'UNAVAILABLE'
     assert result['physical_gap_mm'] is None and not result['phase1']['functional_path_complete']
+
+
+def test_partial_annular_mask_width_remains_projected_band_not_axial_gap():
+    image = np.full((200, 200, 3), 120, np.uint8)
+    mask = np.zeros((200, 200), np.uint8)
+    cv2.ellipse(mask, (100, 100), (60, 50), 0, 10, 175, 255, 12)
+    result = boundary_evidence(image, mask, [10, 10, 190, 190], 'CIRCULAR_OPENING')
+    assert len(result['edge_pairs']) >= 16
+    assert result['candidate_separation_px'] is not None
+    assert result['physical_gap_mm'] is None and not result['joint_opening_confirmed']
+    assert result['reason'] == 'PROJECTED_SAM_BAND_WIDTH_NOT_VERIFIED_AXIAL_JOINT_GAP'
+
+
+def test_filled_disk_is_not_a_narrow_joint_band():
+    image = np.full((200, 200, 3), 120, np.uint8)
+    mask = np.zeros((200, 200), np.uint8)
+    cv2.circle(mask, (100, 100), 70, 255, -1)
+    result = boundary_evidence(image, mask, [10, 10, 190, 190], 'CIRCULAR_OPENING')
+    assert result['candidate_separation_px'] is None
+
+
+def test_phase1_api_uses_same_auth_and_rejects_client_spending_flags(monkeypatch):
+    from fastapi.testclient import TestClient
+    from backend.app.main import app
+    monkeypatch.setenv('JOINTINSPECT_SEWER_FUSION_ENABLED', 'true')
+    monkeypatch.setenv('JOINTINSPECT_PHASE1_VERTEX_ENABLED', 'true')
+    monkeypatch.setenv('JOINTINSPECT_PREVIEW_TOKEN', 'synthetic-test-access')
+    engine = Phase1Unified(fusion=fusion(), reconciler=reconciler())
+    monkeypatch.setattr('backend.app.api.v1.endpoints.sewer_research.cloud_phase1_service', lambda: engine)
+    client = TestClient(app)
+    url = '/api/v1/cv/sewer-research/unified'
+    assert client.post(url, files={'file': ('x.png', payload())}).status_code == 401
+    args = {'headers': {'Authorization': 'Bearer synthetic-test-access'}, 'files': {'file': ('x.png', payload())}}
+    assert client.post(url, **args, data={'options': '{"spending_cap": 1000}'}).status_code == 422
+    response = client.post(url, **args, data={'options': '{"context":{"pipe_diameter_mm":300}}'})
+    assert response.status_code == 200
+    assert response.json()['engine'] == 'jointinspect-phase1-unified-v1'
+    assert response.json()['physical_gap_mm'] is None

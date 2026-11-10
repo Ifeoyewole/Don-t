@@ -23,7 +23,10 @@ from backend.app.core.cv.ai.signed_gemini_receipt import verify_signed_semantic_
 
 
 class Phase1Unified:
-    def __init__(self, *, fusion, reconciler):
+    def __init__(self, *, fusion, reconciler, max_analysis_passes=2):
+        if type(max_analysis_passes) is not int or max_analysis_passes not in (1, 2):
+            raise ValueError('One initial pass and at most one targeted pass')
+        self.max_analysis_passes = max_analysis_passes
         self.fusion, self.reconciler = fusion, reconciler
         self.initialization_failures = getattr(fusion, 'initialization_failures', {})
         self.history = OrderedDict()
@@ -86,7 +89,7 @@ class Phase1Unified:
         passes = 1
         semantic_allowed = False
         gemini_started = perf_counter()
-        for pass_index in range(2):
+        for pass_index in range(self.max_analysis_passes):
             if self.reconciler is None:
                 result['gemini'] = {'status': 'UNAVAILABLE', 'reason': 'RESEARCH_VERTEX_NOT_CONFIGURED', 'authoritative': False}
                 break
@@ -102,7 +105,8 @@ class Phase1Unified:
                 result['gemini'] = response
                 analyses.append({'pass_index': pass_index, 'receipt': response['receipt'], 'usage': response['usage']})
                 proposals = response['analysis']['additional_regions']
-                if pass_index == 1 or not proposals or not gate['pipe_visible'] or gate['prompt_image_conflict']:
+                if (pass_index+1 == self.max_analysis_passes or not proposals
+                        or not gate['pipe_visible'] or gate['prompt_image_conflict']):
                     break
                 proposal = proposals[0]
                 # An AI proposal is explicitly unverified. It is neither human
@@ -130,6 +134,7 @@ class Phase1Unified:
                                     'reason': 'VERTEX_REQUEST_OR_AUTHENTICATED_CONTRACT_FAILED',
                                     'failure_type': type(exc).__name__,
                                     'http_status': getattr(exc, 'code', None),
+                                    'provider_reason': getattr(exc, 'provider_reason', None),
                                     'previous_analysis_count': len(analyses)}
                 break
         candidates = []
