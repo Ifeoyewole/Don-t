@@ -230,7 +230,7 @@ const ResultCard = ({
           <p>Pipe internal diameter: {item.calibrationProfile?.pipe_diameter_mm ?? item.calibrationProfile?.pipeDiameterMm ?? 'Not confirmed'}{(item.calibrationProfile?.pipe_diameter_mm ?? item.calibrationProfile?.pipeDiameterMm) ? ' mm' : ''}</p>
           <p>Camera: {item.calibrationProfile?.camera_id ?? item.calibrationProfile?.cameraId ?? 'Not recorded'}</p>
           <p>Source: {item.calibrationProfile?.source ?? 'No verified reference'} · Reference: {item.calibrationProfile?.calibration_reference_id ?? 'Not recorded'}</p>
-          {getAuthorizedMillimetres(item) == null && <p>To obtain mm: return to Upload and select the confirmed pipe size, actual camera and registered reference. A circular opening needs matching visible pipe geometry. A close-up needs an engineer-registered, image-specific measured reference at the joint plane. Save the reference, then remeasure; nominal diameter alone cannot establish scale.</p>}
+          {getAuthorizedMillimetres(item) == null && !item.unifiedEvidence?.joint_measurement.calibration_authority_verified && <p>To obtain mm: return to Upload and select the confirmed pipe size, actual camera and registered reference. A circular opening needs matching visible pipe geometry. A close-up needs an engineer-registered, image-specific measured reference at the joint plane. Save the reference, then remeasure; nominal diameter alone cannot establish scale.</p>}
           <details><summary>Technical pixel evidence</summary><p>{item.cvDebug?.gapPixels != null ? `${item.cvDebug.gapPixels.toFixed(1)} px (not a physical measurement)` : 'No usable pixel measurement'}</p></details>
         </div>
 

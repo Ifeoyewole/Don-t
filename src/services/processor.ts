@@ -80,7 +80,7 @@ async function runAiAssistedMeasurement(
   blob: Blob | undefined,
   pipeDiameterMm: number | undefined,
   options?: ProcessOptions,
-): Promise<ReturnType<typeof fuseMeasurementWithAi>> {
+): Promise<ReturnType<typeof fuseMeasurementWithAi> | (Omit<ReturnType<typeof fuseMeasurementWithAi>, 'confidence'> & {confidence?: undefined})> {
   const request = {
       imageId: image.id,
       fileName: image.fileName,
@@ -110,7 +110,7 @@ async function runAiAssistedMeasurement(
           calibration_source: options.calibrationSource ?? options.calibrationProfile?.source, camera_id: options.cameraId },
       })
       return {
-        imageId: image.id, originalGapMm: evidence.physical_gap_mm, status: 'REVIEW', measurementSource: 'fastapi', confidence: 0,
+        imageId: image.id, originalGapMm: evidence.physical_gap_mm, status: 'REVIEW', measurementSource: 'fastapi',
         resultStatus: 'REVIEW_REQUIRED', unifiedEvidence: evidence,
         measurementNote: evidence.joint_measurement.measurement_message ?? 'Measurement unavailable — calibration or reliable joint boundaries required',
         calibrationProfile: options.calibrationProfile,

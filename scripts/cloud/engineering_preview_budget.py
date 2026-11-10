@@ -35,7 +35,10 @@ def reserve(payload, options):
         raise ValueError('Explicit bounded engineering scope required')
     bucket = client.bucket('joint-inspection-510310-data')
     store = GcsCreateOnlyStore(bucket, scope['receipt_prefix'])
-    key = hashlib.sha256(canonical({'scope': scope, 'image_sha256': digest, 'options': options})).hexdigest()
+    meaningful_options = json.loads(json.dumps(options))
+    if isinstance(meaningful_options.get('context'), dict):
+        meaningful_options['context'].pop('image_id', None)
+    key = hashlib.sha256(canonical({'scope': scope, 'image_sha256': digest, 'options': meaningful_options})).hexdigest()
     blob = bucket.blob(store.prefix+'/responses/'+key+'.json')
     try:
         blob.reload()
