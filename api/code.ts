@@ -60,7 +60,7 @@ function sign(value: string) {
   return createHmac('sha256', process.env.CODE_SESSION_SECRET || '').update(value).digest('base64url')
 }
 
-function authenticated(req: IncomingMessage) {
+export function authenticated(req: IncomingMessage) {
   if (!process.env.CODE_SESSION_SECRET) return false
   const raw = req.headers.cookie?.split(';').map((item) => item.trim()).find((item) => item.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1)
   const parts = raw?.split('.') || []

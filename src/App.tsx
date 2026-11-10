@@ -627,13 +627,14 @@ function App() {
             await inspectionQueue.clearManholeQueue(uploadManholeId)
             await refreshRouteData()
           }}
-          onStartInspection={async (operatorContext, calibration, jointType, geometrySelectionProvenance) => {
+          onStartInspection={async (operatorContext, calibration, jointType, geometrySelectionProvenance, unifiedPreview) => {
             const result = await processor.processQueuedImages(uploadManholeId, {
               operatorContext,
               calibrationProfile: calibration,
               projectId: uploadProjectId,
               jointType,
               geometrySelectionProvenance: geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
+              executionMode: unifiedPreview ? 'unified-preview' : 'cloud',
             })
             if (!result.success || !result.inspectionId) {
               throw new Error(result.message || 'Inspection processing failed')

@@ -31,6 +31,7 @@ export interface CvWorkerRequest {
 }
 
 export interface CvWorkerResponse {
+  unifiedEvidence?: import('../types/unified').UnifiedEvidence
   imageId: string
   originalGapMm: number | null
   status: InspectionStatus

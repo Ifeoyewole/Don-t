@@ -16,11 +16,25 @@ async def unified(file: UploadFile = File(...), options: str = Form('{}'),
                   authorization: str | None = Header(default=None)):
     if os.getenv('JOINTINSPECT_SEWER_FUSION_ENABLED', 'false') != 'true':
         raise HTTPException(404, 'Unified sewer research is disabled')
-    token = os.getenv('JOINTINSPECT_PREVIEW_TOKEN', '')
-    if not token:
-        raise HTTPException(503, 'Research access is not configured')
-    if not authorization or not hmac.compare_digest(authorization, 'Bearer '+token):
-        raise HTTPException(401, 'Research authentication required')
+    if os.getenv('JOINTINSPECT_RESEARCH_IAM_ONLY') == 'true':
+        try:
+            from google.oauth2 import id_token
+            from google.auth.transport.requests import Request
+            audience = os.environ['JOINTINSPECT_RESEARCH_AUDIENCE']
+            if not authorization or not authorization.startswith('Bearer '):
+                raise ValueError('Missing identity')
+            claims = await run_in_threadpool(id_token.verify_oauth2_token, authorization[7:], Request(), audience)
+            if (claims.get('email_verified') is not True or claims.get('email') !=
+                    os.environ['JOINTINSPECT_RESEARCH_INVOKER_EMAIL']):
+                raise ValueError('Untrusted identity')
+        except Exception:
+            raise HTTPException(401, 'Private engineering identity required')
+    else:
+        token = os.getenv('JOINTINSPECT_PREVIEW_TOKEN', '')
+        if not token:
+            raise HTTPException(503, 'Research access is not configured')
+        if not authorization or not hmac.compare_digest(authorization, 'Bearer '+token):
+            raise HTTPException(401, 'Research authentication required')
     if len(options) > 64*1024:
         raise HTTPException(413, 'Research options too large')
     try:
@@ -37,11 +51,24 @@ async def unified(file: UploadFile = File(...), options: str = Form('{}'),
     if len(payload) > 8*1024*1024:
         raise HTTPException(413, 'Research image exceeds 8 MiB')
     try:
+        cache_blob = None
+        if os.getenv('JOINTINSPECT_RESEARCH_IAM_ONLY') == 'true':
+            from scripts.cloud.engineering_preview_budget import reserve
+            try:
+                cache_blob, cached = await run_in_threadpool(reserve, payload, kwargs)
+            except ValueError:
+                raise HTTPException(429, 'Engineering preview allowance unavailable; no automatic retry')
+            if cached is not None:
+                return cached
         phase1 = os.getenv('JOINTINSPECT_PHASE1_VERTEX_ENABLED') == 'true'
         if not phase1 and 'context' in kwargs:
             raise ValueError('Phase 1 metadata requires the isolated Phase 1 worker')
         service = await run_in_threadpool(cloud_phase1_service if phase1 else cloud_service)
-        return await run_in_threadpool(service.infer, payload, **kwargs)
+        result = await run_in_threadpool(service.infer, payload, **kwargs)
+        if cache_blob is not None:
+            from scripts.cloud.engineering_preview_budget import save
+            await run_in_threadpool(save, cache_blob, result)
+        return result
     except ValueError:
         raise HTTPException(422, 'Invalid research image or task')
     except Exception:

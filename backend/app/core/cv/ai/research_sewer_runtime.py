@@ -48,7 +48,8 @@ def cloud_service():
     try:
         path = stage('JOINTINSPECT_RESEARCH_SEWER_ONNX_URI', 'iswds.onnx', CHECKPOINT_SHA256)
         detector = SewerOnnxDetector.from_verified_cloud_checkpoint(path, cloud_worker=True,
-                    threshold=float(os.getenv('JOINTINSPECT_SEWER_DETECTION_THRESHOLD', '.35')))
+                    threshold=float(os.getenv('JOINTINSPECT_SEWER_DETECTION_THRESHOLD', '.35')),
+                    max_regions=int(os.getenv('JOINTINSPECT_SEWER_MAX_REGIONS', '8')))
     except Exception:
         failures['sewer_detector'] = 'CHECKPOINT_OR_EXPORT_CONTRACT_UNAVAILABLE'
     segmenter = None
@@ -60,6 +61,11 @@ def cloud_service():
         def segmenter(image, box):
             return propose_sam2_mask(image, box, enabled=True, checkpoint_path=sam_path,
                                      expected_sha256=SAM_SHA, predictor_factory=lambda _path: predictor)
+        def joint_segmenter(image, box):
+            from backend.app.core.cv.ai.joint_gap_recovery import text_exclusion_candidates
+            excluded, _ = text_exclusion_candidates(image)
+            return propose_sam2_mask(image, box, enabled=True, checkpoint_path=sam_path,
+                expected_sha256=SAM_SHA, exclusion_mask=excluded, predictor_factory=lambda _path: predictor)
     except Exception:
         failures['sam2'] = 'SAM_STAGING_OR_INITIALIZATION_UNAVAILABLE'
     secret = None
@@ -71,6 +77,8 @@ def cloud_service():
         except Exception:
             failures['gemini'] = 'RECEIPT_SECRET_UNAVAILABLE'
     service = SewerFusion(classifier=classifier, detector=detector, segmenter=segmenter, receipt_secret=secret)
+    if segmenter is not None:
+        service.joint_segmenter = joint_segmenter
     service.cloud_temporary_directory = temporary  # retain only for worker lifetime
     service.initialization_failures = failures
     return service

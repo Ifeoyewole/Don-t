@@ -1,0 +1,44 @@
+# Deployment template only. Render placeholders after an approved research scope.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: jointinspect-unified-preview
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: '0'
+        autoscaling.knative.dev/maxScale: '1'
+        run.googleapis.com/cpu-throttling: 'true'
+    spec:
+      serviceAccountName: joint-inspection-trainer@joint-inspection-510310.iam.gserviceaccount.com
+      containerConcurrency: 1
+      timeoutSeconds: 120
+      containers:
+      - image: __IMMUTABLE_IMAGE_DIGEST__
+        resources:
+          limits: {cpu: '2', memory: 4Gi}
+        ports: [{containerPort: 8080}]
+        env:
+        - {name: JOINTINSPECT_CLOUD_RESEARCH_WORKER, value: 'true'}
+        - {name: JOINTINSPECT_ISWDS_NONCOMMERCIAL_RESEARCH_ALLOWED, value: 'true'}
+        - {name: JOINTINSPECT_SEWER_FUSION_ENABLED, value: 'true'}
+        - {name: JOINTINSPECT_PHASE1_VERTEX_ENABLED, value: 'true'}
+        - {name: JOINTINSPECT_RESEARCH_IAM_ONLY, value: 'true'}
+        - {name: JOINTINSPECT_RESEARCH_AUDIENCE, value: __PRIVATE_SERVICE_URL__}
+        - {name: JOINTINSPECT_RESEARCH_INVOKER_EMAIL, value: joint-inspect-vercel-invoker@joint-inspection-510310.iam.gserviceaccount.com}
+        - {name: JOINTINSPECT_PHASE1_SCOPE_URI, value: __SCOPE_URI__}
+        - {name: JOINTINSPECT_PHASE1_SCOPE_SHA256, value: __SCOPE_SHA256__}
+        - {name: JOINTINSPECT_RESEARCH_HMAC_SECRET_RESOURCE, value: projects/567370443508/secrets/jointinspect-research-semantic-hmac/versions/1}
+        - {name: JOINTINSPECT_RESEARCH_R5_URI, value: 'gs://joint-inspection-510310-data/models/inspect-view/research-candidates/repr-convnext-masked-r5-20261104/best.pt'}
+        - {name: JOINTINSPECT_RESEARCH_SEWER_ONNX_URI, value: 'gs://joint-inspection-510310-data/models/external/iswds/research-quarantine/ffe32890eee1fba794d7a22486289562b118e574/ISWDS_RT-DETR_v2_model.onnx'}
+        - {name: JOINTINSPECT_RESEARCH_SAM_URI, value: 'gs://joint-inspection-510310-data/models/sam2/publisher-quarantine/ecc6e8ce-4fb5-464a-a70d-20283a0e98c8/sam2.1_hiera_tiny.pt'}
+        - {name: JOINTINSPECT_SAM2_DEVICE, value: cpu}
+        - {name: JOINTINSPECT_SEWER_MAX_REGIONS, value: '3'}
+        - {name: VERTEX_PROJECT_ID, value: joint-inspection-510310}
+        - {name: VERTEX_INSPECTION_MODEL, value: gemini-3.1-pro-preview}
+        - {name: VERTEX_INSPECTION_LOCATION, value: global}
+        - {name: VERTEX_SEMANTIC_GATE_ENABLED, value: 'true'}
+        - {name: VERTEX_MAX_RETRIES, value: '0'}

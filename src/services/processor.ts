@@ -10,6 +10,7 @@ import type {
 import { CloudMeasurementError, fuseMeasurementWithAi, measureLocalPreview, measureWithCv } from '../lib'
 import { createId, createTimestamp } from '../utils/identity'
 import { hasExplicitPhotoMode, resolveImageContext } from './imageContext'
+import { requestUnified } from '../lib/unifiedClient'
 
 const listeners = new Set<(event: ProcessingEvent) => void>()
 
@@ -98,6 +99,26 @@ async function runAiAssistedMeasurement(
       jointType: options?.jointType,
     }
   try {
+    if (options?.executionMode === 'unified-preview') {
+      if (!blob) throw new Error('Original image is required for unified preview')
+      const evidence = await requestUnified(blob, {
+        task: image.analysisMode === 'EVIDENCE_ONLY' ? 'OBJECT_SEGMENTATION' : 'JOINT_GEOMETRY',
+        geometry: options.jointType ?? null,
+        ...(image.sequenceId && image.frameIndex != null ? { sequence_id: image.sequenceId, frame_index: image.frameIndex } : {}),
+        context: { image_id: image.id, project_id: image.projectId, pipe_diameter_mm: pipeDiameterMm ?? null,
+          calibration_reference_id: options.calibrationReferenceId ?? options.calibrationProfile?.calibration_reference_id,
+          calibration_source: options.calibrationSource ?? options.calibrationProfile?.source, camera_id: options.cameraId },
+      })
+      return {
+        imageId: image.id, originalGapMm: evidence.physical_gap_mm, status: 'REVIEW', measurementSource: 'fastapi', confidence: 0,
+        resultStatus: 'REVIEW_REQUIRED', unifiedEvidence: evidence,
+        measurementNote: evidence.joint_measurement.measurement_message ?? 'Measurement unavailable — calibration or reliable joint boundaries required',
+        calibrationProfile: options.calibrationProfile,
+        authoritativeGapMm: null, candidateGapMm: evidence.physical_gap_mm, engineeringResult: 'REVIEW_REQUIRED',
+        executionSource: 'CLOUD_RESEARCH_UNVERIFIED',
+        measurementAudit: { originalSource: 'fastapi', finalSource: 'fastapi', decision: 'Research evidence; no engineering acceptance.' },
+      }
+    }
     const measurement = options?.executionMode === 'local-preview'
       ? await measureLocalPreview(request)
       : await measureWithCv(request)
@@ -151,11 +172,11 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
     return null
   }
 
-  if (image.analysisMode === 'EVIDENCE_ONLY') {
+  if (image.analysisMode === 'EVIDENCE_ONLY' && options?.executionMode !== 'unified-preview') {
     emit({ type: 'started', imageId })
     return recordEvidenceOnly(image)
   }
-  if (!hasExplicitPhotoMode(image)) {
+  if (!hasExplicitPhotoMode(image) && options?.executionMode !== 'unified-preview') {
     throw new Error('REVIEW_REQUIRED: confirm this photo\'s joint geometry or choose evidence-only review.')
   }
   const photoOptions = resolveImageContext(image, options)
@@ -193,6 +214,7 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
 
   const resultId = createId()
   const result: InspectionResult = {
+    unifiedEvidence: measurement.unifiedEvidence,
     id: resultId,
     imageId: image.id,
     projectId: image.projectId,
@@ -276,7 +298,7 @@ export const processor = {
       .and((image) => image.queueStatus === 'queued' || image.queueStatus === 'failed')
       .sortBy('orderIndex')
 
-    const concurrency = Math.max(1, options?.concurrency ?? 1)
+    const concurrency = options?.executionMode === 'unified-preview' ? 1 : Math.max(1, options?.concurrency ?? 1)
     const inspectionIds: string[] = []
     let completed = 0
     let failed = 0
@@ -333,7 +355,7 @@ export const processor = {
     const blobRecord = await db.inspectionBlobs.get(image.blobKey)
 
     emit({ type: 'started', imageId: image.id, inspectionId })
-    if (image.analysisMode === 'EVIDENCE_ONLY') {
+    if (image.analysisMode === 'EVIDENCE_ONLY' && !existing.unifiedEvidence) {
       emit({ type: 'completed', imageId: image.id, inspectionId })
       return existing  // No automatic circular measurement of review-only evidence.
     }
@@ -344,7 +366,7 @@ export const processor = {
       cameraId: image.cameraId,
       pipeDiameterMm: image.pipeDiameterMm ?? undefined,
       geometrySelectionProvenance: image.geometrySelectionProvenance ?? existing.geometrySelectionProvenance ?? 'LEGACY_DEFAULT',
-      executionMode: existing.executionSource === 'LOCAL_PREVIEW_UNVERIFIED' ? 'local-preview' : 'cloud',
+      executionMode: existing.unifiedEvidence ? 'unified-preview' : existing.executionSource === 'LOCAL_PREVIEW_UNVERIFIED' ? 'local-preview' : 'cloud',
     }
     try {
       const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(`jointinspect_cal_${image.projectId}_${image.manholeId}`) : null
@@ -367,6 +389,7 @@ export const processor = {
 
     const updated: InspectionResult = {
       ...existing,
+      unifiedEvidence: measurement.unifiedEvidence ?? existing.unifiedEvidence,
       originalGapMm: measurement.originalGapMm,
       finalGapMm: existing.overrideApplied ? existing.finalGapMm : measurement.originalGapMm,
       status: existing.overrideApplied ? existing.status : measurement.status,

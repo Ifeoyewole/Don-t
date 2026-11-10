@@ -4,7 +4,7 @@ export type GapDisplayUnit = 'px' | 'mm' | 'm'
 
 export type GapDisplayEvidence = Pick<
   InspectionResult,
-  'authoritativeGapMm' | 'executionSource' | 'measurementSource' | 'cvDebug'
+  'authoritativeGapMm' | 'executionSource' | 'measurementSource' | 'cvDebug' | 'unifiedEvidence'
 >
 
 const safeNonNegative = (value: unknown): value is number =>
@@ -35,9 +35,14 @@ export function formatGapForUnit(item: GapDisplayEvidence, unit: GapDisplayUnit)
     return pixels === null ? 'Pixel width unavailable' : `${pixels.toFixed(1)} px (image evidence)`
   }
 
-  const mm = getAuthorizedMillimetres(item)
+  const research = item.executionSource === 'CLOUD_RESEARCH_UNVERIFIED' ? item.unifiedEvidence : undefined
+  const researchMm = research?.joint_measurement.calibration_authority_verified === true &&
+    research.joint_measurement.calibration_status === 'VERIFIED_IMAGE_JOINT_PLANE' &&
+    research.physical_gap_mm === research.joint_measurement.physical_gap_mm && safeNonNegative(research.physical_gap_mm)
+    ? research.physical_gap_mm : null
+  const mm = getAuthorizedMillimetres(item) ?? researchMm
   if (mm === null) {
-    return 'Physical gap unavailable — verified calibration required'
+    return 'Measurement unavailable — calibration or reliable joint boundaries required'
   }
   return unit === 'mm'
     ? `${mm.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} mm`

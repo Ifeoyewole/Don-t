@@ -81,7 +81,7 @@ class SewerFusion:
         self.segment_lock = threading.Lock()
 
     def infer(self, payload, *, rois=(), task='OBJECT_SEGMENTATION', geometry=None,
-              receipt=None, sequence_id=None, frame_index=None):
+              receipt=None, sequence_id=None, frame_index=None, proposal_only=False):
         if task not in ('OBJECT_SEGMENTATION', 'JOINT_GEOMETRY', 'INFILTRATION_REVIEW'):
             raise ValueError('Unsupported research task')
         if geometry not in (None, 'VERTICAL_SEAM', 'HORIZONTAL_SEAM', 'CIRCULAR_OPENING'):
@@ -119,7 +119,7 @@ class SewerFusion:
         try:
             if self.detector is None:
                 raise RuntimeError('Not configured')
-            detections = [row.json() for row in self.detector.predict(image)]
+            detections = [] if proposal_only else [row.json() for row in self.detector.predict(image)]
             components['sewer_detector'] = {'status': 'AVAILABLE', 'detections': detections,
                                            'provenance': self.detector.provenance()}
         except Exception:
@@ -158,7 +158,8 @@ class SewerFusion:
                 if self.segmenter is None:
                     raise RuntimeError('Not configured')
                 with self.segment_lock:
-                    evidence = self.segmenter(image, tuple(region['bbox']))
+                    selected_segmenter = getattr(self, 'joint_segmenter', self.segmenter) if task == 'JOINT_GEOMETRY' else self.segmenter
+                    evidence = selected_segmenter(image, tuple(region['bbox']))
                 mask = evidence.mask
                 if (evidence.status != 'MASK_CANDIDATE_RESEARCH' or evidence.image_sha256 != pixel_digest
                         or not isinstance(mask, np.ndarray) or mask.shape != (h, w)
@@ -174,6 +175,9 @@ class SewerFusion:
                     raise ValueError('Mask pixels disagree with region')
                 contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 row.update(mask_status='ACTUAL_MASK_CANDIDATE', mask_png_base64=png(mask),
+                           mask_processing={'raw_mask_sha256': evidence.raw_mask_sha256,
+                                            'excluded_pixels': evidence.excluded_pixels,
+                                            'method': 'EXPLICIT_EXCLUSION_NO_INPAINTING'},
                            mask_quality_score=evidence.mask_quality_score,
                            mask_sha256=hashlib.sha256(mask.tobytes()).hexdigest(),
                            pixel_geometry={'foreground_area_px': int(len(xs)), 'bbox_extent_px': [box[2]-box[0], box[3]-box[1]],
@@ -217,7 +221,7 @@ class SewerFusion:
             reasons.append('INFILTRATION_REQUIRES_TEMPORAL_OR_FIELD_ADJUDICATION')
         if not regions:
             reasons.append('NO_SUITABLE_REGION_PROPOSAL')
-        cv2.putText(overlay, 'RESEARCH / REVIEW REQUIRED / NO MM', (5, 18), cv2.FONT_HERSHEY_SIMPLEX, .4, (0, 0, 255), 1)
+        cv2.putText(overlay, 'RESEARCH / REVIEW REQUIRED', (5, 18), cv2.FONT_HERSHEY_SIMPLEX, .4, (0, 0, 255), 1)
         return {'schema_version': '1.0', 'engine': 'jointinspect-sewer-unified-research-v1',
                 'image_sha256': digest, 'dimensions': [w, h], 'task': task,
                 'decision': 'REVIEW_REQUIRED', 'research_only': True, 'production_eligible': False,

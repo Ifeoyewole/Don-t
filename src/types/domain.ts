@@ -20,7 +20,7 @@ export type InspectionDomainStatus =
   | 'LOW_QUALITY_IMAGE'
   | 'UNSUPPORTED_IMAGE'
 export type MeasurementSource = 'fastapi' | 'cv' | 'offline-preview' | 'ai-assisted' | 'ai-review' | 'manual' | 'fallback'
-export type ExecutionSource = 'CLOUD_AUTHORITATIVE' | 'CLOUD_PENDING' | 'CLOUD_FAILED' | 'LOCAL_PREVIEW_UNVERIFIED'
+export type ExecutionSource = 'CLOUD_AUTHORITATIVE' | 'CLOUD_PENDING' | 'CLOUD_FAILED' | 'LOCAL_PREVIEW_UNVERIFIED' | 'CLOUD_RESEARCH_UNVERIFIED'
 export type JointGeometryType = 'CIRCULAR_OPENING' | 'HORIZONTAL_SEAM' | 'VERTICAL_SEAM'
 export type GeometrySelectionProvenance = 'INSPECTOR_SELECTED' | 'EVIDENCE_SUGGESTED' | 'LEGACY_DEFAULT'
 export interface SemanticGateEvidence {
@@ -258,6 +258,8 @@ export interface UpdateManholeInput {
 }
 
 export interface InspectionImage {
+  sequenceId?: string
+  frameIndex?: number
   id: string
   projectId: string
   manholeId: string
@@ -308,6 +310,7 @@ export interface QueueFilesInput {
 }
 
 export interface InspectionResult {
+  unifiedEvidence?: import('./unified').UnifiedEvidence
   id: string
   imageId: string
   projectId: string
@@ -393,7 +396,7 @@ export interface ProcessOptions {
   calibrationProfile?: CalibrationProfile
   jointType?: JointGeometryType
   geometrySelectionProvenance?: GeometrySelectionProvenance
-  executionMode?: 'cloud' | 'local-preview'
+  executionMode?: 'cloud' | 'local-preview' | 'unified-preview'
 }
 
 export interface ProcessBatchResult {

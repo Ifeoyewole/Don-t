@@ -40,6 +40,8 @@ class Sam2MaskEvidence:
     mask: np.ndarray | None
     reason: str
     image_sha256: str | None = None
+    raw_mask_sha256: str | None = None
+    excluded_pixels: int = 0
 
     def to_roi_proposal(self, geometry: str) -> RoiProposal | None:
         """Make an existing experimental-fusion ROI from the candidate mask."""
@@ -113,6 +115,7 @@ def propose_sam2_mask(
     expected_sha256: str | None = None,
     min_quality: float = 0.75,
     predictor_factory: Callable[[Path], ImagePredictor] | None = None,
+    exclusion_mask: np.ndarray | None = None,
 ) -> Sam2MaskEvidence:
     """Run SAM 2.1 Tiny on an explicit inspector ROI, optionally with a test stub.
 
@@ -149,10 +152,15 @@ def propose_sam2_mask(
         predictor = (predictor_factory or _sam2_predictor)(checkpoint_path)
         image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
         predictor.set_image(image_rgb)
-        masks, scores, _ = predictor.predict(
-            box=np.asarray(prompt_bbox, dtype=np.float32),
-            multimask_output=True,
-        )
+        prompt = {'box': np.asarray(prompt_bbox, dtype=np.float32), 'multimask_output': True}
+        if exclusion_mask is not None:
+            if exclusion_mask.shape != (h, w) or exclusion_mask.dtype != np.uint8:
+                return _review(prompt_bbox, 'invalid_exclusion_mask')
+            _, _, _, centers = cv2.connectedComponentsWithStats(exclusion_mask)
+            points = [[float(x), float(y)] for x, y in centers[1:] if x0 <= x < x1 and y0 <= y < y1][:8]
+            if points:
+                prompt.update(point_coords=np.asarray(points, np.float32), point_labels=np.zeros(len(points), np.int32))
+        masks, scores, _ = predictor.predict(**prompt)
         quality = np.asarray(scores, dtype=np.float32).reshape(-1)
         proposals = np.asarray(masks)
         if proposals.ndim != 3 or proposals.shape[1:] != (h, w):
@@ -163,12 +171,21 @@ def propose_sam2_mask(
             return _review(prompt_bbox, "nonfinite_or_invalid_mask_quality")
         if not np.isfinite(proposals).all():
             return _review(prompt_bbox, "nonfinite_mask_values")
-        index = int(np.argmax(quality))
+        ranking = quality.copy()
+        if exclusion_mask is not None:
+            for i, proposed in enumerate(proposals):
+                foreground = proposed > .5
+                ranking[i] -= np.count_nonzero(foreground & (exclusion_mask > 0))/max(1, np.count_nonzero(foreground))
+        index = int(np.argmax(ranking))
         score = float(quality[index])
         if score < min_quality:
             return _review(prompt_bbox, "mask_quality_below_threshold")
 
         mask = (proposals[index] > 0.5).astype(np.uint8) * 255
+        raw_mask_sha256 = hashlib.sha256(mask.tobytes()).hexdigest()
+        excluded_pixels = int(np.count_nonzero((mask > 0) & (exclusion_mask > 0))) if exclusion_mask is not None else 0
+        if exclusion_mask is not None:
+            mask[exclusion_mask > 0] = 0
         foreground_y, foreground_x = np.where(mask != 0)
         area = len(foreground_y)
         if area < 50 or area > 0.75 * h * w:
@@ -194,6 +211,7 @@ def propose_sam2_mask(
             mask,
             "prompted_mask_not_defect_or_metric_measurement",
             hashlib.sha256(np.ascontiguousarray(image_bgr).tobytes()).hexdigest(),
+            raw_mask_sha256, excluded_pixels,
         )
     except (ImportError, RuntimeError, ValueError, OSError, cv2.error):
         return _review(prompt_bbox, "sam2_dependency_or_inference_unavailable")
