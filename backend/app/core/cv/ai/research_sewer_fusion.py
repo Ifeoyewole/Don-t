@@ -11,6 +11,7 @@ import hashlib
 import io
 import threading
 from collections import OrderedDict
+from time import perf_counter
 
 import cv2
 import numpy as np
@@ -100,7 +101,8 @@ class SewerFusion:
                 raise ValueError('Invalid original-image ROI')
             regions.append({'bbox': list(box), 'source': 'EXPLICIT_RESEARCH_ROI', 'source_label': 'UNVERIFIED_TARGET',
                             'target_identity_verified': False})
-        reasons = []; components = {}
+        reasons = []; components = {}; timings = {}
+        stamp = perf_counter()
         try:
             baseline = self.classifier(payload)
             if (not isinstance(baseline, dict) or baseline.get('image_sha256') != digest
@@ -111,7 +113,9 @@ class SewerFusion:
         except Exception:
             baseline = None
             components['inspect_view'] = {'status': 'UNAVAILABLE', 'reason': 'CLASSIFIER_FAILURE_OR_SOURCE_MISMATCH'}
+        timings['inspect_view'] = round(perf_counter()-stamp, 4)
         detections = []
+        stamp = perf_counter()
         try:
             if self.detector is None:
                 raise RuntimeError('Not configured')
@@ -120,6 +124,7 @@ class SewerFusion:
                                            'provenance': self.detector.provenance()}
         except Exception:
             components['sewer_detector'] = {'status': 'UNAVAILABLE', 'reason': 'DETECTOR_FAILURE_OR_CONTRACT_UNVERIFIED'}
+        timings['sewer_detector'] = round(perf_counter()-stamp, 4)
         if sequence_id is not None:
             detections = self.tracker.update(sequence_id, frame_index, digest, detections)
             components['sewer_detector']['detections'] = detections
@@ -146,6 +151,7 @@ class SewerFusion:
                                  or gate['prompt_image_conflict'] is True):
             reasons.append('SEMANTIC_SCENE_CONFLICT')
         mask_reports = []; overlay = image.copy()
+        stamp = perf_counter()
         for index, region in enumerate(regions):
             row = dict(region, region_id=index, mask_status='UNAVAILABLE', geometry={'physical_gap_mm': None})
             try:
@@ -194,6 +200,7 @@ class SewerFusion:
             x0, y0, x1, y1 = region['bbox']
             cv2.rectangle(overlay, (x0, y0), (x1-1, y1-1), (255, 150, 0), 1)
             mask_reports.append(row)
+        timings['segmentation_and_geometry'] = round(perf_counter()-stamp, 4)
         findings = []
         for row in detections:
             label = row.get('jointinspect_candidate')
@@ -216,6 +223,7 @@ class SewerFusion:
                 'decision': 'REVIEW_REQUIRED', 'research_only': True, 'production_eligible': False,
                 'engineering_result': None, 'physical_gap_mm': None,
                 'components': components, 'gemini': semantic, 'regions': mask_reports,
+                'component_latency_seconds': timings,
                 'preliminary_findings': findings, 'disagreements_and_limits': sorted(set(reasons)),
                 'weak_class_validation': {'OPEN_JOINT': 'UNSUPPORTED', 'PROTRUDING_LATERAL': 'UNSUPPORTED',
                                           'INFILTRATION': 'SOURCE_MODEL_REQUIRES_VERIFIED_CLASS_MAP_AND_JOINTINSPECT_VALIDATION'},

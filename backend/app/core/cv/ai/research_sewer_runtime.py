@@ -74,3 +74,30 @@ def cloud_service():
     service.cloud_temporary_directory = temporary  # retain only for worker lifetime
     service.initialization_failures = failures
     return service
+
+
+@lru_cache(maxsize=1)
+def cloud_phase1_service():
+    """Only the isolated, explicitly enabled worker may make live Vertex calls."""
+    import json
+    from backend.app.core.cv.ai.phase1_unified import Phase1Unified
+    from backend.app.core.cv.ai.research_gemini_reconciliation import VertexEvidenceReconciler
+    from scripts.cloud.research_semantic_receipts import GcsCreateOnlyStore, make_isolated_gate
+    fusion = cloud_service()
+    reconciler = None
+    if os.getenv('JOINTINSPECT_PHASE1_VERTEX_ENABLED') == 'true':
+        from google.cloud import storage
+        from scripts.cloud.inspect_view_sam2_vertex import stage_verified
+        uri = os.environ['JOINTINSPECT_PHASE1_SCOPE_URI']
+        if not uri.startswith('gs://joint-inspection-510310-data/models/inspect-view/research-results/'):
+            raise ValueError('Server-provisioned isolated research scope required')
+        client = storage.Client(project='joint-inspection-510310')
+        root = Path(fusion.cloud_temporary_directory.name)
+        stage_verified(client, uri, root/'phase1-scope.json', os.environ['JOINTINSPECT_PHASE1_SCOPE_SHA256'], max_bytes=64*1024)
+        scope = json.loads((root/'phase1-scope.json').read_text())
+        prefix = scope['receipt_prefix']
+        store = GcsCreateOnlyStore(client.bucket('joint-inspection-510310-data'), prefix)
+        reconciler = VertexEvidenceReconciler(gate=make_isolated_gate(), store=store,
+                                              scope=scope, secret=fusion.receipt_secret)
+    maximum = scope.get('max_analysis_passes', 2) if reconciler else 2
+    return Phase1Unified(fusion=fusion, reconciler=reconciler, max_analysis_passes=maximum)

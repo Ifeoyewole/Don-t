@@ -1,0 +1,17 @@
+# One explicitly authorized CPU demonstration; no Docker build or GPU request.
+# Source archive generation/hash and this immutable base image identify execution.
+steps:
+- name: europe-west2-docker.pkg.dev/joint-inspection-510310/joint-inspection-training/inspect-view-sam2-research@sha256:bf93efdab86558f29a708e2719bdf511953b2c26d87c6cc7b57612ab0b8f0304
+  entrypoint: bash
+  args:
+  - -lc
+  - >-
+    python -m pip install --no-cache-dir --quiet onnxruntime==1.18.1 httpx==0.27.2 &&
+    PYTHONPATH=/workspace python -m scripts.cloud.phase1_demo
+    --plan phase1_plan.json --plan-sha256 ${_PLAN_SHA256}
+  env: ['OMP_NUM_THREADS=2', 'MKL_NUM_THREADS=2']
+serviceAccount: projects/joint-inspection-510310/serviceAccounts/joint-inspection-trainer@joint-inspection-510310.iam.gserviceaccount.com
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+timeout: 900s

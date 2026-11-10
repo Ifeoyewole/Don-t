@@ -6,7 +6,7 @@ import os
 from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
-from backend.app.core.cv.ai.research_sewer_runtime import cloud_service
+from backend.app.core.cv.ai.research_sewer_runtime import cloud_service, cloud_phase1_service
 
 router = APIRouter()
 
@@ -25,7 +25,7 @@ async def unified(file: UploadFile = File(...), options: str = Form('{}'),
         raise HTTPException(413, 'Research options too large')
     try:
         kwargs = json.loads(options)
-        if not isinstance(kwargs, dict) or set(kwargs)-{'rois', 'task', 'geometry', 'receipt', 'sequence_id', 'frame_index'}:
+        if not isinstance(kwargs, dict) or set(kwargs)-{'rois', 'task', 'geometry', 'receipt', 'sequence_id', 'frame_index', 'context'}:
             raise ValueError('Unsupported options')
         # Only bounded, integer pixel ROIs; no browser calibration/approval flags.
         rois = kwargs.get('rois', [])
@@ -37,7 +37,10 @@ async def unified(file: UploadFile = File(...), options: str = Form('{}'),
     if len(payload) > 8*1024*1024:
         raise HTTPException(413, 'Research image exceeds 8 MiB')
     try:
-        service = await run_in_threadpool(cloud_service)
+        phase1 = os.getenv('JOINTINSPECT_PHASE1_VERTEX_ENABLED') == 'true'
+        if not phase1 and 'context' in kwargs:
+            raise ValueError('Phase 1 metadata requires the isolated Phase 1 worker')
+        service = await run_in_threadpool(cloud_phase1_service if phase1 else cloud_service)
         return await run_in_threadpool(service.infer, payload, **kwargs)
     except ValueError:
         raise HTTPException(422, 'Invalid research image or task')
