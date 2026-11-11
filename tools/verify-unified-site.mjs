@@ -63,6 +63,16 @@ try {
   await page.locator('textarea[id^="calibration-advice-"]').fill('Inspector edited reference guidance')
   await page.waitForFunction(async()=>{const {db}=await import('/src/db/database.ts');return (await db.inspectionImages.toArray())[0]?.contextSuggestionStatus==='ready'})
   if(await page.locator('textarea[id^="calibration-advice-"]').inputValue()!=='Inspector edited reference guidance')throw Error('Late AI response overwrote the inspector edit')
+  for(const width of [1440,390]){
+    await page.setViewportSize({width,height:1000})
+    const clipped=await page.locator('.photo-context-editor input,.photo-context-editor select,.photo-context-editor textarea').evaluateAll(fields=>fields.some(field=>{
+      const parent=field.closest('.asset-card').getBoundingClientRect(),box=field.getBoundingClientRect()
+      return box.left<parent.left || box.right>parent.right || box.right>window.innerWidth
+    }))
+    if(clipped)throw Error('Editable photo context clipped at viewport '+width)
+    await page.screenshot({path:path.join(output,`editable-context-${width}.png`),fullPage:true})
+  }
+  await page.setViewportSize({width:1440,height:1000})
   const reference=await context.request.post('https://localhost:5173/api/unified?action=calibration',{headers:{Origin:'https://localhost:5173'},data:{reference_id:'test-reference',project_id:'e2e-project',source:'MANHOLE_METADATA',pipe_diameter_mm:300}})
   if(reference.status()!==200 || (await reference.json()).reference_verified!==false)throw Error('Missing calibration must be a successful unverified lookup, not unavailable service')
   await page.getByText('Unified AI engineering preview',{exact:true}).waitFor()
