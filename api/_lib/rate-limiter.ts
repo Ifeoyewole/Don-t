@@ -5,7 +5,7 @@
  * Features rolling 60-second window rate limiting per IP per route category.
  */
 
-import { GATEWAY_CONFIG } from './config'
+import { GATEWAY_CONFIG } from './config.js'
 
 export interface RateLimitResult {
   allowed: boolean

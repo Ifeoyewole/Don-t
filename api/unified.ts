@@ -1,9 +1,9 @@
 /** Existing website operator session -> private, IAM-authenticated research API. */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { authenticated } from './code'
-import { getCloudRunIdToken } from './_lib/gcp-oidc'
-import { checkRateLimit } from './_lib/rate-limiter'
-import { readStreamWithLimit, PayloadTooLargeError } from './_lib/gateway-guard'
+import { authenticated } from './code.js'
+import { getCloudRunIdToken } from './_lib/gcp-oidc.js'
+import { checkRateLimit } from './_lib/rate-limiter.js'
+import { readStreamWithLimit, PayloadTooLargeError } from './_lib/gateway-guard.js'
 
 export default async function unified(req: IncomingMessage, res: ServerResponse) {
   const send = (status: number, body: unknown) => {

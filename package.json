@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run && node tools/verify-unified-node-runtime.mjs"
   },
   "dependencies": {
     "@techstark/opencv-js": "^4.12.0-release.1",
