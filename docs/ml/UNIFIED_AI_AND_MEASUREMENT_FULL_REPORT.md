@@ -1,5 +1,7 @@
 # JointInspect Unified AI and measurement — full implementation report
 
+Historical execution evidence. The replacement lifecycle implementation and its current rollout/accounting status are documented in `PERSISTENT_ENGINEERING_PREVIEW.md`; fixed-window descriptions below refer to those earlier executions.
+
 Date: 11 November 2026; final live evidence recorded through09:40 UTC. Repository: Ifeoyewole/Don-t. Project:
 `joint-inspection-510310`, region `europe-west2`.
 

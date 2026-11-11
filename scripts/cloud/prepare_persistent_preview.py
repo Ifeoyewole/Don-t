@@ -3,6 +3,7 @@ import argparse
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from scripts.cloud.persistent_preview_quota import CEILING, CYCLE, LEDGER_URI, validate_ledger
@@ -20,9 +21,11 @@ def money(text):
         raise ValueError('Invalid USD amount')
 
 
-def prepare(*, prior_usd, evidence, approval, output, infrastructure_usd='5'):
+def prepare(*, prior_usd, evidence, approval, output, image_digest, infrastructure_usd='5'):
     if not approval.strip() or not evidence.strip():
         raise ValueError('Explicit accounting evidence and approval required')
+    if not re.fullmatch('sha256:[a-f0-9]{64}', image_digest):
+        raise ValueError('Immutable runtime image digest required')
     prior, infra = money(prior_usd), money(infrastructure_usd)
     if prior+infra > CEILING:
         raise ValueError('Opening encumbrance exceeds remaining financial authorization')
@@ -31,6 +34,7 @@ def prepare(*, prior_usd, evidence, approval, output, infrastructure_usd='5'):
         'review_approval_id': approval, 'spending_approval_id': approval,
         'input_authorization': 'IAM_AUTHENTICATED_WEBSITE_UPLOADS',
         'budget_cycle': CYCLE, 'budget_ledger_uri': LEDGER_URI,
+        'runtime_artifact_sha256': image_digest.split(':')[1],
         'currency': 'USD', 'spending_cap': 100, 'max_analysis_passes': 2,
         'prompt_sha256': contract_sha(),
         'receipt_prefix': 'models/inspect-view/research-results/engineering-preview-persistent/v1'}
@@ -57,7 +61,8 @@ if __name__ == '__main__':
     parser.add_argument('--evidence', required=True)
     parser.add_argument('--approval', required=True)
     parser.add_argument('--output', required=True)
+    parser.add_argument('--image-digest', required=True)
     parser.add_argument('--infrastructure-usd', default='5')
     args=parser.parse_args()
     prepare(prior_usd=args.prior_usd, evidence=args.evidence, approval=args.approval,
-            output=args.output, infrastructure_usd=args.infrastructure_usd)
+            output=args.output, image_digest=args.image_digest, infrastructure_usd=args.infrastructure_usd)

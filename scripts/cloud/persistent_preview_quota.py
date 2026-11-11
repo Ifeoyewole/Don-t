@@ -40,7 +40,9 @@ def validate_policy(scope):
             or scope.get('currency') != 'USD' or scope.get('spending_cap') != 100
             or scope.get('input_authorization') != 'IAM_AUTHENTICATED_WEBSITE_UPLOADS'
             or any(k in scope for k in ('expires_unix', 'max_requests', 'max_inspections'))
-            or scope.get('max_analysis_passes') not in (1, 2)):
+            or scope.get('max_analysis_passes') not in (1, 2)
+            or not isinstance(scope.get('runtime_artifact_sha256'), str)
+            or not re.fullmatch('[a-f0-9]{64}', scope['runtime_artifact_sha256'])):
         raise QuotaDenied('Invalid persistent PREVIEW policy')
     if scope.get('receipt_prefix') != RESULT_PREFIX:
         raise QuotaDenied('Private research result prefix required')

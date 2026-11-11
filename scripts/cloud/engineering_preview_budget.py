@@ -31,6 +31,8 @@ def reserve(payload, options):
     validate_scope(dict(scope, approved_image_sha256s=[digest]), digest, int(time.time()))
     if os.getenv('JOINTINSPECT_PREVIEW_LIFECYCLE') == 'ENGINEERING_PREVIEW' and not persistent(scope):
         raise ValueError('Persistent deployment cannot use an expiring one-off scope')
+    if persistent(scope) and os.getenv('JOINTINSPECT_PREVIEW_IMAGE_SHA256') != scope['runtime_artifact_sha256']:
+        raise ValueError('Preview image/policy identity mismatch')
     maximum = scope.get('max_inspections')
     if not persistent(scope) and (scope.get('input_authorization') != 'AUTHENTICATED_ENGINEERING_UPLOADS'
             or type(maximum) is not int or not 1 <= maximum <= 3
@@ -66,7 +68,9 @@ def response_key(scope, digest, options):
     if isinstance(meaningful_options.get('context'), dict):
         meaningful_options['context'].pop('image_id', None)
     # Scope approval/version changes must not rebill the same executable evidence.
-    identity = {'budget_cycle': scope['budget_cycle'], 'contract': scope['prompt_sha256']} if persistent(scope) else scope
+    identity = {'budget_cycle': scope['budget_cycle'], 'contract': scope['prompt_sha256'],
+        'runtime_artifact_sha256': scope['runtime_artifact_sha256'],
+        'calibration_registry_sha256': hashlib.sha256(os.getenv('JOINTINSPECT_VERIFIED_CALIBRATIONS_JSON', '[]').encode()).hexdigest()} if persistent(scope) else scope
     return hashlib.sha256(canonical({'scope': identity, 'image_sha256': digest, 'options': meaningful_options})).hexdigest()
 
 

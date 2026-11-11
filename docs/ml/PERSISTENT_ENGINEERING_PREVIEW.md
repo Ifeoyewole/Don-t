@@ -28,7 +28,7 @@ counts are validated on every reservation. Generation-CAS retries are bounded;
 contention or storage errors fail closed. A new scope prefix/URI cannot redirect
 or replace the financial ledger. Same executable contract + image + meaningful
 options use stable response identity; changing an approval identifier does not
-silently rerun completed input.
+silently rerun completed input. The cache identity also binds the immutable image digest and server calibration-registry hash; deliberate executable or calibration changes invalidate stale results without resetting the financial ledger.
 
 ## Provider cost envelope
 
@@ -59,7 +59,7 @@ Do not describe a usage estimate as an actual remaining billing balance.
 ## Initialization and deployment
 
 `python -m scripts.cloud.prepare_persistent_preview --prior-usd <confirmed-upper-bound>
---evidence <accounting-source> --approval <authorization-reference> --output <directory>`
+--evidence <accounting-source> --approval <authorization-reference> --image-digest sha256:<built-digest> --output <directory>`
 prepares files only. It cannot upload, initialize cloud resources or infer an
 unknown historical balance. Ledger upload MUST use generation-match0; existing
 ledgers must never be overwritten to renew funds. Policy JSON is SHA-pinned by

@@ -24,6 +24,7 @@ spec:
         env:
         - {name: JOINTINSPECT_CLOUD_RESEARCH_WORKER, value: 'true'}
         - {name: JOINTINSPECT_PREVIEW_LIFECYCLE, value: ENGINEERING_PREVIEW}
+        - {name: JOINTINSPECT_PREVIEW_IMAGE_SHA256, value: __IMAGE_SHA256__}
         - {name: JOINTINSPECT_ISWDS_NONCOMMERCIAL_RESEARCH_ALLOWED, value: 'true'}
         - {name: JOINTINSPECT_SEWER_FUSION_ENABLED, value: 'true'}
         - {name: JOINTINSPECT_PHASE1_VERTEX_ENABLED, value: 'true'}

@@ -19,7 +19,7 @@ def policy():
         'model': 'gemini-3.1-pro-preview', 'location': 'global',
         'review_approval_id': 'test-upload-permission', 'spending_approval_id': 'test-no-money',
         'input_authorization': 'IAM_AUTHENTICATED_WEBSITE_UPLOADS',
-        'budget_ledger_uri': LEDGER_URI, 'budget_cycle': CYCLE,
+        'budget_ledger_uri': LEDGER_URI, 'budget_cycle': CYCLE, 'runtime_artifact_sha256': 'a'*64,
         'currency': 'USD', 'spending_cap': 100, 'max_analysis_passes': 2,
         'receipt_prefix': 'models/inspect-view/research-results/engineering-preview-persistent/v1',
         'prompt_sha256': contract_sha()}
@@ -160,8 +160,8 @@ def test_preparation_never_invents_or_resets_historical_spending(tmp_path):
     from scripts.cloud.prepare_persistent_preview import prepare, money
     for amount in ('NaN', '-1', '101', '0.0000001', 'Infinity'):
         with pytest.raises(ValueError): money(amount)
-    with pytest.raises(ValueError): prepare(prior_usd='96', evidence='owner upper bound', approval='owner', output=tmp_path)
-    scope, ledger = prepare(prior_usd='20', evidence='synthetic upper bound, no billing claim', approval='TEST', output=tmp_path)
+    with pytest.raises(ValueError): prepare(prior_usd='96', evidence='owner upper bound', approval='owner', output=tmp_path, image_digest='sha256:'+'a'*64)
+    scope, ledger = prepare(prior_usd='20', evidence='synthetic upper bound, no billing claim', approval='TEST', output=tmp_path, image_digest='sha256:'+'a'*64)
     assert validate_ledger(ledger) == 25_000_000
     assert 'expires_unix' not in scope
     assert ledger['ceiling_microusd'] == CEILING
@@ -173,6 +173,8 @@ def test_cache_identity_survives_deployments_approval_changes_and_new_upload_ids
     a=response_key(first,'a'*64,{'task':'JOINT_GEOMETRY','context':{'image_id':'local-one','project_id':'project'}})
     b=response_key(second,'a'*64,{'task':'JOINT_GEOMETRY','context':{'image_id':'local-two','project_id':'project'}})
     assert a==b
+    second['runtime_artifact_sha256']='b'*64
+    assert a!=response_key(second,'a'*64,{'task':'JOINT_GEOMETRY','context':{'project_id':'project'}})
     assert a!=response_key(first,'b'*64,{'task':'JOINT_GEOMETRY','context':{'project_id':'project'}})
     assert a!=response_key(first,'a'*64,{'task':'JOINT_GEOMETRY','context':{'project_id':'another-project'}})
 
