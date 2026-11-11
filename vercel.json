@@ -1,9 +1,18 @@
 {
   "version": 2,
   "functions": {
-    "api/unified.ts": { "maxDuration": 120 },
-    "api/v1/cv/[...route].js": { "maxDuration": 120 },
-    "api/code.ts": { "maxDuration": 60 }
+    "api/unified.ts": {
+      "maxDuration": 120
+    },
+    "api/v1/cv/[...route].js": {
+      "maxDuration": 120
+    },
+    "api/code.ts": {
+      "maxDuration": 60
+    },
+    "api/engineering-session.ts": {
+      "maxDuration": 10
+    }
   },
   "headers": [
     {
@@ -48,6 +57,13 @@
     {
       "source": "/((?!api/|cv/|health).*)",
       "destination": "/index.html"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/code/:path*",
+      "destination": "/",
+      "permanent": true
     }
   ]
 }

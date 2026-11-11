@@ -66,7 +66,7 @@ source/calibration evidence.
 Existing Upload page → opt-in Unified engineering preview → `/api/unified` →
 private Cloud Run `/api/v1/cv/sewer-research/unified` → original results page and
 IndexedDB record → existing exports. The gateway uses the existing signed Secure
-operator session from `/code`, not the anonymous public-product identity.
+operator session from the inspection upload page, not the anonymous public-product identity.
 It verifies same origin, including HTTP/2 `:authority`, enforces upload/rate limits
 and obtains an IAM ID token through existing Vercel federation. Tokens/keys never
 enter the browser bundle. The private research backend independently verifies the
@@ -120,3 +120,7 @@ actual remaining billing balance is not available. New live deployment/inference
 therefore requires a verified remaining authorization. Commercial permissions
 remain separately documented and are not used as an intermediate engineering
 review gate for software development.
+
+## Operations console retirement
+
+`/code` and its subpaths redirect home; `/api/code` returns410 for every operation. The operations console is removed from the application bundle. Engineering preview sign-in lives inside the existing inspection upload page and uses `/api/engineering-session`. Existing signed sessions, credentials, IAM and research allowances are preserved; no new cloud permissions or workloads are introduced. Historical reports mentioning `/code` describe the earlier workflow.

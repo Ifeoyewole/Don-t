@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
 import { requestInspectionContextSuggestions } from '../lib/contextSuggestions'
 import { checkCalibrationReference, type CalibrationReferenceStatus } from '../lib/calibrationReference'
-import { unifiedPreviewAvailable } from '../lib/unifiedClient'
+import { UnifiedPreviewAccess } from '../components/UnifiedPreviewAccess'
 import type { CalibrationProfile, GeometrySelectionProvenance, InspectionImage, JointGeometryType, ProcessBatchResult } from '../types/domain'
 
 type Props = {
@@ -93,11 +93,6 @@ export const PhotoUploadPage = ({
   const [previewAvailable, setPreviewAvailable] = useState(false)
   const [unifiedPreview, setUnifiedPreview] = useState(false)
   const previewModeRef = useRef(false)
-  useEffect(() => {
-    const controller = new AbortController()
-    void unifiedPreviewAvailable(controller.signal).then(setPreviewAvailable).catch(() => {})
-    return () => controller.abort()
-  }, [])
   const [error, setError] = useState('')
   const [notesDrafts, setNotesDrafts] = useState<Record<string, string>>({})
   const [cameraDrafts, setCameraDrafts] = useState<Record<string, string>>({})
@@ -336,6 +331,7 @@ export const PhotoUploadPage = ({
 
   return (
     <div className="page-grid upload-page">
+      <UnifiedPreviewAccess available={previewAvailable} onAvailability={setPreviewAvailable} onSignOut={() => {setUnifiedPreview(false);previewModeRef.current=false}} />
       {previewAvailable && <section className="card"><label><input type="checkbox" checked={unifiedPreview} onChange={e => {setUnifiedPreview(e.target.checked);previewModeRef.current=e.target.checked;if(e.target.checked){for(const controller of suggestionControllers.current.values())controller.abort();suggestionControllers.current.clear()}}} disabled={busy} /> Unified AI engineering preview</label><p>Select before uploading to avoid separate scene-preflight calls. Uses the existing protected operator session. Results remain preliminary; no physical millimetres without verified calibration. Images up to 3 MiB. Requests are bounded and are not retried automatically.</p></section>}
       <section className="page-breadcrumbs">
         <button className="page-back-link" type="button" onClick={onBack}>

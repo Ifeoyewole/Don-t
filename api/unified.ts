@@ -1,6 +1,6 @@
 /** Existing website operator session -> private, IAM-authenticated research API. */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { authenticated } from './code.js'
+import { authenticated } from './_lib/operator-session.js'
 import { getCloudRunIdToken } from './_lib/gcp-oidc.js'
 import { checkRateLimit } from './_lib/rate-limiter.js'
 import { readStreamWithLimit, PayloadTooLargeError } from './_lib/gateway-guard.js'

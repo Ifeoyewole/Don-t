@@ -9,7 +9,6 @@ export type NavKey =
   | 'models'
   | 'reports'
   | 'settings'
-  | 'code'
 
 interface InspectorProfile {
   name: string
@@ -33,7 +32,6 @@ type Props = {
   onNavigateProjects: () => void
   onNavigateInspections?: () => void
   onNavigateReports?: () => void
-  onNavigateCode?: () => void
   globalSearchQuery?: string
   onGlobalSearchChange?: (query: string) => void
 }
@@ -143,7 +141,6 @@ export const AppShell = ({
   onNavigateProjects,
   onNavigateInspections,
   onNavigateReports,
-  onNavigateCode,
   globalSearchQuery = '',
   onGlobalSearchChange,
 }: Props) => {
@@ -231,10 +228,6 @@ export const AppShell = ({
       } else {
         onNavigateProjects()
       }
-      return
-    }
-    if (key === 'code') {
-      onNavigateCode?.()
       return
     }
     if (key === 'calibration' || key === 'models' || key === 'settings') {
