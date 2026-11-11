@@ -106,9 +106,64 @@ login or calendar window, persisted a saved-real-artifact unified result, and
 exported JSON/PDF/ZIP with no browser errors. It was an offline replay, not new
 Gemini inference. No OpenCV implementation file changed.
 
-Read-only GCS inspection found no pre-existing financial ledger at the fixed
-URI (404). No opening balance or budget replenishment has been created. Runtime
-activation/build awaits the confirmed historical used/reserved USD upper bound
-requested from the owner. The existing worker still uses its earlier scope until
-an accounting-backed deployment is performed; this report does not claim that
-worker has already adopted the persistent policy.
+The initial read-only GCS inspection found no pre-existing financial ledger
+(404), so activation paused until the owner supplied the opening accounting
+figure. The owner subsequently confirmed5USD already used. The following records
+supersede that initial deployment blocker.
+
+## Activated deployment — 11 November 2026
+
+The opening ledger was created once with generation-match0, recording the
+owner-confirmed5USD prior use and a separate5USD infrastructure encumbrance.
+No prior ledger was overwritten or replenished. The ledger was initialized
+before the bounded CPU image build; only the new immutable policy was uploaded
+after its image digest became known.
+
+- Source/PR45 merge: `f286d7195d255b47fb4df2fe3c1f6c4ae99b7dd1`.
+- Cloud Build: `62834b6d-7243-4e14-b10a-3909c46034e8`, SUCCESS.
+- Immutable image: `sha256:ed619547abc10664bd37147cb5a75a13fbbeb3ab5e8936b602dee52fe6598f34`.
+- Private worker: `jointinspect-unified-preview-00003-m24`, READY.
+- Policy SHA-256: `6e19fdad804a2420656bfd78d2580b1141807767102d1ce0655bf415e32142d1`.
+- Policy object: `gs://joint-inspection-510310-data/models/inspect-view/research-results/engineering-preview-persistent/v1/policies/6e19fdad804a2420656bfd78d2580b1141807767102d1ce0655bf415e32142d1.json`.
+- Website deployment: `dpl_FEWSfiRaRwAUFT1upieQL5ouoH1M`, READY, production configuration of the existing website with research mode PREVIEW.
+
+The existing website at https://joint-inspection.vercel.app returns200 from
+`/api/unified`, reporting `mode=PREVIEW` and `user_sign_in_required=false`.
+The obsolete expiry/window values were cleared; no calendar cutoff exists in
+the active gateway or persistent policy. Normal website health returns200.
+Anonymous direct worker access returns403. Service IAM still contains only the
+existing Vercel invoker binding; no public invoker or additional IAM grant was
+introduced. Commercial model weights/configuration and the OpenCV algorithms
+were not changed by activation.
+
+### One controlled real verification
+
+A fresh website submission of the existing permitted frame26 completed with:
+
+- HTTP200 in118.659 seconds, one submission and no automatic retry.
+- Inspect View and ISWDS available; two actual SAM masks.
+- Authenticated Gemini interpretation, two bounded analysis passes and
+  `functional_path_complete=true`.
+- The new input-token preflight succeeded before generation.
+- One persisted unified inspection record; zero user cookies/browser errors.
+- Primary unit mm. Physical measurement null because calibration/joint evidence
+  did not authorize a physical joint-gap measurement; no field accuracy claim.
+
+The model/fusion portion took83.7575 seconds; the browser timing also includes
+initialization/network overhead. This is a successful real cloud request, not
+an offline replay or saved-result-only readback. No GPU, training, new model,
+legacy restoration or repeated paid verification run was performed.
+
+Ledger readback after verification passed integrity validation: one inspection
+and two Gemini reservations, three claims total. Allocations are5USD prior use,
+5USD infrastructure,1USD inspection and4USD Gemini reservations:15USD encumbered,
+**85USD unreserved**. Daily quota remaining at that observation: four inspections
+and eight Gemini analyses. These reservations are not actual provider charges;
+actual billing-account invoices were not available. Financial authorization does
+not refill at daily rollover.
+
+Deployment evidence (private research storage):
+`gs://joint-inspection-510310-data/models/inspect-view/research-results/engineering-preview-persistent/v1/deployments/62834b6d-7243-4e14-b10a-3909c46034e8/deployment-report.json`.
+Local browser evidence:
+`/workspace/scratch/persistent-preview-deploy/live-verification/verification.json`,
+`after-inspection.png` and `overlay.png`.
