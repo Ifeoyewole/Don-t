@@ -285,6 +285,10 @@ export interface InspectionImage {
   cameraId?: string
   pipeDiameterMm?: number | null
   suggestedJointType?: JointGeometryType
+  suggestedCalibrationNotes?: string
+  calibrationNotes?: string
+  calibrationNotesEdited?: boolean
+  suggestedReferenceKind?: string
   suggestedInspectionContext?: string
   possibleGapVisible?: boolean | null
   contextSuggestionModel?: string

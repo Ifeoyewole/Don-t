@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from scripts.cloud.persistent_preview_quota import (
-    CEILING, CYCLE, LEDGER_URI, LedgerConflict, QuotaDenied, reserve, validate_ledger,
+from scripts.cloud.preview_spending import (
+    CEILING, CYCLE, LEDGER_URI, LedgerConflict, PreviewBudgetDenied, reserve, validate_ledger,
 )
 from scripts.cloud.research_semantic_receipts import validate_scope
 
@@ -26,14 +26,13 @@ def policy():
 
 
 def opening():
-    return {'schema': 1, 'cycle': CYCLE, 'status': 'ACTIVE', 'currency': 'USD',
+    return {'schema': 2, 'cycle': CYCLE, 'status': 'ACTIVE', 'currency': 'USD',
         'ceiling_microusd': CEILING, 'opening_approval_id': 'synthetic-only',
         'prior_accounting_evidence': 'Synthetic fixture; not a real account balance',
         'pricing_evidence': 'Synthetic conservative token envelope',
         'prior_consumption_bound_microusd': 10_000_000, 'infrastructure_reserve_microusd': 5_000_000,
-        'period_seconds': 86400, 'period_limits': {'inspection': 5, 'gemini': 10},
         'operation_reservations_microusd': {'inspection': 1_000_000, 'gemini': 2_000_000},
-        'claims': {}, 'period_usage': {}}
+        'claims': {}}
 
 
 class MemoryLedger:
@@ -58,59 +57,72 @@ def claim(ledger, kind, n, now=100000):
     reserve(policy(), None, kind, key(n), now=now, ledger=ledger)
 
 
-def test_calendar_quota_recovers_but_money_never_replenishes():
-    ledger = MemoryLedger();ledger.value['period_limits']['inspection'] = 1
-    claim(ledger, 'inspection', 'first')
-    with pytest.raises(QuotaDenied, match='Period quota'): claim(ledger, 'inspection', 'second')
-    claim(ledger, 'inspection', 'second', now=100000+86400)
-    assert validate_ledger(ledger.value) == 17_000_000
-    assert len(ledger.value['claims']) == 2
+def test_no_daily_inspection_or_gemini_quota_is_enforced():
+    ledger = MemoryLedger()
+    for n in range(7): claim(ledger,'inspection',n,now=100000)
+    for n in range(12): claim(ledger,'gemini',n,now=100000)
+    assert len(ledger.value['claims'])==19
+    assert validate_ledger(ledger.value)==46_000_000
+    assert not {'period_seconds','period_limits','period_usage'} & ledger.value.keys()
 
 
 def test_total_budget_exhausts_independently_of_period_and_scope_revision():
     ledger = MemoryLedger();ledger.value['prior_consumption_bound_microusd'] = 94_000_000
     claim(ledger, 'inspection', 'one')
     changed = policy(); changed['review_approval_id'] += '-new-revision'
-    with pytest.raises(QuotaDenied, match='Cumulative'):
+    with pytest.raises(PreviewBudgetDenied, match='Cumulative'):
         reserve(changed, None, 'inspection', key('two'), now=200000, ledger=ledger)
     assert validate_ledger(ledger.value) == CEILING
 
 
 def test_duplicate_or_failed_work_is_never_automatically_refunded_or_retried():
     ledger = MemoryLedger();claim(ledger, 'gemini', 'failed')
-    with pytest.raises(QuotaDenied, match='Previously reserved'): claim(ledger, 'gemini', 'failed', now=999999)
+    with pytest.raises(PreviewBudgetDenied, match='Previously reserved'): claim(ledger, 'gemini', 'failed', now=999999)
     assert validate_ledger(ledger.value) == 17_000_000
 
 
 @pytest.mark.parametrize('change', [
     {'status': 'PAUSED'}, {'prior_consumption_bound_microusd': None}, {'currency': 'GBP'},
     {'ceiling_microusd': CEILING+1}, {'prior_accounting_evidence': ''}, {'pricing_evidence': ''},
-    {'period_usage': {'1': {'inspection': 9, 'gemini': 0}}},
+    {'claims': {'corrupt-key': {}}},
     {'operation_reservations_microusd': {'inspection': 1, 'gemini': 1}},
 ])
 def test_corrupt_unfunded_or_underpriced_accounting_fails_closed(change):
     ledger = MemoryLedger();ledger.value.update(change)
-    with pytest.raises(QuotaDenied): claim(ledger, 'inspection', 'blocked')
-    assert not ledger.value['claims']
+    before=copy.deepcopy(ledger.value)
+    with pytest.raises(PreviewBudgetDenied): claim(ledger, 'inspection', 'blocked')
+    assert ledger.value==before
 
 
 def test_atomic_concurrency_cannot_double_spend_remaining_funds():
     ledger = MemoryLedger();ledger.value['prior_consumption_bound_microusd'] = 94_000_000
     def run(n):
         try: claim(ledger, 'inspection', n);return True
-        except QuotaDenied:return False
+        except PreviewBudgetDenied:return False
     with ThreadPoolExecutor(max_workers=16) as workers:
         assert sum(workers.map(run, range(16))) == 1
     assert len(ledger.value['claims']) == 1
 
 
-def test_independent_process_handles_share_same_state_and_daily_quota():
-    ledger = MemoryLedger()
-    for n in range(5): claim(ledger, 'inspection', n)
-    with pytest.raises(QuotaDenied, match='Period quota'): claim(ledger, 'inspection', 6)
-    # New wrapper, same durable state (simulates worker restart).
-    restarted = MemoryLedger(copy.deepcopy(ledger.value))
-    with pytest.raises(QuotaDenied, match='Period quota'): claim(restarted, 'inspection', 6)
+def test_worker_restart_and_day_rollover_do_not_restore_financial_funds():
+    ledger=MemoryLedger()
+    for n in range(6):claim(ledger,'inspection',n)
+    restarted=MemoryLedger(copy.deepcopy(ledger.value))
+    claim(restarted,'inspection',6,now=100000+86400)
+    assert validate_ledger(restarted.value)==22_000_000
+    assert len(restarted.value['claims'])==7
+
+
+def test_daily_quota_migration_keeps_every_previous_financial_claim():
+    from scripts.cloud.preview_spending import remove_daily_quotas
+    ledger=MemoryLedger();claim(ledger,'gemini','historical')
+    old=copy.deepcopy(ledger.value);old.update(schema=1,period_seconds=86400,
+        period_limits={'inspection':0,'gemini':0},period_usage={'1':{'inspection':5,'gemini':10}})
+    migrated=remove_daily_quotas(old)
+    assert validate_ledger(migrated)==validate_ledger(old)
+    assert migrated['claims']==old['claims']
+    assert not {'period_seconds','period_limits','period_usage'} & migrated.keys()
+    claim(MemoryLedger(migrated),'inspection','new')
 
 
 def test_policy_has_no_calendar_expiry_and_cannot_redirect_or_reset_budget():
@@ -125,7 +137,7 @@ def test_reconciler_reserves_before_count_and_generate_and_reuses_authenticated_
     from backend.tests.test_phase1_unified import reconciler, interpretation, payload
     from backend.app.core.cv.ai.phase1_unified import Phase1Unified
     from backend.tests.test_phase1_unified import fusion
-    import scripts.cloud.persistent_preview_quota as module
+    import scripts.cloud.preview_spending as module
     ledger = MemoryLedger();monkeypatch.setattr(module, 'GcsLedger', lambda bucket: ledger)
     vertex = reconciler();vertex.scope = policy();vertex.store.bucket = SimpleNamespace(name='joint-inspection-510310-data')
     calls = []
@@ -145,7 +157,7 @@ def test_reconciler_reserves_before_count_and_generate_and_reuses_authenticated_
 def test_input_cost_envelope_stops_generation_without_refunding_reservation(monkeypatch):
     from backend.tests.test_phase1_unified import reconciler, payload, fusion
     from backend.app.core.cv.ai.phase1_unified import Phase1Unified
-    import scripts.cloud.persistent_preview_quota as module
+    import scripts.cloud.preview_spending as module
     ledger = MemoryLedger();monkeypatch.setattr(module, 'GcsLedger', lambda bucket: ledger)
     vertex = reconciler();vertex.scope=policy();vertex.store.bucket=SimpleNamespace(name='joint-inspection-510310-data')
     vertex.token_counter = lambda body: 100001
@@ -182,7 +194,7 @@ def test_cache_identity_survives_deployments_approval_changes_and_new_upload_ids
 def test_gcs_adapter_uses_generation_conditions_and_never_recreates_missing_ledger():
     import json
     from google.api_core.exceptions import NotFound, PreconditionFailed
-    from scripts.cloud.persistent_preview_quota import GcsLedger
+    from scripts.cloud.preview_spending import GcsLedger
     class Blob:
         generation=7
         size=1024
@@ -200,10 +212,10 @@ def test_gcs_adapter_uses_generation_conditions_and_never_recreates_missing_ledg
     assert generation==7 and value['ceiling_microusd']==CEILING
     with pytest.raises(LedgerConflict):ledger.replace(value,generation)
     blob.missing=True
-    with pytest.raises(QuotaDenied,match='never initialize'):ledger.read()
+    with pytest.raises(PreviewBudgetDenied,match='never initialize'):ledger.read()
 
 
-def test_private_worker_requires_iam_before_quota_and_never_initializes_models_when_denied(monkeypatch):
+def test_private_worker_requires_iam_before_spending_and_never_initializes_models_when_denied(monkeypatch):
     from fastapi.testclient import TestClient
     from backend.app.main import app
     import google.oauth2.id_token
@@ -215,7 +227,7 @@ def test_private_worker_requires_iam_before_quota_and_never_initializes_models_w
     monkeypatch.setenv('JOINTINSPECT_RESEARCH_INVOKER_EMAIL','allowed@example.test')
     calls=[]
     monkeypatch.setattr(endpoint,'cloud_phase1_service',lambda:calls.append('MODEL_MUST_NOT_LOAD'))
-    def denied(*args):calls.append('budget');raise QuotaDenied('Cumulative research allowance exhausted')
+    def denied(*args):calls.append('budget');raise PreviewBudgetDenied('Cumulative research allowance exhausted')
     monkeypatch.setattr(budget,'reserve',denied)
     client=TestClient(app);url='/api/v1/cv/sewer-research/unified';files={'file':('frame.png',b'synthetic')}
     assert client.post(url,files=files).status_code==401

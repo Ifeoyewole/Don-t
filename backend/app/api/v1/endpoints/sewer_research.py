@@ -7,13 +7,13 @@ from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from backend.app.core.cv.ai.research_sewer_runtime import cloud_service, cloud_phase1_service
+from backend.app.api.v1.endpoints.calibration import CalibrationReferenceCheck
+from scripts.cloud.preview_spending import PreviewBudgetDenied
 
 router = APIRouter()
 
 
-@router.post('/sewer-research/unified')
-async def unified(file: UploadFile = File(...), options: str = Form('{}'),
-                  authorization: str | None = Header(default=None)):
+async def authorize(authorization):
     if os.getenv('JOINTINSPECT_SEWER_FUSION_ENABLED', 'false') != 'true':
         raise HTTPException(404, 'Unified sewer research is disabled')
     if os.getenv('JOINTINSPECT_RESEARCH_IAM_ONLY') == 'true':
@@ -35,6 +35,12 @@ async def unified(file: UploadFile = File(...), options: str = Form('{}'),
             raise HTTPException(503, 'Research access is not configured')
         if not authorization or not hmac.compare_digest(authorization, 'Bearer '+token):
             raise HTTPException(401, 'Research authentication required')
+
+
+@router.post('/sewer-research/unified')
+async def unified(file: UploadFile = File(...), options: str = Form('{}'),
+                  authorization: str | None = Header(default=None)):
+    await authorize(authorization)
     if len(options) > 64*1024:
         raise HTTPException(413, 'Research options too large')
     try:
@@ -57,7 +63,7 @@ async def unified(file: UploadFile = File(...), options: str = Form('{}'),
             try:
                 cache_blob, cached = await run_in_threadpool(reserve, payload, kwargs)
             except ValueError:
-                raise HTTPException(429, 'Preview quota or research budget unavailable; no automatic retry')
+                raise HTTPException(429, 'Research spending allowance unavailable; no automatic retry')
             if cached is not None:
                 return cached
         phase1 = os.getenv('JOINTINSPECT_PHASE1_VERTEX_ENABLED') == 'true'
@@ -75,3 +81,34 @@ async def unified(file: UploadFile = File(...), options: str = Form('{}'),
         raise HTTPException(422, 'Invalid research image or task')
     except Exception:
         raise HTTPException(503, 'Research worker unavailable; review required')
+
+
+@router.post('/sewer-research/context-suggestions')
+async def context_suggestions(file: UploadFile = File(...),
+        metadata_pipe_diameter_mm: float | None = Form(None, gt=0, le=5000),
+        metadata_source: str = Form('MANHOLE_METADATA'), authorization: str | None = Header(default=None)):
+    await authorize(authorization)
+    payload=await file.read(3*1024*1024+1)
+    if not payload or len(payload)>3*1024*1024:
+        raise HTTPException(413,'Suggestion image must be nonempty and at most3MiB')
+    if metadata_source not in ('PROJECT_METADATA','MANHOLE_METADATA'):
+        raise HTTPException(422,'Invalid metadata source')
+    try:
+        from backend.app.core.cv.ai.research_sewer_runtime import cloud_reconciler
+        from backend.app.core.cv.ai.inspection_advisory import suggest
+        engine=await run_in_threadpool(cloud_reconciler)
+        return await run_in_threadpool(suggest,payload,engine,metadata_pipe_diameter_mm,metadata_source)
+    except PreviewBudgetDenied:
+        raise HTTPException(429,'Research spending allowance unavailable; no automatic retry')
+    except ValueError:
+        raise HTTPException(502,'Gemini suggestion response could not be validated; editable inputs remain available')
+    except Exception:
+        raise HTTPException(503,'Gemini suggestions unavailable; editable inputs remain available')
+
+
+@router.post('/sewer-research/check-reference')
+async def check_reference(request: CalibrationReferenceCheck,
+                          authorization: str | None = Header(default=None)):
+    await authorize(authorization)
+    from backend.app.api.v1.endpoints.calibration import check_calibration_reference
+    return await check_calibration_reference(request)

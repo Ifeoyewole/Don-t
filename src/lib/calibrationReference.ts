@@ -7,13 +7,13 @@ export interface CalibrationReferenceStatus {
 }
 
 /** A read-only match against the server registry, not a claim that photo scale is valid. */
-export async function checkCalibrationReference(profile: CalibrationProfile): Promise<CalibrationReferenceStatus> {
+export async function checkCalibrationReference(profile: CalibrationProfile, unifiedPreview = false): Promise<CalibrationReferenceStatus> {
   const ref = profile.calibration_reference_id || profile.calibrationReferenceId
   const diameter = profile.pipe_diameter_mm ?? profile.pipeDiameterMm
-  if (!ref || !diameter || !Number.isFinite(diameter) || diameter <= 0) {
+  if (!ref || ref.startsWith('UNVERIFIED-') || !diameter || !Number.isFinite(diameter) || diameter <= 0) {
     return { reference_verified: false, status: 'CALIBRATION_REQUIRED', guidance: 'An official reference and known diameter are required. A nominal diameter alone is not calibration.' }
   }
-  const response = await fetch('/api/v1/cv/calibration/check-reference', {
+  const response = await fetch(unifiedPreview ? '/api/unified?action=calibration' : '/api/v1/cv/calibration/check-reference', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

@@ -12,7 +12,7 @@ import time
 
 from scripts.cloud.inspect_view_sam2_vertex import stage_verified
 from scripts.cloud.research_semantic_receipts import GcsCreateOnlyStore, validate_scope
-from scripts.cloud.persistent_preview_quota import persistent, reserve as reserve_persistent
+from scripts.cloud.preview_spending import persistent, reserve as reserve_persistent
 from backend.app.core.cv.ai.research_gemini_reconciliation import canonical, contract_sha
 
 

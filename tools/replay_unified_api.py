@@ -33,3 +33,24 @@ class RecordedOnly:
 
 
 endpoint.cloud_phase1_service = lambda: RecordedOnly()
+
+
+# Explicit offline advisory fixture for editable-form browser verification.
+# It is labelled as a fixture and never passed off as a new Vertex result.
+import backend.app.core.cv.ai.inspection_advisory as advisory
+import backend.app.core.cv.ai.research_sewer_runtime as runtime
+
+def fixture_suggestions(payload, engine, diameter, source):
+    import time
+    time.sleep(.75)
+    if hashlib.sha256(payload).hexdigest()!=recorded['image_sha256']:
+        raise ValueError('Advisory fixture requires its exact recorded frame')
+    return {'model':'OFFLINE_ADVISORY_FIXTURE_NO_VERTEX_CALL','domain_status':'PIPE_JOINT_INSPECTION',
+        'processing_allowed':True,'image_quality_usable':True,'suggested_joint_type':'CIRCULAR_OPENING',
+        'suggested_inspection_context':'Fixture: a curved joint candidate is visible.', 'possible_gap_visible':True,
+        'calibration':{'pipe_diameter_mm':diameter,'source':source,'calibration_reference_id':None,
+            'verified':False,'authority':'UNVERIFIED_METADATA','suggested_notes':'Fixture: use a same-plane physical reference; the lower edge is obscured.',
+            'reference_kind':'NONE','reference_bbox':[]},'review_required':True,'reason':'Explicit offline advisory fixture.'}
+
+runtime.cloud_reconciler=lambda:object()
+advisory.suggest=fixture_suggestions

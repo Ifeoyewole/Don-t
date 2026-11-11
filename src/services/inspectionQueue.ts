@@ -70,13 +70,21 @@ export const inspectionQueue = {
       if (!image || (image.queueStatus !== 'queued' && image.queueStatus !== 'failed')) return
       const update: Partial<InspectionImage> = {}
       if (origin === 'ai') {
+        update.suggestedCalibrationNotes = patch.suggestedCalibrationNotes?.slice(0,1000)
+        update.suggestedReferenceKind = patch.suggestedReferenceKind
+        if (patch.calibrationNotes && !image.calibrationNotesEdited) update.calibrationNotes=patch.calibrationNotes.slice(0,1000)
+        if (patch.analysisMode === 'EVIDENCE_ONLY' && image.geometrySelectionProvenance !== 'INSPECTOR_SELECTED' && !patch.jointType) {
+          update.analysisMode='EVIDENCE_ONLY'
+          update.jointType=undefined
+          update.geometrySelectionProvenance='EVIDENCE_SUGGESTED'
+        }
         update.suggestedJointType = patch.suggestedJointType
         update.suggestedInspectionContext = patch.suggestedInspectionContext?.slice(0, 1000)
         update.possibleGapVisible = patch.possibleGapVisible
         update.contextSuggestionModel = patch.contextSuggestionModel
         update.contextSuggestionStatus = patch.contextSuggestionStatus
         update.contextSuggestionMessage = patch.contextSuggestionMessage?.slice(0, 300)
-        if (patch.jointType && image.geometrySelectionProvenance !== 'INSPECTOR_SELECTED' && image.analysisMode !== 'EVIDENCE_ONLY') {
+        if (patch.jointType && image.geometrySelectionProvenance !== 'INSPECTOR_SELECTED') {
           update.analysisMode = 'MEASURE_JOINT'
           update.jointType = patch.jointType
           update.geometrySelectionProvenance = 'EVIDENCE_SUGGESTED'
@@ -85,6 +93,7 @@ export const inspectionQueue = {
           update.operatorContext = patch.operatorContext.slice(0, 1000)
         }
       } else if (origin === 'inspector') {
+        if (patch.calibrationNotes !== undefined) {update.calibrationNotes=patch.calibrationNotes.slice(0,1000);update.calibrationNotesEdited=true}
         if ('sequenceId' in patch) update.sequenceId = patch.sequenceId?.trim().slice(0,128) || undefined
         if ('frameIndex' in patch) update.frameIndex = Number.isSafeInteger(patch.frameIndex) && (patch.frameIndex ?? -1) >= 0 ? patch.frameIndex : undefined
         if (patch.analysisMode === 'EVIDENCE_ONLY') {

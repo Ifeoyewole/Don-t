@@ -93,13 +93,16 @@ export const PhotoUploadPage = ({
   const [previewAvailable, setPreviewAvailable] = useState(false)
   const [unifiedPreview, setUnifiedPreview] = useState(false)
   const previewModeRef = useRef(false)
+  const previewCapability = useRef<Promise<boolean> | null>(null)
   useEffect(() => {
     const controller = new AbortController()
-    void unifiedPreviewAvailable(controller.signal).then(setPreviewAvailable).catch(() => {})
+    previewCapability.current = unifiedPreviewAvailable(controller.signal)
+    void previewCapability.current.then(available=>{setPreviewAvailable(available);if(available){setUnifiedPreview(true);previewModeRef.current=true}}).catch(() => {})
     return () => controller.abort()
   }, [])
   const [error, setError] = useState('')
   const [notesDrafts, setNotesDrafts] = useState<Record<string, string>>({})
+  const [referenceDrafts, setReferenceDrafts] = useState<Record<string, string>>({})
   const [cameraDrafts, setCameraDrafts] = useState<Record<string, string>>({})
   const [diameterDrafts, setDiameterDrafts] = useState<Record<string, string>>({})
   const suggestionControllers = useRef(new Map<string, AbortController>())
@@ -137,6 +140,7 @@ export const PhotoUploadPage = ({
       for (const controller of suggestionControllers.current.values()) controller.abort()
       suggestionControllers.current.clear()
       setNotesDrafts({})
+      setReferenceDrafts({})
       setCameraDrafts({})
       setDiameterDrafts({})
     })
@@ -157,8 +161,8 @@ export const PhotoUploadPage = ({
     }
 
     const profile: CalibrationProfile = {
-      calibration_reference_id: refId || `UNVERIFIED-${Date.now().toString(36).toUpperCase()}`,
-      calibrationReferenceId: refId || `UNVERIFIED-${Date.now().toString(36).toUpperCase()}`,
+      calibration_reference_id: refId,
+      calibrationReferenceId: refId,
       project_id: projectId,
       projectId,
       source: calSource,
@@ -179,7 +183,8 @@ export const PhotoUploadPage = ({
       setSaveSuccessMsg('Local reference saved for this manhole. Checking server authority…')
       setReferenceChecking(true)
       try {
-        const result = await checkCalibrationReference(profile)
+        const preview = await previewCapability.current?.catch(()=>false) ?? previewModeRef.current
+        const result = await checkCalibrationReference(profile, preview)
         setReferenceStatus(result)
         setSaveSuccessMsg(result.reference_verified
           ? 'Server reference matched. This does NOT guarantee scale for every photo.'
@@ -239,19 +244,25 @@ export const PhotoUploadPage = ({
     const controller = new AbortController()
     suggestionControllers.current.set(image.id, controller)
     await persistPhotoContext(image.id, { contextSuggestionStatus: 'pending' }, 'system')
-    const timeout = window.setTimeout(() => controller.abort('timeout'), 45000)
+    const timeout = window.setTimeout(() => controller.abort('timeout'), 120000)
     try {
-      const result = await requestInspectionContextSuggestions(photo, controller.signal, manholePipeDiameterMm)
+      const preview = await previewCapability.current?.catch(()=>false) ?? previewModeRef.current
+      const result = await requestInspectionContextSuggestions(photo, controller.signal, manholePipeDiameterMm, preview)
       if (controller.signal.aborted) return
-      const allowed = result.processing_allowed && result.image_quality_usable
+      const allowed = result.processing_allowed
+      const geometry = result.image_quality_usable ? result.suggested_joint_type : null
       await persistPhotoContext(image.id, {
         contextSuggestionStatus: allowed ? 'ready' : 'review_required',
         contextSuggestionMessage: result.reason,
         contextSuggestionModel: result.model,
-        suggestedJointType: allowed ? result.suggested_joint_type ?? undefined : undefined,
+        suggestedJointType: allowed ? geometry ?? undefined : undefined,
+        suggestedCalibrationNotes: result.calibration.suggested_notes,
+        suggestedReferenceKind: result.calibration.reference_kind,
+        calibrationNotes: result.calibration.suggested_notes,
+        analysisMode: allowed && geometry ? 'MEASURE_JOINT' : 'EVIDENCE_ONLY',
         suggestedInspectionContext: allowed ? result.suggested_inspection_context ?? undefined : undefined,
         possibleGapVisible: allowed ? result.possible_gap_visible : null,
-        jointType: allowed ? result.suggested_joint_type ?? undefined : undefined,
+        jointType: allowed ? geometry ?? undefined : undefined,
         operatorContext: allowed ? result.suggested_inspection_context ?? undefined : undefined,
       }, 'ai')
     } catch (err) {
@@ -274,11 +285,10 @@ export const PhotoUploadPage = ({
     try {
       const selected = Array.from(files)
       const added = await onAddFiles(selected)
-      if (online && !unifiedPreview) {
+      if (online) {
         // Two image-only requests at a time, to limit network and Vertex usage.
         void (async () => {
           for (let i = 0; i < added.length; i += 2) {
-            if (previewModeRef.current) return
             await Promise.all(added.slice(i, i + 2).map((image, offset) =>
               analyzeForSuggestions(image, selected[i + offset])))
           }
@@ -336,7 +346,7 @@ export const PhotoUploadPage = ({
 
   return (
     <div className="page-grid upload-page">
-      {previewAvailable && <section className="card"><label><input type="checkbox" checked={unifiedPreview} onChange={e => {setUnifiedPreview(e.target.checked);previewModeRef.current=e.target.checked;if(e.target.checked){for(const controller of suggestionControllers.current.values())controller.abort();suggestionControllers.current.clear()}}} disabled={busy} /> Unified AI engineering preview</label><p>Select before uploading to avoid separate scene-preflight calls. No user sign-in is required. Preview use is subject to daily quotas and the remaining research allowance. Results remain preliminary; no physical millimetres without verified calibration. Images up to 3 MiB. Requests are bounded and are not retried automatically.</p></section>}
+      {previewAvailable && <section className="card"><strong>Unified AI engineering preview</strong><p>Gemini automatically suggests editable photo context and reference guidance. No daily inspection or Gemini-analysis quotas. The cumulative research spending allowance remains in force. Results stay preliminary; mm require valid scale and reliable boundaries.</p></section>}
       <section className="page-breadcrumbs">
         <button className="page-back-link" type="button" onClick={onBack}>
           Projects
@@ -704,6 +714,18 @@ export const PhotoUploadPage = ({
                           Apply this photo's suggestions
                         </button>
                       )}
+                      <div className="photo-calibration-advice">
+                        <label htmlFor={`calibration-advice-${image.id}`}>Gemini reference suggestion (editable)</label>
+                        <textarea id={`calibration-advice-${image.id}`} maxLength={1000} value={referenceDrafts[image.id] ?? image.calibrationNotes ?? ''}
+                          placeholder={image.contextSuggestionStatus === 'pending' ? 'Gemini is examining reference and perspective evidence…' : 'Reference guidance appears after image analysis; you can edit it.'}
+                          disabled={image.queueStatus === 'processing' || image.queueStatus === 'completed'}
+                          onChange={e=>{
+                            const text=e.target.value
+                            setReferenceDrafts(old=>({...old,[image.id]:text}))
+                            void persistPhotoContext(image.id,{calibrationNotes:text},'inspector')
+                          }} />
+                        <p>{image.suggestedReferenceKind === 'NONE' ? 'No visible physical reference identified. Suggestions do not establish mm scale.' : 'A suggested reference is provisional until its physical dimensions and image geometry are verified.'}</p>
+                      </div>
                       {unifiedPreview && <div className="photo-frame-context">
                         <label htmlFor={`sequence-${image.id}`}>Known source video / sequence ID (optional)</label>
                         <input id={`sequence-${image.id}`} maxLength={128} defaultValue={image.sequenceId ?? ''} disabled={busy}

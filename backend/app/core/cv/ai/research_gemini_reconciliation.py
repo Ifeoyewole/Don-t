@@ -99,13 +99,13 @@ def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()
 
 
-def vertex_response_schema():
+def vertex_response_schema(model=Interpretation):
     """Vertex's supported Schema subset; enforce full constraints locally.
 
     Resolve Pydantic $defs and omit unsupported/expensive string/array bounds.
     Do not forward an arbitrary Python-library JSON schema to the provider.
     """
-    root = Interpretation.model_json_schema()
+    root = model.model_json_schema()
 
     def convert(node):
         if '$ref' in node:
@@ -178,6 +178,15 @@ class VertexEvidenceReconciler:
         self.gate, self.store, self.scope, self.secret = gate, store, scope, secret
         self.transport = transport or self._request
         self.token_counter = token_counter or self._count_tokens
+
+    def generate_authorized_json(self, request_body):
+        """Existing Vertex transport, after the caller reserves spending once."""
+        from scripts.cloud.preview_spending import persistent, MAX_INPUT_TOKENS
+        if persistent(self.scope):
+            count = self.token_counter(request_body)
+            if type(count) is not int or not 0 < count <= MAX_INPUT_TOKENS:
+                raise ValueError('Input exceeds the financially authorized token envelope')
+        return self.transport(request_body)
 
     def _count_tokens(self, body):
         # Count the exact multimodal input before generation. One attempt only;
@@ -285,7 +294,7 @@ class VertexEvidenceReconciler:
                 raise ValueError('Research authorization must bind this exact reconciliation contract')
             claim = {'image_sha256': image_sha, 'bundle_sha256': bundle_sha,
                      'spending_approval_id': self.scope['spending_approval_id'], 'status': 'NO_AUTOMATIC_RETRY'}
-            from scripts.cloud.persistent_preview_quota import persistent, reserve, MAX_INPUT_TOKENS
+            from scripts.cloud.preview_spending import persistent, reserve, MAX_INPUT_TOKENS
             is_persistent = persistent(self.scope)
             if is_persistent:
                 reserve(self.scope, self.store, 'gemini', key)
@@ -308,11 +317,7 @@ class VertexEvidenceReconciler:
                 'generationConfig': {'responseMimeType': 'application/json',
                     'responseSchema': vertex_response_schema(),
                     'temperature': .1, 'maxOutputTokens': 8192}}
-            if is_persistent:
-                count = self.token_counter(request_body)
-                if type(count) is not int or not 0 <= count <= MAX_INPUT_TOKENS:
-                    raise ValueError('Input exceeds the financially authorized token envelope')
-            raw, usage = self.transport(request_body)
+            raw, usage = self.generate_authorized_json(request_body)
             analysis = safe_analysis(raw, width=width, height=height, region_ids=region_ids, pass_index=pass_index)
             cached = dict(issuer=ISSUER, contract=contract_sha(), model=MODEL, location=LOCATION,
                           image_sha256=image_sha, bundle_sha256=bundle_sha, pass_index=pass_index,

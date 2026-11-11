@@ -15,6 +15,9 @@ export interface InspectionContextSuggestion {
     calibration_reference_id: null
     verified: false
     authority: 'UNVERIFIED_METADATA'
+    suggested_notes?: string
+    reference_kind?: string
+    reference_bbox?: number[]
   }
   review_required: true
   reason: string
@@ -46,7 +49,7 @@ export function validateInspectionContextSuggestion(
     (result.suggested_inspection_context != null &&
       (typeof result.suggested_inspection_context !== 'string' || result.suggested_inspection_context.length > 1000)) ||
     (result.possible_gap_visible != null && typeof result.possible_gap_visible !== 'boolean') ||
-    !cal || cal.verified !== false || cal.calibration_reference_id != null ||
+    !cal || (cal.suggested_notes != null && (typeof cal.suggested_notes !== 'string' || cal.suggested_notes.length>1000)) || cal.verified !== false || cal.calibration_reference_id != null ||
     cal.authority !== 'UNVERIFIED_METADATA' ||
     (cal.pipe_diameter_mm != null &&
       (typeof cal.pipe_diameter_mm !== 'number' || !Number.isFinite(cal.pipe_diameter_mm) ||
@@ -71,6 +74,7 @@ export async function requestInspectionContextSuggestions(
   photo: File,
   signal: AbortSignal,
   manholeDiameterMm?: number,
+  unifiedPreview = false,
 ): Promise<InspectionContextSuggestion> {
   const formData = new FormData()
   formData.append('file', photo, photo.name)
@@ -78,7 +82,7 @@ export async function requestInspectionContextSuggestions(
     formData.append('metadata_pipe_diameter_mm', String(manholeDiameterMm))
     formData.append('metadata_source', 'MANHOLE_METADATA')
   }
-  const response = await fetch('/api/v1/cv/context-suggestions', {
+  const response = await fetch(unifiedPreview ? '/api/unified?action=suggestions' : '/api/v1/cv/context-suggestions', {
     method: 'POST',
     body: formData,
     signal,
