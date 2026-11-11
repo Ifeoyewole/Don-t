@@ -215,5 +215,34 @@ model.
 
 ## Delivery update
 
-Pending final no-sign-in PR, deployment and first permitted live website result.
-This section must be updated with actual evidence rather than a completion claim.
+PR42 merged as `0535c898693fab5c776c394740309be4a246a33f` and deployment
+`dpl_6enucjaPAk1tzq41qHvnPszxmsWV` is READY. The live browser reached the
+inspection upload and submitted frame10 without an operator cookie or password.
+The user-facing sign-in form is removed, and the session endpoint is retired.
+
+The first new request exposed a real timeout defect: the gateway stopped waiting
+after110.601 seconds (HTTP502), while Cloud Run completed at116.005 seconds with
+HTTP200 and saved the complete result. Therefore that initial website attempt
+was **not** a successful end-to-end display.
+
+The saved real result has all three models available, two real SAM masks,
+authenticated Gemini advisory interpretation, and `functional_path_complete=true`.
+Inference/fusion took78.55 seconds; the116.005-second request also included
+initialization/transport overhead. There were two bounded analysis passes.
+Millimetres remain null, with `joint_geometry_not_reliable` and unverified
+calibration. No physical measurement or accuracy improvement is claimed.
+
+Saved result:
+`gs://joint-inspection-510310-data/models/inspect-view/research-results/engineering-preview/20261111T083135Z/responses/ac2dac58544b431fb9874b44690b9634ab998c47afaed943ed2694fdc227e539.json`.
+One inspection slot and two Gemini slots were consumed; two inspections/four
+Gemini attempts remain at this observation. No inference was automatically retried.
+
+The website-only recovery increases its network wait from110 to240 seconds,
+client wait from115 to245 seconds, and Vercel function ceiling to300 seconds.
+**Cloud Run's120-second request bound, CPU, instance limit, immutable scope,
+expiry and spending allowance remain unchanged.** The change accommodates the
+observed116-second successful cloud response; it does not extend cloud execution.
+
+Fresh website readback and final delivery verification are recorded after the
+recovery deployment. A saved, hash-matched response can be read back without
+repeating model work.

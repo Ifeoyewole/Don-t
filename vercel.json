@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "api/unified.ts": {
-      "maxDuration": 120
+      "maxDuration": 300
     },
     "api/v1/cv/[...route].js": {
       "maxDuration": 120
