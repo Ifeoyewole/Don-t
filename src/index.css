@@ -2212,6 +2212,40 @@ img {
   padding: 16px;
 }
 
+/* Detailed per-photo evidence needs a readable form, not a thumbnail column. */
+.upload-assets-card .upload-assets-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.upload-assets-card .asset-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.upload-assets-card .asset-image-wrap {
+  aspect-ratio: auto;
+  height: 240px;
+}
+
+.upload-assets-card .asset-image-wrap img {
+  object-fit: contain;
+}
+
+.photo-context-editor input,
+.photo-context-editor select,
+.photo-context-editor textarea {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.photo-context-editor textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
 .upload-title-row,
 .asset-meta-row,
 .inspection-meta-row,
