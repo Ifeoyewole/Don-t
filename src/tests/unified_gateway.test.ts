@@ -31,12 +31,14 @@ it('rejects cross-origin and malformed-origin posts before requesting a cloud id
     expect((await invoke('POST',{cookie:session(),host:'jointinspect.test',origin})).status).toBe(403)
   }
 })
-it('recognizes HTTP/2 authority without weakening same-origin enforcement',async()=>{
+it('recognizes HTTP/2 authority and waits beyond the observed cloud cold-start latency',async()=>{
+  const timeout=vi.spyOn(AbortSignal,'timeout')
   const fetch=vi.fn().mockResolvedValue({ok:true,json:async()=>({research_only:true})});vi.stubGlobal('fetch',fetch)
   const result=await invoke('POST',{cookie:session(),':authority':'jointinspect.test',origin:'https://jointinspect.test','content-type':'multipart/form-data; boundary=test'})
   expect(result.status).toBe(200)
   expect(fetch).toHaveBeenCalledTimes(1)
   expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer synthetic-id-token')
+  expect(timeout).toHaveBeenCalledWith(240_000)
 })
 it('does not leak internal provider errors or retry failed requests',async()=>{
   const fetch=vi.fn().mockRejectedValue(new Error('private provider detail'));vi.stubGlobal('fetch',fetch)

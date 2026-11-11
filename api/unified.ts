@@ -39,7 +39,7 @@ export default async function unified(req: IncomingMessage, res: ServerResponse)
     if (!token) return send(503, { detail: 'Private worker identity unavailable' })
     const response = await fetch(url+'/api/v1/cv/sewer-research/unified', {
       method: 'POST', headers: { Authorization: 'Bearer '+token, 'Content-Type': contentType },
-      body: new Uint8Array(bytes), signal: AbortSignal.timeout(110_000), redirect: 'error',
+      body: new Uint8Array(bytes), signal: AbortSignal.timeout(240_000), redirect: 'error',
     })
     if (!response.ok) return send(response.status, { detail: 'Unified preview unavailable or research allowance exhausted. No automatic retry.' })
     const data = await response.json()
