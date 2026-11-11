@@ -4,7 +4,6 @@
 import { createServer } from 'vite'
 import { chromium } from 'playwright'
 import { spawn, execFileSync } from 'node:child_process'
-import { createHmac } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
@@ -14,7 +13,7 @@ const output = process.env.JOINTINSPECT_VERIFY_OUTPUT || '/tmp/jointinspect-web-
 await fs.mkdir(output, { recursive: true })
 execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', path.join(output,'test-key.pem'), '-out', path.join(output,'test-cert.pem'), '-subj', '/CN=localhost', '-days', '1'], {stdio:'ignore'})
 Object.assign(process.env, { UNIFIED_ENGINEERING_PREVIEW_ENABLED: 'true', UNIFIED_PREVIEW_URL: 'https://unified-preview-fixture.a.run.app',
-  CODE_SESSION_SECRET: 'synthetic-browser-test-session-secret-only', DEV_CLOUD_RUN_ID_TOKEN: 'synthetic-local-replay-token' })
+  CODE_SESSION_SECRET: 'synthetic-browser-test-session-secret-only', CODE_ACCESS_PASSWORD: 'synthetic-browser-password-only', DEV_CLOUD_RUN_ID_TOKEN: 'synthetic-local-replay-token' })
 const python = process.env.JOINTINSPECT_TEST_PYTHON || 'python'
 const child = spawn(python, ['-m', 'uvicorn', 'tools.replay_unified_api:app', '--host', '127.0.0.1', '--port', '8000'], {
   env: { ...process.env, JOINTINSPECT_SEWER_FUSION_ENABLED: 'true', JOINTINSPECT_PHASE1_VERTEX_ENABLED: 'true',
@@ -32,18 +31,20 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100))
   }
   vite = await createServer({ server: { host: '127.0.0.1', port: 5173, strictPort: true, https: {key: await fs.readFile(path.join(output,'test-key.pem')), cert: await fs.readFile(path.join(output,'test-cert.pem'))} }, plugins: [{ name: 'real-unified-gateway',
-    configureServer(server) { server.middlewares.use('/api/unified', async (req, res, next) => {
-      try { console.log('preview origin/host', req.headers.origin, req.headers.host); const module = await server.ssrLoadModule('/api/unified.ts'); await module.default(req, res) } catch (e) { next(e) }
-    }) } }] })
+    configureServer(server) {
+      for (const [route, modulePath] of [['/api/unified', '/api/unified.ts'], ['/api/engineering-session', '/api/engineering-session.ts'], ['/api/code', '/api/code.ts']]) {
+        server.middlewares.use(route, async (req, res, next) => {
+          try { const module = await server.ssrLoadModule(modulePath); await module.default(req, res) } catch (e) { next(e) }
+        })
+      }
+    } }] })
   await vite.listen()
   browser = await chromium.launch({ executablePath: '/usr/bin/chromium', headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] })
   const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 1000 } })
   const anonymous = await context.request.get('https://localhost:5173/api/unified')
   const anonymousStatus = anonymous.status()
   if (anonymousStatus !== 401) throw Error('Anonymous preview was not rejected')
-  const value = `${Math.floor(Date.now()/1000)+3600}.synthetic-session`
-  const signature = createHmac('sha256', process.env.CODE_SESSION_SECRET).update(value).digest('base64url')
-  await context.addCookies([{ name: '__Host-jointinspect-code', value: value+'.'+signature, url: 'https://localhost:5173', secure: true, httpOnly: true, sameSite: 'Strict' }])
+  if ((await context.request.post('https://localhost:5173/api/code?action=run')).status() !== 410) throw Error('Retired operations endpoint still active')
   page = await context.newPage();const errors = []
   page.on('pageerror', error => errors.push(String(error)))
   page.on('response', async response => {if(response.url().includes('/api/unified'))console.log('gateway response', response.status(), response.status()>=400?await response.text().catch(()=> 'closed'):'ok')})
@@ -57,6 +58,9 @@ try {
       meterRun: 1, unitLengthM: 2.6, estimatedPipeCount: 1, estimatedJointCount: 1, createdAt: now, updatedAt: now })
   })
   await page.goto('https://localhost:5173/projects/e2e-project/manholes/e2e-manhole/upload')
+  await page.getByText('Engineering preview sign-in', {exact:true}).click()
+  await page.getByLabel('Operator password').fill('synthetic-browser-password-only')
+  await page.getByRole('button', {name:'Sign in to engineering preview',exact:true}).click()
   await page.locator('label').filter({hasText: 'Unified AI engineering preview'}).locator('input').check()
   await page.locator('#upload-input').setInputFiles({ name: 'real-frame-10.jpg', mimeType: 'image/jpeg', buffer: await fs.readFile(path.join(root, 'original.jpg')) })
   await page.waitForFunction(async () => { const {db} = await import('/src/db/database.ts');return (await db.inspectionImages.count()) > 0 })
@@ -70,7 +74,12 @@ try {
     return {json:JSON.parse(json), pdfBytes:pdf.size, zipBytes:zip.size} })
   if (!exports.json.results[0].unifiedEvidence || exports.pdfBytes < 1000 || exports.zipBytes < 1000) throw Error('Unified exports lost evidence')
   for (const width of [1440, 390]) {await page.setViewportSize({width, height:1000});await page.screenshot({path:path.join(output, `site-${width}.png`),fullPage:true})}
-  await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({mode:'RECORDED_REAL_ARTIFACT_HTTP_REPLAY_NOT_LIVE_INFERENCE', anonymousStatus,
+  await page.goto('https://localhost:5173/projects/e2e-project/manholes/e2e-manhole/upload')
+  await page.getByRole('button', {name:'Sign out of engineering preview',exact:true}).click()
+  await page.getByText('Engineering preview sign-in', {exact:true}).waitFor()
+  const signedOutStatus = (await context.request.get('https://localhost:5173/api/unified')).status()
+  if (signedOutStatus !== 401) throw Error('Sign-out did not revoke browser access')
+  await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({mode:'RECORDED_REAL_ARTIFACT_HTTP_REPLAY_NOT_LIVE_INFERENCE', anonymousStatus, inlineSignIn:true, signedOutStatus, retiredOperationsStatus:410,
     persistedResults:results.length, unifiedImageSha:results[0].unifiedEvidence.image_sha256, pdfBytes:exports.pdfBytes, zipBytes:exports.zipBytes, browserErrors:errors}, null, 2))
   if (errors.length) throw Error('Browser errors: '+errors.join(';'))
   console.log('Existing website upload → protected gateway → FastAPI replay → IndexedDB result → JSON/PDF/evidence ZIP verified.')
