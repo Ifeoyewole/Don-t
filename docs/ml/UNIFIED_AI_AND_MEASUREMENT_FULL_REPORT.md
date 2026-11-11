@@ -243,6 +243,33 @@ client wait from115 to245 seconds, and Vercel function ceiling to300 seconds.
 expiry and spending allowance remain unchanged.** The change accommodates the
 observed116-second successful cloud response; it does not extend cloud execution.
 
-Fresh website readback and final delivery verification are recorded after the
-recovery deployment. A saved, hash-matched response can be read back without
-repeating model work.
+### Verified no-sign-in website display
+
+The real saved result was read back through the **live existing website** with
+no session cookie, password, mocked response or additional model execution.
+Before forwarding the request, the test required its computed cache key to
+match the exact already-existing response object; a mismatch would be blocked.
+
+- HTTP200; response/readback duration1.341 seconds (cache latency, not inference).
+- Two actual SAM masks, authenticated Gemini and complete five-component evidence.
+- One persisted inspection record, source `CLOUD_RESEARCH_UNVERIFIED`.
+- Primary measurement unit `mm`; physical gap remains null.
+- Zero browser cookies and zero browser errors.
+- The unified report and overlay displayed in the existing results interface.
+
+This proves fresh cloud execution followed by successful website readback of its
+saved result. It does **not** erase the first request's timeout or represent a
+second fresh inference. The website-only wait correction still requires its
+final CI/deployment checks; an uninterrupted post-correction cold-start request
+has not been benchmarked. The cached readback was already fast enough to succeed
+under the earlier wait limit.
+
+Local evidence:
+`/workspace/scratch/no-signin-live/cache-readback/verification.json`,
+`after-inspection.png`, `overlay.png`, `unified-report.json`.
+The initial timeout evidence is separately preserved in
+`/workspace/scratch/no-signin-live/verification.json`.
+
+No additional image was processed and no Gemini request was repeated for this
+readback. The remaining allowance is unchanged at two inspections/four Gemini
+attempts at the time of verification.
