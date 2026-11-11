@@ -236,3 +236,6 @@
     border-right-color: var(--border);
   }
 }
+.unified-inspection-evidence { min-width: 0; overflow-wrap: anywhere; }
+.unified-evidence-overlay { display: block; width: 100%; height: auto; object-fit: contain; border-radius: 8px; }
+.unified-evidence-mask { display: block; width: min(100%, 320px); height: auto; }

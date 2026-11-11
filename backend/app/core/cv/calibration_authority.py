@@ -29,6 +29,13 @@ class VerifiedCalibration:
     image_sha256: Optional[str] = None
     image_width: Optional[int] = None
     image_height: Optional[int] = None
+    joint_plane_verified: bool = False
+    measurement_direction: Optional[str] = None
+    image_is_rectified: bool = False
+    camera_matrix: Optional[list] = None
+    distortion_coefficients: Optional[list] = None
+    plane_homography: Optional[list] = None
+    scale_uncertainty_fraction: Optional[float] = None
 
     def scale_for_image(self, sha256: str, width: int, height: int) -> Optional[float]:
         """Measured span is in rectified image pixels, at the joint plane.
@@ -77,6 +84,13 @@ def _records() -> tuple[VerifiedCalibration, ...]:
                     image_sha256=str(item['image_sha256']) if item.get('image_sha256') else None,
                     image_width=int(item['image_width']) if item.get('image_width') is not None else None,
                     image_height=int(item['image_height']) if item.get('image_height') is not None else None,
+                    joint_plane_verified=item.get('joint_plane_verified') is True,
+                    measurement_direction=item.get('measurement_direction'),
+                    image_is_rectified=item.get('image_is_rectified') is True,
+                    camera_matrix=item.get('camera_matrix'),
+                    distortion_coefficients=item.get('distortion_coefficients'),
+                    plane_homography=item.get('plane_homography'),
+                    scale_uncertainty_fraction=item.get('scale_uncertainty_fraction'),
                     validated_joint_types=tuple(
                         x for x in item.get("validated_joint_types", ["CIRCULAR_OPENING"])
                         if x in {"CIRCULAR_OPENING", "HORIZONTAL_SEAM", "VERTICAL_SEAM"}

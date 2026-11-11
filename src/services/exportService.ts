@@ -26,6 +26,7 @@ interface ExportProjectData {
 }
 
 interface ExportResultRecord {
+  unifiedEvidence?: InspectionResult['unifiedEvidence']
   projectName: string
   manholeId: string
   dateTime: string
@@ -74,6 +75,7 @@ function buildExportResultRecords(data: ExportProjectData): ExportResultRecord[]
     const capturedCount = data.inspectionResults.filter((item) => item.manholeId === result.manholeId).length
 
     return {
+      unifiedEvidence: result.unifiedEvidence,
       projectName: data.project.name,
       manholeId: manhole?.manholeId ?? 'N/A',
       dateTime: result.processedAt,
@@ -177,6 +179,34 @@ async function createPdfBlob(data: ExportProjectData): Promise<Blob> {
     }
   }
 
+  for (const result of data.inspectionResults) {
+    const evidence = result.unifiedEvidence
+    if (!evidence) continue
+    page = pdf.addPage([595, 842]); y = 800
+    const plain = (value: string) => value.replace(/[^\x20-\x7e]/g, '?')
+    const paragraphs = [`Unified engineering preview - ${result.jointLabel}`, evidence.summary,
+      `Geometry: ${evidence.joint_measurement.status}. Physical gap: unavailable.`,
+      `Gemini: ${evidence.gemini.model ?? 'unreported'} - ${evidence.gemini.status}`,
+      ...evidence.preliminary_findings.map(f => `${f.label}: ${f.explanation ?? f.status}`),
+      ...evidence.disagreements_and_limits]
+    for (const paragraph of paragraphs) {
+      const words = plain(paragraph).split(/\s+/); let line = ''
+      for (const word of [...words, '\n']) {
+        if (word === '\n' || font.widthOfTextAtSize(`${line} ${word}`, 10) > 485) {
+          if (y < 60) { page = pdf.addPage([595, 842]); y = 800 }
+          page.drawText(line, { x: left, y, size: 10, font }); y -= 15; line = ''
+        }
+        if (word !== '\n') line += (line ? ' ' : '')+word
+      }
+      y -= 8
+    }
+    if (evidence.overlay_png_base64) {
+      const image = await pdf.embedPng(Uint8Array.from(atob(evidence.overlay_png_base64), c => c.charCodeAt(0)))
+      const size = image.scaleToFit(480, 340)
+      if (y-size.height < 60) { page = pdf.addPage([595, 842]); y = 800 }
+      page.drawImage(image, { x: left, y: y-size.height, width: size.width, height: size.height })
+    }
+  }
   page.drawText(DISCLAIMER, {
     x: left,
     y: 40,
@@ -223,6 +253,16 @@ export const exportService = {
     zip.file(createExportFileName(baseName, 'pdf'), pdfBlob)
 
     const imagesFolder = zip.folder('images')
+    for (const result of data.inspectionResults) {
+      const evidence = result.unifiedEvidence
+      if (!evidence) continue
+      const folder = zip.folder(`unified/${result.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`)
+      folder?.file('report.json', JSON.stringify(evidence, null, 2))
+      if (evidence.overlay_png_base64) folder?.file('overlay.png', evidence.overlay_png_base64, { base64: true })
+      for (const region of evidence.regions) {
+        if (region.mask_png_base64) folder?.file(`mask-${region.region_id}.png`, region.mask_png_base64, { base64: true })
+      }
+    }
     for (const blobRecord of data.inspectionBlobs) {
       imagesFolder?.file(blobRecord.fileName, blobRecord.blob)
     }

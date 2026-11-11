@@ -16,7 +16,9 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from backend.app.core.cv.ai.research_joint_boundaries import boundary_evidence, draw_boundaries
+from backend.app.core.cv.ai.research_joint_boundaries import draw_boundaries
+from backend.app.core.cv.ai.joint_gap_recovery import recover_joint_gap
+from backend.app.core.cv.ai.unified_calibration import calibrated_gap, UNAVAILABLE
 from backend.app.core.cv.ai.research_sewer_fusion import decode, png
 from backend.app.core.cv.ai.research_sewer_detector import overlap
 from backend.app.core.cv.ai.signed_gemini_receipt import verify_signed_semantic_receipt
@@ -32,12 +34,14 @@ class Phase1Unified:
         self.history = OrderedDict()
         self.lock = threading.Lock()
 
-    def _geometry(self, image, result, geometry, task):
+    def _geometry(self, image, result, geometry, task, context=None):
         for region in result['regions']:
             if task != 'JOINT_GEOMETRY' or not geometry or 'mask_png_base64' not in region:
                 continue
             mask = cv2.imdecode(np.frombuffer(base64.b64decode(region['mask_png_base64']), np.uint8), cv2.IMREAD_GRAYSCALE)
-            region['boundary_evidence'] = boundary_evidence(image, mask, region['bbox'], geometry)
+            region['boundary_evidence'] = recover_joint_gap(image, mask, region['bbox'], geometry)
+            region['boundary_evidence']['server_calibration'] = calibrated_gap(region['boundary_evidence'],
+                image_sha256=result['image_sha256'], dimensions=result['dimensions'], context=context or {}, geometry=geometry)
 
     def _context(self, payload, result, metadata, previous):
         with Image.open(io.BytesIO(payload)) as image:
@@ -58,7 +62,7 @@ class Phase1Unified:
             regions.append(row)
         return {'image_sha256': result['image_sha256'], 'dimensions': result['dimensions'],
                 'mime_type': mime, 'task': result['task'], 'components': result['components'],
-                'regions': regions, 'declared_context_unverified': metadata,
+                'regions': regions, 'declared_context_unverified': {k:v for k,v in metadata.items() if k != 'image_id'},
                 'provided_mask_region_ids': [r['region_id'] for r in result['regions']
                                              if 'mask_png_base64' in r][:4],
                 'previous_frame_advisory': previous, 'calibration_authority': 'UNVERIFIED',
@@ -76,7 +80,7 @@ class Phase1Unified:
         result = self.fusion.infer(payload, rois=rois, task=task, geometry=geometry,
                                    receipt=receipt, sequence_id=sequence_id, frame_index=frame_index)
         first_elapsed = perf_counter()-started
-        self._geometry(image, result, geometry, task)
+        self._geometry(image, result, geometry, task, context)
         overlay = cv2.imdecode(np.frombuffer(base64.b64decode(result['overlay_png_base64']), np.uint8), cv2.IMREAD_COLOR)
         for region in result['regions']:
             draw_boundaries(overlay, region.get('boundary_evidence', {}))
@@ -84,7 +88,7 @@ class Phase1Unified:
         if sequence_id is not None:
             with self.lock:
                 prior = self.history.get(sequence_id)
-                if (prior and 0 < frame_index-prior['frame_index'] <= 5
+                if (prior and prior.get('dimensions') == result['dimensions'] and 0 < frame_index-prior['frame_index'] <= 5
                         and prior['image_sha256'] != result['image_sha256']):
                     previous = dict(prior)
         analyses = []
@@ -113,7 +117,9 @@ class Phase1Unified:
                 proposal = proposals[0]
                 # An AI proposal is explicitly unverified. It is neither human
                 # review nor a calibration/defect annotation approval.
-                extra = self.fusion.infer(payload, rois=[proposal['bbox']], task='OBJECT_SEGMENTATION')
+                extra_geometry = proposal['geometry'] if task == 'JOINT_GEOMETRY' and proposal['geometry'] != 'NONE' else None
+                extra = self.fusion.infer(payload, rois=[proposal['bbox']],
+                    task='JOINT_GEOMETRY' if extra_geometry else 'OBJECT_SEGMENTATION', geometry=extra_geometry, proposal_only=True)
                 candidates = [r for r in extra['regions'] if r['source'] == 'EXPLICIT_RESEARCH_ROI']
                 for region in candidates[:1]:
                     region['region_id'] = len(result['regions'])
@@ -125,7 +131,7 @@ class Phase1Unified:
                         tint = overlay.copy(); tint[mask > 0] = (220, 120, 20)
                         overlay = cv2.addWeighted(overlay, .65, tint, .35, 0)
                         if task == 'JOINT_GEOMETRY' and proposal['geometry'] != 'NONE':
-                            region['boundary_evidence'] = boundary_evidence(image, mask, region['bbox'], proposal['geometry'])
+                            region['boundary_evidence'] = recover_joint_gap(image, mask, region['bbox'], proposal['geometry'])
                             draw_boundaries(overlay, region['boundary_evidence'])
                 passes = 2
             except Exception as exc:
@@ -139,25 +145,52 @@ class Phase1Unified:
                                     'provider_reason': getattr(exc, 'provider_reason', None),
                                     'previous_analysis_count': len(analyses)}
                 break
-        candidates = []
+        candidates = []; physical_candidates = []
         assessments = {a['region_id']: a for a in result['gemini'].get('analysis', {}).get('region_assessments', [])}
         for region in result['regions']:
             evidence = region.get('boundary_evidence', {})
-            value = evidence.get('candidate_separation_px')
+            value = evidence.get('gap_estimate_px')
             target = assessments.get(region['region_id'], {})
             suitable = (semantic_allowed and target.get('mask_target') == 'JOINT_BOUNDARY_BAND'
                         and target.get('suitable_for_joint_boundary_analysis') is True)
+            hypotheses = result['gemini'].get('analysis', {}).get('hypotheses', [])
+            open_scene = any(h['label'] == 'OPEN_JOINT' and h['status'] == 'POSSIBLE'
+                             and region['region_id'] in h['region_ids'] for h in hypotheses)
+            conflicting_structure = any(h['label'] in ('JOINT_DISPLACEMENT', 'PROTRUDING_LATERAL')
+                and h['status'] == 'POSSIBLE' and region['region_id'] in h['region_ids'] for h in hypotheses)
+            suitable = suitable and open_scene and not conflicting_structure
             if suitable and value is not None:
                 candidates.append({'region_id': region['region_id'], 'value': value, 'units': 'px',
-                    'bbox': region['bbox'], 'geometry': geometry,
-                    'meaning': 'PRELIMINARY_BOUNDARY_SEPARATION_NOT_VERIFIED_AXIAL_GAP'})
+                    'bbox': region['bbox'], 'geometry': evidence.get('geometry', geometry),
+                    'meaning': 'VISIBLE_IMAGE_EDGE_OPENING_CANDIDATE_NOT_PHYSICAL_AXIAL_GAP'})
             region['geometry'] = {'status': 'PRELIMINARY_PIXEL_EVIDENCE' if suitable and value is not None
                                   else 'joint_geometry_not_reliable',
                                   'pixel_candidate': value if suitable else None,
                                   'physical_gap_mm': None, 'calibration_verified': False}
+            region['geometry']['interpretation'] = ('OPENING_CANDIDATE' if suitable else
+                'OPEN_JOINT_NOT_ESTABLISHED_DISPLACEMENT_OR_SOCKET_POSSIBLE')
+            calibration = calibrated_gap(evidence if suitable else {}, image_sha256=result['image_sha256'],
+                dimensions=result['dimensions'], context=context, geometry=evidence.get('geometry', geometry))
+            region['geometry'].update(calibration)
+            region['geometry']['calibration_verified'] = calibration['calibration_authority_verified']
+            if calibration['physical_gap_mm'] is not None:
+                physical_candidates.append(dict(calibration, bbox=region['bbox'], region_id=region['region_id']))
         result['joint_measurement'] = {'status': 'PRELIMINARY_PIXEL_EVIDENCE' if candidates else 'joint_geometry_not_reliable',
                                        'candidates': candidates, 'physical_gap_mm': None,
                                        'calibration_status': 'UNVERIFIED', 'engineering_acceptance': False}
+        result['primary_measurement_unit'] = 'mm'
+        result['joint_measurement']['unit'] = 'mm'
+        result['joint_measurement']['measurement_message'] = UNAVAILABLE
+        result['joint_measurement']['calibration_authority_verified'] = False
+        if physical_candidates:
+            chosen = min(physical_candidates, key=lambda p: p['repeatability_mad_mm'])
+            if all(overlap(p['bbox'], chosen['bbox']) >= .5 and
+                   abs(p['physical_gap_mm']-chosen['physical_gap_mm']) <= .1*chosen['physical_gap_mm']
+                   for p in physical_candidates):
+                result['joint_measurement'].update(chosen, status='CALIBRATED_RESEARCH_GAP_ESTIMATE')
+                result['physical_gap_mm'] = chosen['physical_gap_mm']
+            else:
+                result['joint_measurement']['status'] = 'CONFLICTING_CALIBRATED_REGIONS'
         analysis = result['gemini'].get('analysis', {})
         advisory = [{'label': h['label'], 'status': 'GEMINI_VISUAL_HYPOTHESIS_NOT_CONFIRMED',
                      'explanation': h['explanation'], 'region_ids': h['region_ids'],
@@ -165,7 +198,7 @@ class Phase1Unified:
                     for h in analysis.get('hypotheses', []) if h['status'] == 'POSSIBLE']
         result['preliminary_findings'].extend(advisory)
         result['disagreements_and_limits'] = sorted(set(result['disagreements_and_limits']+
-            analysis.get('contradictions', [])+['NO_VERIFIED_PHYSICAL_CALIBRATION',
+            analysis.get('contradictions', [])+([] if result['physical_gap_mm'] is not None else ['NO_VERIFIED_PHYSICAL_MEASUREMENT'])+[
                 'SPECIALIST_CLASS_IDS_UNMAPPED_WHERE_UNAVAILABLE', 'NO_TARGET_CLASS_ACCURACY_ESTABLISHED']))
         result['gemini_analyses'] = analyses
         result['phase1'] = {'model_passes': passes, 'gemini_required': True,
@@ -181,6 +214,9 @@ class Phase1Unified:
         result['engine'] = 'jointinspect-phase1-unified-v1'
         result['source_context'] = context
         result['summary'] = analysis.get('summary', 'Partial evidence retained; Gemini interpretation unavailable.')
+        caption = (f"CALIBRATED RESEARCH GAP: {result['physical_gap_mm']:.2f} mm" if result['physical_gap_mm'] is not None
+                   else 'MEASUREMENT UNAVAILABLE - CALIBRATION / JOINT EDGES REQUIRED')
+        cv2.putText(overlay, caption, (5, overlay.shape[0]-8), cv2.FONT_HERSHEY_SIMPLEX, .32, (0, 0, 255), 1)
         result['overlay_png_base64'] = png(overlay)
         result['temporal_geometry'] = {'status': 'SINGLE_FRAME_OR_UNCORROBORATED', 'physical_gap_mm': None}
         if (previous and candidates and previous.get('pixel_candidates')
@@ -197,6 +233,7 @@ class Phase1Unified:
                 prior = self.history.get(sequence_id)
                 if prior is None or frame_index > prior['frame_index']:
                     self.history[sequence_id] = {'frame_index': frame_index, 'image_sha256': result['image_sha256'],
+                        'dimensions': result['dimensions'],
                         'summary': result['summary'][:1800], 'pixel_candidates': candidates,
                         'source_lineage': 'CALLER_DECLARED_NOT_VERIFIED'}
                     self.history.move_to_end(sequence_id)

@@ -1,6 +1,7 @@
 {
   "version": 2,
   "functions": {
+    "api/unified.ts": { "maxDuration": 120 },
     "api/v1/cv/[...route].js": { "maxDuration": 120 },
     "api/code.ts": { "maxDuration": 60 }
   },

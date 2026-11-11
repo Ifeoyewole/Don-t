@@ -129,6 +129,8 @@ def boundary_evidence(image, mask, bbox, geometry):
 
 
 def draw_boundaries(canvas, evidence):
+    for a, b, c, d in evidence.get('text_exclusion_boxes', []):
+        cv2.rectangle(canvas, (a, b), (c, d), (0, 0, 255), 1)
     for pair in evidence.get('edge_pairs', [])[::3]:
         if pair['sam_nearby_support']:
             cv2.line(canvas, tuple(pair['a']), tuple(pair['b']), (0, 255, 255), 1)

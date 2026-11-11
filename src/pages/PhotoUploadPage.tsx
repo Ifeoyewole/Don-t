@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
 import { requestInspectionContextSuggestions } from '../lib/contextSuggestions'
 import { checkCalibrationReference, type CalibrationReferenceStatus } from '../lib/calibrationReference'
+import { unifiedPreviewAvailable } from '../lib/unifiedClient'
 import type { CalibrationProfile, GeometrySelectionProvenance, InspectionImage, JointGeometryType, ProcessBatchResult } from '../types/domain'
 
 type Props = {
@@ -18,7 +19,7 @@ type Props = {
   onUpdateImageContext: (imageId: string, patch: Partial<InspectionImage>, origin: 'ai' | 'inspector' | 'system') => Promise<void>
   onRemoveFile: (imageId: string) => Promise<void>
   onClearQueue: () => Promise<void>
-  onStartInspection: (operatorContext?: string, calibration?: CalibrationProfile, jointType?: JointGeometryType, provenance?: GeometrySelectionProvenance) => Promise<ProcessBatchResult>
+  onStartInspection: (operatorContext?: string, calibration?: CalibrationProfile, jointType?: JointGeometryType, provenance?: GeometrySelectionProvenance, unifiedPreview?: boolean) => Promise<ProcessBatchResult>
 }
 
 const validationTone = (image: InspectionImage) =>
@@ -89,6 +90,14 @@ export const PhotoUploadPage = ({
   onStartInspection,
 }: Props) => {
   const [busy, setBusy] = useState(false)
+  const [previewAvailable, setPreviewAvailable] = useState(false)
+  const [unifiedPreview, setUnifiedPreview] = useState(false)
+  const previewModeRef = useRef(false)
+  useEffect(() => {
+    const controller = new AbortController()
+    void unifiedPreviewAvailable(controller.signal).then(setPreviewAvailable).catch(() => {})
+    return () => controller.abort()
+  }, [])
   const [error, setError] = useState('')
   const [notesDrafts, setNotesDrafts] = useState<Record<string, string>>({})
   const [cameraDrafts, setCameraDrafts] = useState<Record<string, string>>({})
@@ -265,10 +274,11 @@ export const PhotoUploadPage = ({
     try {
       const selected = Array.from(files)
       const added = await onAddFiles(selected)
-      if (online) {
+      if (online && !unifiedPreview) {
         // Two image-only requests at a time, to limit network and Vertex usage.
         void (async () => {
           for (let i = 0; i < added.length; i += 2) {
+            if (previewModeRef.current) return
             await Promise.all(added.slice(i, i + 2).map((image, offset) =>
               analyzeForSuggestions(image, selected[i + offset])))
           }
@@ -312,11 +322,11 @@ export const PhotoUploadPage = ({
       }
       await Promise.all([...pendingWrites.current])
       const readyToMeasure = queue.filter((image) => image.queueStatus === 'queued' || image.queueStatus === 'failed')
-      if (readyToMeasure.some((image) => image.analysisMode !== 'EVIDENCE_ONLY' && !image.jointType)) {
+      if (!unifiedPreview && readyToMeasure.some((image) => image.analysisMode !== 'EVIDENCE_ONLY' && !image.jointType)) {
         throw new Error('Choose a geometry or evidence-only review for every photo before processing.')
       }
       if (calDirty) throw new Error('Save or discard edited calibration fields before inspection; stale references are not used.')
-      await onStartInspection(undefined, savedProfile ?? undefined)
+      await onStartInspection(undefined, savedProfile ?? undefined, undefined, undefined, unifiedPreview)
     } catch (processingError) {
       setError(processingError instanceof Error ? processingError.message : 'Processing failed.')
     } finally {
@@ -326,6 +336,7 @@ export const PhotoUploadPage = ({
 
   return (
     <div className="page-grid upload-page">
+      {previewAvailable && <section className="card"><label><input type="checkbox" checked={unifiedPreview} onChange={e => {setUnifiedPreview(e.target.checked);previewModeRef.current=e.target.checked;if(e.target.checked){for(const controller of suggestionControllers.current.values())controller.abort();suggestionControllers.current.clear()}}} disabled={busy} /> Unified AI engineering preview</label><p>Select before uploading to avoid separate scene-preflight calls. Uses the existing protected operator session. Results remain preliminary; no physical millimetres without verified calibration. Images up to 3 MiB. Requests are bounded and are not retried automatically.</p></section>}
       <section className="page-breadcrumbs">
         <button className="page-back-link" type="button" onClick={onBack}>
           Projects
@@ -347,7 +358,7 @@ export const PhotoUploadPage = ({
           className="button button-primary dashboard-cta"
           type="button"
           onClick={() => void handleStart()}
-          disabled={!queue.length || busy || needsImageSelection}
+          disabled={!queue.length || busy || (!unifiedPreview && needsImageSelection)}
         >
           {busy ? 'Processing...' : 'Start Inspection'}
         </button>
@@ -581,7 +592,7 @@ export const PhotoUploadPage = ({
               <div className="progress-fill" style={{ width: `${Math.max(queueCompletion, online ? 12 : 4)}%` }} />
             </div>
             <p>
-              Project records persist in local storage. Inspection photos undergo ephemeral server-side computer vision &amp; Vertex AI domain gating; images are not retained on servers and training consent is disabled by default.
+              {unifiedPreview ? 'Engineering preview reports and overlays are retained in private research storage for reproducibility. No model training is performed.' : 'Project records persist in local storage. Inspection photos undergo ephemeral server-side computer vision and Vertex AI domain gating; images are not retained on servers and training consent is disabled by default.'}
             </p>
             <p>{aiReviewCount ? `${aiReviewCount} photo(s) will use enhanced CV and AI review before a retake decision.` : 'All queued photos are eligible for measurement.'}</p>
             <div className="action-row">
@@ -693,6 +704,15 @@ export const PhotoUploadPage = ({
                           Apply this photo's suggestions
                         </button>
                       )}
+                      {unifiedPreview && <div className="photo-frame-context">
+                        <label htmlFor={`sequence-${image.id}`}>Known source video / sequence ID (optional)</label>
+                        <input id={`sequence-${image.id}`} maxLength={128} defaultValue={image.sequenceId ?? ''} disabled={busy}
+                          onBlur={e => void persistPhotoContext(image.id, {sequenceId:e.target.value}, 'inspector')} />
+                        <label htmlFor={`frame-${image.id}`}>Original frame index (optional)</label>
+                        <input id={`frame-${image.id}`} type="number" min="0" step="1" defaultValue={image.frameIndex ?? ''} disabled={busy}
+                          onBlur={e => void persistPhotoContext(image.id, {frameIndex:e.target.value === '' ? undefined : Number(e.target.value)}, 'inspector')} />
+                        <p>Leave blank if unknown. Filenames and upload order do not verify video lineage.</p>
+                      </div>}
                       <label htmlFor={`camera-${image.id}`} style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginTop: '0.6rem' }}>
                         Capture camera / rig ID
                       </label>
@@ -783,7 +803,7 @@ export const PhotoUploadPage = ({
                 className="button button-primary"
                 type="button"
                 onClick={() => void handleStart()}
-                disabled={!queue.length || busy || needsImageSelection}
+                disabled={!queue.length || busy || (!unifiedPreview && needsImageSelection)}
               >
                 {busy ? 'Processing Queue...' : 'Start Inspection'}
               </button>

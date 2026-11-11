@@ -85,6 +85,8 @@ export const inspectionQueue = {
           update.operatorContext = patch.operatorContext.slice(0, 1000)
         }
       } else if (origin === 'inspector') {
+        if ('sequenceId' in patch) update.sequenceId = patch.sequenceId?.trim().slice(0,128) || undefined
+        if ('frameIndex' in patch) update.frameIndex = Number.isSafeInteger(patch.frameIndex) && (patch.frameIndex ?? -1) >= 0 ? patch.frameIndex : undefined
         if (patch.analysisMode === 'EVIDENCE_ONLY') {
           update.analysisMode = 'EVIDENCE_ONLY'
           update.jointType = undefined

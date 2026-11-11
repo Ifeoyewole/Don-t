@@ -1,4 +1,5 @@
 import { InspectionReadiness } from '../components/InspectionReadiness'
+import { UnifiedInspectionEvidence } from '../components/UnifiedInspectionEvidence'
 import { useEffect, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
 import { classifyWrcEvidence } from '../lib/wrcEvidence'
@@ -209,6 +210,7 @@ const ResultCard = ({
       </div>
 
       <div className="inspection-result-body">
+        {item.unifiedEvidence && <UnifiedInspectionEvidence evidence={item.unifiedEvidence} />}
         {item.resultStatus === 'REJECTED_UNRELIABLE' && (
           <div className="rejection-callout">
             <div className="rejection-callout-header">
@@ -228,7 +230,7 @@ const ResultCard = ({
           <p>Pipe internal diameter: {item.calibrationProfile?.pipe_diameter_mm ?? item.calibrationProfile?.pipeDiameterMm ?? 'Not confirmed'}{(item.calibrationProfile?.pipe_diameter_mm ?? item.calibrationProfile?.pipeDiameterMm) ? ' mm' : ''}</p>
           <p>Camera: {item.calibrationProfile?.camera_id ?? item.calibrationProfile?.cameraId ?? 'Not recorded'}</p>
           <p>Source: {item.calibrationProfile?.source ?? 'No verified reference'} · Reference: {item.calibrationProfile?.calibration_reference_id ?? 'Not recorded'}</p>
-          {getAuthorizedMillimetres(item) == null && <p>To obtain mm: return to Upload and select the confirmed pipe size, actual camera and registered reference. A circular opening needs matching visible pipe geometry. A close-up needs an engineer-registered, image-specific measured reference at the joint plane. Save the reference, then remeasure; nominal diameter alone cannot establish scale.</p>}
+          {getAuthorizedMillimetres(item) == null && !item.unifiedEvidence?.joint_measurement.calibration_authority_verified && <p>To obtain mm: return to Upload and select the confirmed pipe size, actual camera and registered reference. A circular opening needs matching visible pipe geometry. A close-up needs an engineer-registered, image-specific measured reference at the joint plane. Save the reference, then remeasure; nominal diameter alone cannot establish scale.</p>}
           <details><summary>Technical pixel evidence</summary><p>{item.cvDebug?.gapPixels != null ? `${item.cvDebug.gapPixels.toFixed(1)} px (not a physical measurement)` : 'No usable pixel measurement'}</p></details>
         </div>
 
@@ -287,7 +289,7 @@ const ResultCard = ({
           borderRadius: '8px',
           border: '1px solid rgba(255, 255, 255, 0.08)',
           fontSize: '0.82rem',
-          display: 'flex',
+          display: item.unifiedEvidence ? 'none' : 'flex',
           flexDirection: 'column',
           gap: '10px'
         }}>
@@ -306,7 +308,7 @@ const ResultCard = ({
                   ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
                 color: item.semanticGate?.domainStatus === 'PIPE_JOINT_INSPECTION' && item.semanticGate.processingAllowed === true ? '#22c55e' : '#ef4444'
               }}>
-                Vertex AI (Gemini 2.5)
+                Vertex AI ({item.semanticGate?.model ?? 'model not reported'})
               </span>
             </div>
             {!item.semanticGate ? (
@@ -490,7 +492,7 @@ const ResultCard = ({
 
         <div className="inspection-audit-grid">
           <span>{item.measurementAudit?.enhancementUsed ? 'Enhanced image used' : 'Original image basis'}</span>
-          <span>{item.aiReview ? `${Math.round(item.aiReview.confidence * 100)}% AI review` : 'AI skipped'}</span>
+          <span>{item.unifiedEvidence ? `Gemini: ${item.unifiedEvidence.gemini.status}` : item.aiReview ? `${Math.round(item.aiReview.confidence * 100)}% AI review` : 'AI skipped'}</span>
           <span>{item.cvDebug?.visibleSectors ? `${item.cvDebug.visibleSectors} sectors checked` : 'Geometry trace saved'}</span>
         </div>
 
@@ -501,7 +503,7 @@ const ResultCard = ({
 
         <div className="inspection-meta-row">
           <span>{measurementLabel(item)}</span>
-          <span>{Math.round((item.confidence ?? 0) * 100)}% confidence</span>
+          <span>{item.unifiedEvidence ? 'Independent model evidence; no fused confidence' : `${Math.round((item.confidence ?? 0) * 100)}% confidence`}</span>
         </div>
 
         <div className="inspection-cta-row">

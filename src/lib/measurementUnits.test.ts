@@ -37,8 +37,8 @@ describe('physical gap unit display', () => {
       cvDebug: { pipeDetected: true, gapPixels: 134 },
     }
     expect(formatGapForUnit(uncalibrated, 'px')).toContain('134.0 px')
-    expect(formatGapForUnit(uncalibrated, 'mm')).toContain('verified calibration required')
-    expect(formatGapForUnit(uncalibrated, 'm')).toContain('verified calibration required')
+    expect(formatGapForUnit(uncalibrated, 'mm')).toBe('Measurement unavailable — calibration or reliable joint boundaries required')
+    expect(formatGapForUnit(uncalibrated, 'm')).toBe('Measurement unavailable — calibration or reliable joint boundaries required')
   })
 
   it('blocks non-cloud, manual, model-only and provisional values', () => {
@@ -51,7 +51,7 @@ describe('physical gap unit display', () => {
     ]) {
       const item = { ...verified, ...partial }
       expect(getAuthorizedMillimetres(item)).toBeNull()
-      expect(formatGapForUnit(item, 'm')).toContain('verified calibration required')
+      expect(formatGapForUnit(item, 'm')).toContain('calibration or reliable joint boundaries required')
     }
   })
 
