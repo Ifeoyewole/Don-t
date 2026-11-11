@@ -9,7 +9,7 @@ vi.mock('../../api/_lib/rate-limiter', () => ({checkRateLimit: vi.fn(async () =>
 beforeEach(() => {
   vi.stubEnv('UNIFIED_ENGINEERING_PREVIEW_ENABLED','true');vi.stubEnv('UNIFIED_PREVIEW_URL','https://preview-test.a.run.app');vi.stubEnv('CODE_SESSION_SECRET','synthetic-session-key-only')
 })
-afterEach(() => {vi.unstubAllEnvs();vi.unstubAllGlobals()})
+afterEach(() => {vi.unstubAllEnvs();vi.unstubAllGlobals();vi.restoreAllMocks()})
 function session() {
   const value = `${Math.floor(Date.now()/1000)+600}.test-nonce`
   return '__Host-jointinspect-code='+value+'.'+createHmac('sha256',process.env.CODE_SESSION_SECRET!).update(value).digest('base64url')
@@ -42,4 +42,19 @@ it('does not leak internal provider errors or retry failed requests',async()=>{
   const fetch=vi.fn().mockRejectedValue(new Error('private provider detail'));vi.stubGlobal('fetch',fetch)
   const result=await invoke('POST',{cookie:session(),host:'jointinspect.test',origin:'https://jointinspect.test','content-type':'multipart/form-data; boundary=test'})
   expect(result.status).toBe(502);expect(JSON.stringify(result.body)).not.toContain('private provider detail');expect(fetch).toHaveBeenCalledTimes(1)
+})
+
+it('allows no-sign-in only for the explicitly activated current demonstration scope',async()=>{
+  vi.spyOn(Date,'now').mockReturnValue(1794393094000)
+  vi.stubEnv('UNIFIED_NO_SIGNIN_WINDOW','1794393095')
+  vi.stubEnv('UNIFIED_PREVIEW_EXPIRES_UNIX','1794393095')
+  expect((await invoke('GET',{})).status).toBe(200)
+  vi.stubEnv('UNIFIED_NO_SIGNIN_WINDOW','1794399999')
+  expect((await invoke('GET',{})).status).toBe(401)
+  vi.stubEnv('UNIFIED_NO_SIGNIN_WINDOW','1794393095')
+  vi.stubEnv('UNIFIED_PREVIEW_EXPIRES_UNIX','1794399999')
+  expect((await invoke('GET',{})).status).toBe(401)
+  vi.stubEnv('UNIFIED_PREVIEW_EXPIRES_UNIX','1794393095')
+  vi.spyOn(Date,'now').mockReturnValue(1794393096000)
+  expect((await invoke('GET',{})).status).toBe(503)
 })

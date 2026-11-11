@@ -1,5 +1,7 @@
 # Unified geometry and existing website integration
 
+Historical implementation record for PR39–41. Current status and no-sign-in access changes are documented in `UNIFIED_AI_AND_MEASUREMENT_FULL_REPORT.md`; the sign-in workflow below is superseded.
+
 ## Implementation and primary units
 
 The existing upload queue, inspection records, result page and JSON/PDF/evidence

@@ -14,7 +14,13 @@ export default async function unified(req: IncomingMessage, res: ServerResponse)
   if (process.env.UNIFIED_ENGINEERING_PREVIEW_ENABLED !== 'true') return send(404, { available: false })
   const expires = process.env.UNIFIED_PREVIEW_EXPIRES_UNIX
   if (expires && (!Number.isFinite(Number(expires)) || Number(expires) < Date.now()/1000)) return send(503, {available:false, detail:'Engineering preview authorization expired'})
-  if (!authenticated(req)) return send(401, { detail: 'Sign in using the existing engineering operator access.', available: false })
+  // One-time public demonstration allowance; cannot be extended by changing
+  // an environment timestamp. The private worker independently enforces the
+  // immutable 3-inspection / 6-request scope. Default authentication stays intact.
+  const approvedDemoExpiry = 1794393095 // 2026-11-11T10:31:35Z
+  const noSignInWindow = process.env.UNIFIED_NO_SIGNIN_WINDOW === String(approvedDemoExpiry)
+    && Number(expires) === approvedDemoExpiry && Date.now()/1000 < approvedDemoExpiry
+  if (!noSignInWindow && !authenticated(req)) return send(401, { available: false, detail: 'No active inspection access window' })
   const url = process.env.UNIFIED_PREVIEW_URL?.replace(/\/$/, '')
   if (!url || !/^https:\/\/[a-z0-9-]+\.[a-z0-9.-]*run\.app$/.test(url)) return send(503, { detail: 'Private unified worker is not configured', available: false })
   if (req.method === 'GET') return send(200, { available: true, authenticated: true, max_file_bytes: 3*1024*1024 })
