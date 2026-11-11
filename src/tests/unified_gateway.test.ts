@@ -9,8 +9,8 @@ beforeEach(() => {
   vi.stubEnv('UNIFIED_ENGINEERING_PREVIEW_ENABLED','true');vi.stubEnv('UNIFIED_PREVIEW_URL','https://preview-test.a.run.app');vi.stubEnv('UNIFIED_PREVIEW_MODE','PREVIEW')
 })
 afterEach(() => {vi.unstubAllEnvs();vi.unstubAllGlobals();vi.restoreAllMocks()})
-async function invoke(method: string, headers: Record<string,string>) {
-  const req=Object.assign(Readable.from([Buffer.from('bounded test form')]),{method, headers}) as unknown as IncomingMessage
+async function invoke(method: string, headers: Record<string,string>, url='/api/unified') {
+  const req=Object.assign(Readable.from([Buffer.from('bounded test form')]),{method, headers, url}) as unknown as IncomingMessage
   let status=0, body=''
   const res={writeHead: (code:number)=>{status=code}, end:(value:string)=>{body=value}} as unknown as ServerResponse
   await handler(req,res)
@@ -57,4 +57,14 @@ it('enforces rate limits before contacting the private worker',async()=>{
   const fetch=vi.fn();vi.stubGlobal('fetch',fetch)
   const result=await invoke('POST',{host:'jointinspect.test',origin:'https://jointinspect.test','content-type':'multipart/form-data; boundary=test'})
   expect(result.status).toBe(429);expect(fetch).not.toHaveBeenCalled()
+})
+
+it('routes editable suggestions and read-only calibration through the private worker',async()=>{
+  const fetch=vi.fn().mockResolvedValue({ok:true,json:async()=>({reference_verified:false,status:'CALIBRATION_REQUIRED'})});vi.stubGlobal('fetch',fetch)
+  expect((await invoke('POST',{host:'jointinspect.test',origin:'https://jointinspect.test','content-type':'application/json'},'/api/unified?action=calibration')).status).toBe(200)
+  expect(fetch.mock.calls[0][0]).toBe('https://preview-test.a.run.app/api/v1/cv/sewer-research/check-reference')
+  expect((await invoke('POST',{host:'jointinspect.test',origin:'https://jointinspect.test','content-type':'multipart/form-data; boundary=test'},'/api/unified?action=suggestions')).status).toBe(200)
+  expect(fetch.mock.calls[1][0]).toBe('https://preview-test.a.run.app/api/v1/cv/sewer-research/context-suggestions')
+  expect(fetch.mock.calls[1][1].headers.Authorization).toBe('Bearer synthetic-id-token')
+  expect((await invoke('GET',{},'/api/unified?action=arbitrary-resource')).status).toBe(404)
 })

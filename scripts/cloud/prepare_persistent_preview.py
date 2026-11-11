@@ -6,7 +6,7 @@ import json
 import re
 from pathlib import Path
 
-from scripts.cloud.persistent_preview_quota import CEILING, CYCLE, LEDGER_URI, validate_ledger
+from scripts.cloud.preview_spending import CEILING, CYCLE, LEDGER_URI, validate_ledger
 from backend.app.core.cv.ai.research_gemini_reconciliation import contract_sha
 
 
@@ -38,14 +38,13 @@ def prepare(*, prior_usd, evidence, approval, output, image_digest, infrastructu
         'currency': 'USD', 'spending_cap': 100, 'max_analysis_passes': 2,
         'prompt_sha256': contract_sha(),
         'receipt_prefix': 'models/inspect-view/research-results/engineering-preview-persistent/v1'}
-    ledger = {'schema': 1, 'cycle': CYCLE, 'currency': 'USD', 'status': 'ACTIVE',
+    ledger = {'schema': 2, 'cycle': CYCLE, 'currency': 'USD', 'status': 'ACTIVE',
         'ceiling_microusd': CEILING, 'opening_approval_id': approval,
         'prior_consumption_bound_microusd': prior, 'prior_accounting_evidence': evidence,
         'infrastructure_reserve_microusd': infra,
         'pricing_evidence': 'https://cloud.google.com/vertex-ai/generative-ai/pricing; Gemini3.1Pro global <=200k input USD2/M input, USD12/M output; conservative envelope USD8/M input, USD64/M output; runtime countTokens <=100k and maxOutputTokens8192',
-        'period_seconds': 86400, 'period_limits': {'inspection': 5, 'gemini': 10},
         'operation_reservations_microusd': {'inspection': 1_000_000, 'gemini': 2_000_000},
-        'claims': {}, 'period_usage': {}}
+        'claims': {}}
     validate_ledger(ledger)
     output = Path(output);output.mkdir(parents=True, exist_ok=True)
     for name, value in [('scope', scope), ('opening-ledger', ledger)]:

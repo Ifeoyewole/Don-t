@@ -48,7 +48,6 @@ try {
   page = await context.newPage();const errors = []
   page.on('pageerror', error => errors.push(String(error)))
   page.on('response', async response => {if(response.url().includes('/api/unified'))console.log('gateway response', response.status(), response.status()>=400?await response.text().catch(()=> 'closed'):'ok')})
-  await page.route('**/context-suggestions', route => route.fulfill({ status: 503, json: { detail: 'Offline browser replay; no Gemini calls' } }))
   await page.goto('https://localhost:5173')
   await page.evaluate(async () => {
     const { db } = await import('/src/db/database.ts')
@@ -58,10 +57,15 @@ try {
       meterRun: 1, unitLengthM: 2.6, estimatedPipeCount: 1, estimatedJointCount: 1, createdAt: now, updatedAt: now })
   })
   await page.goto('https://localhost:5173/projects/e2e-project/manholes/e2e-manhole/upload')
-  await page.locator('label').filter({hasText: 'Unified AI engineering preview'}).locator('input').check()
+  await page.getByText('Unified AI engineering preview',{exact:true}).waitFor()
   await page.locator('#upload-input').setInputFiles({ name: 'real-frame-10.jpg', mimeType: 'image/jpeg', buffer: await fs.readFile(path.join(root, 'original.jpg')) })
   await page.waitForFunction(async () => { const {db} = await import('/src/db/database.ts');return (await db.inspectionImages.count()) > 0 })
-  await page.locator('label').filter({hasText: 'Unified AI engineering preview'}).locator('input').check()
+  await page.locator('textarea[id^="calibration-advice-"]').fill('Inspector edited reference guidance')
+  await page.waitForFunction(async()=>{const {db}=await import('/src/db/database.ts');return (await db.inspectionImages.toArray())[0]?.contextSuggestionStatus==='ready'})
+  if(await page.locator('textarea[id^="calibration-advice-"]').inputValue()!=='Inspector edited reference guidance')throw Error('Late AI response overwrote the inspector edit')
+  const reference=await context.request.post('https://localhost:5173/api/unified?action=calibration',{headers:{Origin:'https://localhost:5173'},data:{reference_id:'test-reference',project_id:'e2e-project',source:'MANHOLE_METADATA',pipe_diameter_mm:300}})
+  if(reference.status()!==200 || (await reference.json()).reference_verified!==false)throw Error('Missing calibration must be a successful unverified lookup, not unavailable service')
+  await page.getByText('Unified AI engineering preview',{exact:true}).waitFor()
   await page.getByRole('button', {name: /Start inspection/i}).last().click()
   await page.getByRole('heading', {name: 'Unified AI engineering preview'}).waitFor({timeout: 30000})
   const results = await page.evaluate(async () => {const {db} = await import('/src/db/database.ts');return db.inspectionResults.toArray()})
@@ -71,7 +75,7 @@ try {
     return {json:JSON.parse(json), pdfBytes:pdf.size, zipBytes:zip.size} })
   if (!exports.json.results[0].unifiedEvidence || exports.pdfBytes < 1000 || exports.zipBytes < 1000) throw Error('Unified exports lost evidence')
   for (const width of [1440, 390]) {await page.setViewportSize({width, height:1000});await page.screenshot({path:path.join(output, `site-${width}.png`),fullPage:true})}
-  await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({mode:'RECORDED_REAL_ARTIFACT_HTTP_REPLAY_NOT_LIVE_INFERENCE', anonymousStatus, userSignInRequired:false, retiredOperationsStatus:410,
+  await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({mode:'RECORDED_REAL_ARTIFACT_HTTP_REPLAY_NOT_LIVE_INFERENCE', anonymousStatus, userSignInRequired:false, retiredOperationsStatus:410, editableAdviceVerified:true, calibrationLookupStatus:200,
     persistedResults:results.length, unifiedImageSha:results[0].unifiedEvidence.image_sha256, pdfBytes:exports.pdfBytes, zipBytes:exports.zipBytes, browserErrors:errors}, null, 2))
   if (errors.length) throw Error('Browser errors: '+errors.join(';'))
   console.log('Existing website upload → protected gateway → FastAPI replay → IndexedDB result → JSON/PDF/evidence ZIP verified.')

@@ -106,6 +106,8 @@ async function runAiAssistedMeasurement(
         geometry: options.jointType ?? null,
         ...(image.sequenceId && image.frameIndex != null ? { sequence_id: image.sequenceId, frame_index: image.frameIndex } : {}),
         context: { image_id: image.id, project_id: image.projectId, pipe_diameter_mm: pipeDiameterMm ?? null,
+          operator_context: image.operatorContext ?? options.operatorContext ?? null,
+          reference_guidance: image.calibrationNotes ?? null,
           calibration_reference_id: options.calibrationReferenceId ?? options.calibrationProfile?.calibration_reference_id,
           calibration_source: options.calibrationSource ?? options.calibrationProfile?.source, camera_id: options.cameraId },
       })
