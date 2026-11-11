@@ -1,6 +1,6 @@
 # JointInspect Unified AI and measurement — full implementation report
 
-Date: 11 November 2026. Repository: Ifeoyewole/Don-t. Project:
+Date: 11 November 2026; final live evidence recorded through09:40 UTC. Repository: Ifeoyewole/Don-t. Project:
 `joint-inspection-510310`, region `europe-west2`.
 
 ## Actual completion status
@@ -196,7 +196,6 @@ replay and final deployment results are recorded in the delivery update below.
 
 Outstanding substantive work:
 
-- Fresh website-to-cloud inference verification after removing the login obstacle.
 - Real CCTV with a verified joint-plane physical reference and independently
   measured gap, followed by error/uncertainty analysis.
 - Unambiguous source class definitions for this ISWDS checkpoint.
@@ -259,9 +258,8 @@ match the exact already-existing response object; a mismatch would be blocked.
 
 This proves fresh cloud execution followed by successful website readback of its
 saved result. It does **not** erase the first request's timeout or represent a
-second fresh inference. The website-only wait correction still requires its
-final CI/deployment checks; an uninterrupted post-correction cold-start request
-has not been benchmarked. The cached readback was already fast enough to succeed
+second fresh inference. At that readback timestamp, the website-only wait correction still required
+final deployment checks. The subsequent fresh live execution is documented below. The cached readback was already fast enough to succeed
 under the earlier wait limit.
 
 Local evidence:
@@ -273,3 +271,66 @@ The initial timeout evidence is separately preserved in
 No additional image was processed and no Gemini request was repeated for this
 readback. The remaining allowance is unchanged at two inspections/four Gemini
 attempts at the time of verification.
+
+
+## Final released verification — 11 November 2026
+
+PR43 passed all exact-HEAD checks and merged as
+`79a0e75d2de75c5ad4c8a6a7d2d3d8b7961ef560`. The deployed production website build
+`dpl_9PREbdth3faay9v3GYFCvfT5Ux21` is READY. The longer website wait is live;
+no Cloud Run runtime or resource configuration was changed for this fix.
+
+A **different permitted image, frame26**, was then submitted once through the
+existing website without a user session or password. This was a fresh inference,
+not a cache readback, synthetic output or a rerun of frame10.
+
+| Final live check | Actual observation |
+|---|---|
+| HTTP result | 200 |
+| Browser request time | 77.888 seconds |
+| Inference/fusion processing | 76.1653 seconds |
+| Inspect View / ISWDS | Both available |
+| Actual SAM masks | 3 |
+| Gemini | AUTHENTICATED_ADVISORY |
+| Analysis passes | 2, within the bound |
+| Task | OBJECT_SEGMENTATION; no unsupported joint-gap measurement |
+| Persisted records | 1, CLOUD_RESEARCH_UNVERIFIED |
+| Primary unit | mm |
+| Physical gap | null; unverified calibration / no joint measurement authorized |
+| Browser cookies / errors | None / none |
+
+Original frame26 SHA-256:
+`9b381ebf3bb2893869586c535589c48cb70ff115c718df73489685c433a1bf47`.
+The client checked the original-image hash before accepting the result. The
+actual unified overlay appeared in the existing results interface and the
+same-image result persisted to its normal inspection database.
+
+Evidence: `/workspace/scratch/no-signin-live/frame26-fresh/verification.json`,
+`unified-report.json`, `overlay.png` and `after-inspection.png`.
+The test script blocked a second submission. No retry loop or GPU workload ran.
+
+Together, the frame10 cloud execution + exact-cache website readback and the
+uninterrupted fresh frame26 website execution establish a functioning software
+integration. They do not establish clinical/engineering accuracy or a real
+millimetre metrology validation. The frame26 task intentionally routes object
+segmentation without inventing a joint width.
+
+Final allowance use: two inspections and four Gemini attempts; one inspection
+and two Gemini attempts remain, shared globally until10:31:35 UTC. The cache
+readback did not consume another model execution. Actual provider charges remain
+unavailable; no billed amount is invented.
+
+### Preserved model provenance
+
+- Inspect View r5: `repr-convnext-masked-r5-20261104/best.pt`, under
+  `gs://joint-inspection-510310-data/models/inspect-view/research-candidates/`.
+  SHA-256 `659b56baa3e04c30b611c21de85d7ba00abeadc7e2c40dcf801a475719e74ed7`.
+- ISWDS: `ISWDS_RT-DETR_v2_model.onnx`, under
+  `gs://joint-inspection-510310-data/models/external/iswds/research-quarantine/ffe32890eee1fba794d7a22486289562b118e574/`.
+  SHA-256 `1afdfd5b1f39dcd9f927b3ac25662487d3ac2e7fe823d7322b1065a7e887bb3b`.
+- SAM2.1 Tiny: `sam2.1_hiera_tiny.pt`, under
+  `gs://joint-inspection-510310-data/models/sam2/publisher-quarantine/ecc6e8ce-4fb5-464a-a70d-20283a0e98c8/`.
+  SHA-256 `7402e0d864fa82708a20fbd15bc84245c2f26dff0eb43a4b5b93452deb34be69`.
+
+Research source/rights quarantine is preserved. No source label, commercial
+clearance, verified positive or performance metric was fabricated.
