@@ -13,7 +13,7 @@ const output = process.env.JOINTINSPECT_VERIFY_OUTPUT || '/tmp/jointinspect-web-
 await fs.mkdir(output, { recursive: true })
 execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', path.join(output,'test-key.pem'), '-out', path.join(output,'test-cert.pem'), '-subj', '/CN=localhost', '-days', '1'], {stdio:'ignore'})
 Object.assign(process.env, { UNIFIED_ENGINEERING_PREVIEW_ENABLED: 'true', UNIFIED_PREVIEW_URL: 'https://unified-preview-fixture.a.run.app',
-  UNIFIED_NO_SIGNIN_WINDOW: '1794393095', UNIFIED_PREVIEW_EXPIRES_UNIX: '1794393095', DEV_CLOUD_RUN_ID_TOKEN: 'synthetic-local-replay-token' })
+  UNIFIED_PREVIEW_MODE: 'PREVIEW', DEV_CLOUD_RUN_ID_TOKEN: 'synthetic-local-replay-token' })
 const python = process.env.JOINTINSPECT_TEST_PYTHON || 'python'
 const child = spawn(python, ['-m', 'uvicorn', 'tools.replay_unified_api:app', '--host', '127.0.0.1', '--port', '8000'], {
   env: { ...process.env, JOINTINSPECT_SEWER_FUSION_ENABLED: 'true', JOINTINSPECT_PHASE1_VERTEX_ENABLED: 'true',

@@ -168,7 +168,7 @@ def safe_analysis(raw, *, width, height, region_ids, pass_index):
 
 
 class VertexEvidenceReconciler:
-    def __init__(self, *, gate, store, scope, secret, transport=None):
+    def __init__(self, *, gate, store, scope, secret, transport=None, token_counter=None):
         if gate.model != MODEL or gate.location != LOCATION or gate.project_id != 'joint-inspection-510310':
             raise ValueError('Use the configured research Vertex model, location and project')
         if not isinstance(secret, bytes) or len(secret) < 32:
@@ -177,6 +177,26 @@ class VertexEvidenceReconciler:
             raise ValueError('Research requests must disable automatic retries')
         self.gate, self.store, self.scope, self.secret = gate, store, scope, secret
         self.transport = transport or self._request
+        self.token_counter = token_counter or self._count_tokens
+
+    def _count_tokens(self, body):
+        # Count the exact multimodal input before generation. One attempt only;
+        # the financial reservation precedes this authenticated provider call.
+        if not self.gate.enabled:
+            raise RuntimeError('Research Vertex integration disabled')
+        token = self.gate._get_access_token()
+        if not token:
+            raise RuntimeError('Vertex credentials unavailable')
+        url = (f'https://aiplatform.googleapis.com/v1/projects/{self.gate.project_id}/locations/'
+               f'{LOCATION}/publishers/google/models/{MODEL}:countTokens')
+        request = urllib.request.Request(url, data=canonical({'contents': body['contents']}),
+            headers={'Authorization': 'Bearer '+token, 'Content-Type': 'application/json'})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            result = json.loads(response.read(64*1024))
+        count = result.get('totalTokens')
+        if type(count) is not int or count < 0:
+            raise ValueError('Verified input token count unavailable')
+        return count
 
     def _request(self, body):
         if not self.gate.enabled:
@@ -265,11 +285,15 @@ class VertexEvidenceReconciler:
                 raise ValueError('Research authorization must bind this exact reconciliation contract')
             claim = {'image_sha256': image_sha, 'bundle_sha256': bundle_sha,
                      'spending_approval_id': self.scope['spending_approval_id'], 'status': 'NO_AUTOMATIC_RETRY'}
+            from scripts.cloud.persistent_preview_quota import persistent, reserve, MAX_INPUT_TOKENS
+            is_persistent = persistent(self.scope)
+            if is_persistent:
+                reserve(self.scope, self.store, 'gemini', key)
             if not self.store.create('analysis-claims/'+key+'.json', claim):
                 raise ValueError('Request previously claimed; inspect failure, do not repeat charge')
             # Shared atomic request slots prevent changed bundles bypassing cap.
             scope_key = hashlib.sha256(canonical(self.scope)).hexdigest()
-            if not any(self.store.create(f'analysis-slots/{scope_key}/{i}.json', claim)
+            if not is_persistent and not any(self.store.create(f'analysis-slots/{scope_key}/{i}.json', claim)
                        for i in range(self.scope['max_requests'])):
                 raise ValueError('Research request allowance exhausted')
             parts = [{'text': PROMPT+'\nEVIDENCE JSON:\n'+serialized.decode()},
@@ -280,10 +304,15 @@ class VertexEvidenceReconciler:
             for index, mask in enumerate(masks):
                 parts.extend([{'text': 'ACTUAL SAM2 MASK FOR REGION ID '+str(mask_regions[index])}, {'inlineData': {
                     'mimeType': 'image/png', 'data': base64.b64encode(mask).decode()}}])
-            raw, usage = self.transport({'contents': [{'role': 'user', 'parts': parts}],
+            request_body = {'contents': [{'role': 'user', 'parts': parts}],
                 'generationConfig': {'responseMimeType': 'application/json',
                     'responseSchema': vertex_response_schema(),
-                    'temperature': .1, 'maxOutputTokens': 8192}})
+                    'temperature': .1, 'maxOutputTokens': 8192}}
+            if is_persistent:
+                count = self.token_counter(request_body)
+                if type(count) is not int or not 0 <= count <= MAX_INPUT_TOKENS:
+                    raise ValueError('Input exceeds the financially authorized token envelope')
+            raw, usage = self.transport(request_body)
             analysis = safe_analysis(raw, width=width, height=height, region_ids=region_ids, pass_index=pass_index)
             cached = dict(issuer=ISSUER, contract=contract_sha(), model=MODEL, location=LOCATION,
                           image_sha256=image_sha, bundle_sha256=bundle_sha, pass_index=pass_index,

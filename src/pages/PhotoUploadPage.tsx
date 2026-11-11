@@ -336,7 +336,7 @@ export const PhotoUploadPage = ({
 
   return (
     <div className="page-grid upload-page">
-      {previewAvailable && <section className="card"><label><input type="checkbox" checked={unifiedPreview} onChange={e => {setUnifiedPreview(e.target.checked);previewModeRef.current=e.target.checked;if(e.target.checked){for(const controller of suggestionControllers.current.values())controller.abort();suggestionControllers.current.clear()}}} disabled={busy} /> Unified AI engineering preview</label><p>Select before uploading to avoid separate scene-preflight calls. No user sign-in is required during the active demonstration window. Results remain preliminary; no physical millimetres without verified calibration. Images up to 3 MiB. Requests are bounded and are not retried automatically.</p></section>}
+      {previewAvailable && <section className="card"><label><input type="checkbox" checked={unifiedPreview} onChange={e => {setUnifiedPreview(e.target.checked);previewModeRef.current=e.target.checked;if(e.target.checked){for(const controller of suggestionControllers.current.values())controller.abort();suggestionControllers.current.clear()}}} disabled={busy} /> Unified AI engineering preview</label><p>Select before uploading to avoid separate scene-preflight calls. No user sign-in is required. Preview use is subject to daily quotas and the remaining research allowance. Results remain preliminary; no physical millimetres without verified calibration. Images up to 3 MiB. Requests are bounded and are not retried automatically.</p></section>}
       <section className="page-breadcrumbs">
         <button className="page-back-link" type="button" onClick={onBack}>
           Projects

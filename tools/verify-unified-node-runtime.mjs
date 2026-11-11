@@ -26,10 +26,10 @@ try {
     }
     if (await invoke() !== 404) throw new Error('Disabled preview must return 404');
     process.env.UNIFIED_ENGINEERING_PREVIEW_ENABLED='true';
-    if (await invoke() !== 401) throw new Error('Anonymous preview must return 401');
-    console.log('Native emitted ESM gateway: disabled=404, anonymous=401');
+    if (await invoke() !== 200) throw new Error('PREVIEW must not require sign-in');
+    console.log('Native emitted ESM gateway: disabled=404, no-sign-in PREVIEW=200');
   `, path.join(output, 'unified.js')], { ...process.env,
-    UNIFIED_ENGINEERING_PREVIEW_ENABLED: 'false', UNIFIED_PREVIEW_EXPIRES_UNIX: '' })
+    UNIFIED_ENGINEERING_PREVIEW_ENABLED: 'false', UNIFIED_PREVIEW_MODE: 'PREVIEW', UNIFIED_PREVIEW_URL: 'https://native-test.a.run.app' })
 } finally {
   rmSync(output, { recursive: true, force: true })
 }
