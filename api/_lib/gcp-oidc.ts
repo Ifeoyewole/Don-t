@@ -6,7 +6,7 @@
  */
 
 import { getVercelOidcToken } from '@vercel/oidc'
-import { GATEWAY_CONFIG } from './config'
+import { GATEWAY_CONFIG } from './config.js'
 
 interface CachedIdToken {
   token: string
