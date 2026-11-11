@@ -24,3 +24,7 @@ training/configs/*
 __pycache__/
 *.pyc
 *.gstmp
+
+# Never send local credentials in source build archives.
+.env*
+**/.env*

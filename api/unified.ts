@@ -1,6 +1,5 @@
-/** Existing website operator session -> private, IAM-authenticated research API. */
+/** No-sign-in PREVIEW website -> private IAM-authenticated, quota-metered worker. */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { authenticated } from './_lib/operator-session.js'
 import { getCloudRunIdToken } from './_lib/gcp-oidc.js'
 import { checkRateLimit } from './_lib/rate-limiter.js'
 import { readStreamWithLimit, PayloadTooLargeError } from './_lib/gateway-guard.js'
@@ -12,18 +11,10 @@ export default async function unified(req: IncomingMessage, res: ServerResponse)
   }
   if (!['GET', 'POST'].includes(req.method || '')) return send(405, { detail: 'Method not allowed' })
   if (process.env.UNIFIED_ENGINEERING_PREVIEW_ENABLED !== 'true') return send(404, { available: false })
-  const expires = process.env.UNIFIED_PREVIEW_EXPIRES_UNIX
-  if (expires && (!Number.isFinite(Number(expires)) || Number(expires) < Date.now()/1000)) return send(503, {available:false, detail:'Engineering preview authorization expired'})
-  // One-time public demonstration allowance; cannot be extended by changing
-  // an environment timestamp. The private worker independently enforces the
-  // immutable 3-inspection / 6-request scope. Default authentication stays intact.
-  const approvedDemoExpiry = 1794393095 // 2026-11-11T10:31:35Z
-  const noSignInWindow = process.env.UNIFIED_NO_SIGNIN_WINDOW === String(approvedDemoExpiry)
-    && Number(expires) === approvedDemoExpiry && Date.now()/1000 < approvedDemoExpiry
-  if (!noSignInWindow && !authenticated(req)) return send(401, { available: false, detail: 'No active inspection access window' })
+  if (process.env.UNIFIED_PREVIEW_MODE !== 'PREVIEW') return send(503, {available:false, detail:'Engineering preview is paused'})
   const url = process.env.UNIFIED_PREVIEW_URL?.replace(/\/$/, '')
   if (!url || !/^https:\/\/[a-z0-9-]+\.[a-z0-9.-]*run\.app$/.test(url)) return send(503, { detail: 'Private unified worker is not configured', available: false })
-  if (req.method === 'GET') return send(200, { available: true, authenticated: true, max_file_bytes: 3*1024*1024 })
+  if (req.method === 'GET') return send(200, { available: true, mode: 'PREVIEW', user_sign_in_required: false, max_file_bytes: 3*1024*1024 })
   const origin = req.headers.origin
   const authority = req.headers.host ?? req.headers[':authority']
   let sameOrigin = false

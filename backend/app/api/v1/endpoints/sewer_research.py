@@ -57,7 +57,7 @@ async def unified(file: UploadFile = File(...), options: str = Form('{}'),
             try:
                 cache_blob, cached = await run_in_threadpool(reserve, payload, kwargs)
             except ValueError:
-                raise HTTPException(429, 'Engineering preview allowance unavailable; no automatic retry')
+                raise HTTPException(429, 'Preview quota or research budget unavailable; no automatic retry')
             if cached is not None:
                 return cached
         phase1 = os.getenv('JOINTINSPECT_PHASE1_VERTEX_ENABLED') == 'true'
@@ -69,6 +69,8 @@ async def unified(file: UploadFile = File(...), options: str = Form('{}'),
             from scripts.cloud.engineering_preview_budget import save
             await run_in_threadpool(save, cache_blob, result)
         return result
+    except HTTPException:
+        raise
     except ValueError:
         raise HTTPException(422, 'Invalid research image or task')
     except Exception:

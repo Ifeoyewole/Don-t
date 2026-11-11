@@ -41,6 +41,12 @@ def validate_scope(scope,image_sha256,now):
         or not isinstance(scope.get('review_approval_id'),str) or not scope['review_approval_id'].strip()
         or not isinstance(scope.get('spending_approval_id'),str) or not scope['spending_approval_id'].strip()):
         raise ValueError('Explicit review, model and spending scope required')
+    from scripts.cloud.persistent_preview_quota import persistent, validate_policy
+    if persistent(scope):
+        validate_policy(scope)
+        if not isinstance(image_sha256, str) or not re.fullmatch('[a-f0-9]{64}', image_sha256):
+            raise ValueError('Original image hash required')
+        return
     hashes=scope.get('approved_image_sha256s');maximum=scope.get('max_requests');cap=scope.get('spending_cap')
     expiry=scope.get('expires_unix')
     if (not isinstance(hashes,list) or type(maximum) is not int or not 1<=maximum<=100
@@ -109,6 +115,9 @@ def get_or_create_receipt(payload,*,prompt_sha256,store,scope,secret,gate_factor
         check_existing(cached,image_sha,secret,now)
         return cached,'REUSED_AUTHENTICATED'
     validate_scope(scope,image_sha,now)
+    from scripts.cloud.persistent_preview_quota import persistent
+    if persistent(scope):
+        raise ValueError('Persistent preview requires the metered unified reconciler')
     if scope.get('prompt_sha256')!=prompt_sha256:raise ValueError('Approval must bind the exact semantic contract')
     from PIL import Image
     from io import BytesIO

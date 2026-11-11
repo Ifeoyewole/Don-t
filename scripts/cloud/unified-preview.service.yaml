@@ -1,4 +1,4 @@
-# Deployment template only. Render placeholders after an approved research scope.
+# Persistent private PREVIEW. Render an immutable image/policy; ledger accounting must be initialized once.
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
@@ -23,6 +23,7 @@ spec:
         ports: [{containerPort: 8080}]
         env:
         - {name: JOINTINSPECT_CLOUD_RESEARCH_WORKER, value: 'true'}
+        - {name: JOINTINSPECT_PREVIEW_LIFECYCLE, value: ENGINEERING_PREVIEW}
         - {name: JOINTINSPECT_ISWDS_NONCOMMERCIAL_RESEARCH_ALLOWED, value: 'true'}
         - {name: JOINTINSPECT_SEWER_FUSION_ENABLED, value: 'true'}
         - {name: JOINTINSPECT_PHASE1_VERTEX_ENABLED, value: 'true'}
