@@ -48,12 +48,6 @@ const CloudIcon = () => (
   </svg>
 )
 
-const CheckIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true">
-    <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-)
-
 const DashboardIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" width="18" height="18" aria-hidden="true">
     <rect x="3" y="3" width="7" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
@@ -276,14 +270,14 @@ export const AppShell = ({
           {/* AI Model Status Badge (Click to view model specs) */}
           <button
             type="button"
-            className={`status-pill ${isModelReady ? 'is-model-ready' : 'is-model-loading'} status-pill-clickable`}
+            className="status-pill status-pill-clickable"
             onClick={() => setActiveModal('models')}
-            title="Primary defect classifier load status (not Gemini reachability or field accuracy). Click for details."
+            title="Actual model availability is recorded with each inspection. Click for model and connection details."
           >
             <span className="status-dot-ready" aria-hidden="true">
-              <CheckIcon />
+              <SearchIcon />
             </span>
-            <span className="status-pill-text">{isModelReady ? 'Defect Classifier Ready' : 'Defect Classifier Unavailable'}</span>
+            <span className="status-pill-text">Models · see report</span>
           </button>
 
           {/* Dynamic Inspector Session Profile */}
@@ -569,9 +563,9 @@ export const AppShell = ({
                   <span className="spec-note">Circular and seam measurement with review tiers</span>
                 </div>
                 <div className="spec-card">
-                  <span className="spec-label">Primary Classifier</span>
-                  <strong>{isModelReady ? 'Primary defect classifier loaded' : 'Not loaded / not verifiable'}</strong>
-                  <span className="spec-note">Runtime health determines whether the production model is loaded</span>
+                  <span className="spec-label">Cloud API classifier health</span>
+                  <strong>{isModelReady ? 'Connection reports classifier loaded' : 'Connection does not report a loaded classifier'}</strong>
+                  <span className="spec-note">This connection check is separate from Inspect View, specialist, SAM2 and Gemini availability in Unified results.</span>
                 </div>
                 <div className="spec-card">
                   <span className="spec-label">Research Candidate</span>
