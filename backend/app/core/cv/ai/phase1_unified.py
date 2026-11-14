@@ -87,8 +87,24 @@ class Phase1Unified:
         image = decode(payload)
         # Use the exact existing orchestrator for classifier/detector/SAM paths.
         # An incoming receipt remains subject to its existing verification.
-        result = self.fusion.infer(payload, rois=rois, task=task, geometry=geometry,
+        fusion_rois = list(rois)
+        cv_prompt = False
+        if not fusion_rois and task == 'JOINT_GEOMETRY' and geometry in ('VERTICAL_SEAM','HORIZONTAL_SEAM'):
+            excluded, _ = text_exclusion_candidates(image)
+            proposal = measure_image_seam(image, geometry, exclusion=excluded)
+            if proposal['gap_estimate_px'] is not None:
+                points = np.array([p[k] for p in proposal['edge_pairs'] for k in ('a','b')])
+                low = np.maximum(points.min(axis=0)-12,0)
+                high = np.minimum(points.max(axis=0)+13,[image.shape[1],image.shape[0]])
+                fusion_rois = [[int(low[0]),int(low[1]),int(high[0]),int(high[1])]]
+                cv_prompt = True
+        result = self.fusion.infer(payload, rois=fusion_rois, task=task, geometry=geometry,
                                    receipt=receipt, sequence_id=sequence_id, frame_index=frame_index)
+        if cv_prompt:
+            for region in result['regions']:
+                if region['source'] == 'EXPLICIT_RESEARCH_ROI':
+                    region['source'] = 'OPENCV_UNVERIFIED_SAM_PROMPT'
+                    region['target_identity_verified'] = False
         first_elapsed = perf_counter()-started
         self._geometry(image, result, geometry, task, context, rois)
         overlay = cv2.imdecode(np.frombuffer(base64.b64decode(result['overlay_png_base64']), np.uint8), cv2.IMREAD_COLOR)

@@ -48,7 +48,7 @@ def test_missing_all_models_keeps_cv_diagnostics_without_authorizing_mm():
     assert result['physical_gap_mm'] is None and result['decision']=='REVIEW_REQUIRED'
     assert result['scene_validation']['status']=='UNVERIFIED_OR_UNSUITABLE'
     assert not result['phase1']['functional_path_complete']
-    assert result['regions'][0]['mask_status']=='NOT_REQUIRED_FOR_OPENCV'
+    assert next(r for r in result['regions'] if r['source']=='OPENCV_INDEPENDENT_SEAM')['mask_status']=='NOT_REQUIRED_FOR_OPENCV'
 
 
 def test_normal_or_unclassified_joint_does_not_erase_geometry():
@@ -99,3 +99,17 @@ def test_verified_scale_and_pipe_scene_can_measure_without_defect_label_or_sam(m
         assert not result['phase1']['functional_path_complete']  # No SAM or sewer classifiers in this fixture.
         assert result['phase1']['geometry_path_complete']
     finally:clear_calibration_cache()
+
+
+def test_opencv_localization_prompts_existing_sam_without_requiring_a_detector():
+    calls=[]
+    def segment(image,box):
+        from backend.tests.test_sewer_unified_research import segment as fixture_segment
+        calls.append(box)
+        return fixture_segment(image,box)
+    result=Phase1Unified(fusion=SewerFusion(classifier=lambda _:None,segmenter=segment),reconciler=None).infer(
+        _payload(),task='JOINT_GEOMETRY',geometry='HORIZONTAL_SEAM')
+    assert calls
+    assert any(r['mask_status']=='ACTUAL_MASK_CANDIDATE' for r in result['regions'])
+    assert any(r['source']=='OPENCV_UNVERIFIED_SAM_PROMPT' for r in result['regions'])
+    assert result['joint_measurement']['candidates'] and result['physical_gap_mm'] is None
