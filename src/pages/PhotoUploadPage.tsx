@@ -346,7 +346,13 @@ export const PhotoUploadPage = ({
         throw new Error('Choose a geometry or evidence-only review for every photo before processing.')
       }
       if (calDirty) throw new Error('Save or discard edited calibration fields before inspection; stale references are not used.')
-      await onStartInspection(undefined, savedProfile ?? undefined, undefined, undefined, unifiedPreview)
+      // Unsaved default diameter is still declared metadata, never verified scale.
+      const profile: CalibrationProfile | undefined = savedProfile ?? (calPipeDiameter !== '' ? {
+        calibration_reference_id: '', project_id: projectId, source: calSource,
+        pipe_diameter_mm: Number(calPipeDiameter), verified: false,
+        camera_id: null, verified_at: null,
+      } : undefined)
+      await onStartInspection(undefined, profile, undefined, undefined, unifiedPreview)
     } catch (processingError) {
       setError(processingError instanceof Error ? processingError.message : 'Processing failed.')
     } finally {

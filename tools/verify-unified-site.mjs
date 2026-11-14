@@ -84,6 +84,7 @@ try {
   await page.getByRole('heading', {name: 'Unified AI engineering preview'}).waitFor({timeout: 30000})
   const results = await page.evaluate(async () => {const {db} = await import('/src/db/database.ts');return db.inspectionResults.toArray()})
   if (results.length !== 1 || results[0].executionSource !== 'CLOUD_RESEARCH_UNVERIFIED' || !results[0].unifiedEvidence?.replay_only || results[0].finalGapMm !== null) throw Error('Research evidence persistence failed')
+  if(results[0].unifiedEvidence.replay_received_context?.pipe_diameter_mm !== 300 || results[0].unifiedEvidence.replay_received_context?.calibration_source !== 'MANHOLE_METADATA')throw Error('Displayed default diameter/source were omitted from request')
   const exports = await page.evaluate(async () => { const {exportService} = await import('/src/services/exportService.ts');
     const json = await (await exportService.exportJson('e2e-project')).text();const pdf=await exportService.exportPdf('e2e-project');const zip=await exportService.exportEvidenceZip('e2e-project');
     return {json:JSON.parse(json), pdfBytes:pdf.size, zipBytes:zip.size} })

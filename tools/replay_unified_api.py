@@ -31,6 +31,7 @@ class RecordedOnly:
         result['gemini']['status'] = 'RECORDED_REPLAY_NO_NEW_VERTEX_CALL'
         result['summary'] = 'RECORDED ARTIFACT REPLAY — '+result['summary']
         result['replay_only'] = True
+        result['replay_received_context'] = kwargs.get('context',{})
         return result
 
 
