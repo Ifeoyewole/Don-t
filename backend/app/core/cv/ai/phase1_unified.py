@@ -17,7 +17,8 @@ import numpy as np
 from PIL import Image
 
 from backend.app.core.cv.ai.research_joint_boundaries import draw_boundaries
-from backend.app.core.cv.ai.joint_gap_recovery import recover_joint_gap
+from backend.app.core.cv.ai.joint_gap_recovery import recover_joint_gap, text_exclusion_candidates
+from backend.app.core.cv.ai.independent_seam import measure_image_seam
 from backend.app.core.cv.ai.unified_calibration import calibrated_gap, UNAVAILABLE
 from backend.app.core.cv.ai.research_sewer_fusion import decode, png
 from backend.app.core.cv.ai.research_sewer_detector import overlap
@@ -34,9 +35,18 @@ class Phase1Unified:
         self.history = OrderedDict()
         self.lock = threading.Lock()
 
-    def _geometry(self, image, result, geometry, task, context=None):
+    def _geometry(self, image, result, geometry, task, context=None, rois=()):
+        if task == 'JOINT_GEOMETRY' and geometry in ('VERTICAL_SEAM','HORIZONTAL_SEAM'):
+            excluded, boxes = text_exclusion_candidates(image)
+            for box in (rois or [None]):
+                evidence = measure_image_seam(image, geometry, box, exclusion=excluded)
+                evidence['text_exclusion_boxes'] = boxes
+                result['regions'].append({'region_id':len(result['regions']),
+                    'bbox':evidence['roi_bbox'], 'source':'OPENCV_INDEPENDENT_SEAM',
+                    'mask_status':'NOT_REQUIRED_FOR_OPENCV',
+                    'boundary_evidence':evidence, 'geometry':{'physical_gap_mm':None}})
         for region in result['regions']:
-            if task != 'JOINT_GEOMETRY' or not geometry or 'mask_png_base64' not in region:
+            if region.get('source') == 'OPENCV_INDEPENDENT_SEAM' or task != 'JOINT_GEOMETRY' or not geometry or 'mask_png_base64' not in region:
                 continue
             mask = cv2.imdecode(np.frombuffer(base64.b64decode(region['mask_png_base64']), np.uint8), cv2.IMREAD_GRAYSCALE)
             region['boundary_evidence'] = recover_joint_gap(image, mask, region['bbox'], geometry)
@@ -77,10 +87,26 @@ class Phase1Unified:
         image = decode(payload)
         # Use the exact existing orchestrator for classifier/detector/SAM paths.
         # An incoming receipt remains subject to its existing verification.
-        result = self.fusion.infer(payload, rois=rois, task=task, geometry=geometry,
+        fusion_rois = list(rois)
+        cv_prompt = False
+        if not fusion_rois and task == 'JOINT_GEOMETRY' and geometry in ('VERTICAL_SEAM','HORIZONTAL_SEAM'):
+            excluded, _ = text_exclusion_candidates(image)
+            proposal = measure_image_seam(image, geometry, exclusion=excluded)
+            if proposal['gap_estimate_px'] is not None:
+                points = np.array([p[k] for p in proposal['edge_pairs'] for k in ('a','b')])
+                low = np.maximum(points.min(axis=0)-12,0)
+                high = np.minimum(points.max(axis=0)+13,[image.shape[1],image.shape[0]])
+                fusion_rois = [[int(low[0]),int(low[1]),int(high[0]),int(high[1])]]
+                cv_prompt = True
+        result = self.fusion.infer(payload, rois=fusion_rois, task=task, geometry=geometry,
                                    receipt=receipt, sequence_id=sequence_id, frame_index=frame_index)
+        if cv_prompt:
+            for region in result['regions']:
+                if region['source'] == 'EXPLICIT_RESEARCH_ROI':
+                    region['source'] = 'OPENCV_UNVERIFIED_SAM_PROMPT'
+                    region['target_identity_verified'] = False
         first_elapsed = perf_counter()-started
-        self._geometry(image, result, geometry, task, context)
+        self._geometry(image, result, geometry, task, context, rois)
         overlay = cv2.imdecode(np.frombuffer(base64.b64decode(result['overlay_png_base64']), np.uint8), cv2.IMREAD_COLOR)
         for region in result['regions']:
             draw_boundaries(overlay, region.get('boundary_evidence', {}))
@@ -133,6 +159,11 @@ class Phase1Unified:
                         if task == 'JOINT_GEOMETRY' and proposal['geometry'] != 'NONE':
                             region['boundary_evidence'] = recover_joint_gap(image, mask, region['bbox'], proposal['geometry'])
                             draw_boundaries(overlay, region['boundary_evidence'])
+                    if task == 'JOINT_GEOMETRY' and proposal['geometry'] in ('VERTICAL_SEAM','HORIZONTAL_SEAM'):
+                        excluded, boxes = text_exclusion_candidates(image)
+                        region['boundary_evidence'] = measure_image_seam(image, proposal['geometry'], proposal['bbox'],exclusion=excluded)
+                        region['boundary_evidence']['text_exclusion_boxes'] = boxes
+                        draw_boundaries(overlay,region['boundary_evidence'])
                 passes = 2
             except Exception as exc:
                 # Failed second call must not retain a stale first-pass gate
@@ -146,19 +177,14 @@ class Phase1Unified:
                                     'previous_analysis_count': len(analyses)}
                 break
         candidates = []; physical_candidates = []
-        assessments = {a['region_id']: a for a in result['gemini'].get('analysis', {}).get('region_assessments', [])}
+        scene_status = 'PIPE_JOINT_CONFIRMED' if semantic_allowed else 'UNVERIFIED_OR_UNSUITABLE'
+        result['scene_validation'] = {'status':scene_status,'measurement_authorized':semantic_allowed}
         for region in result['regions']:
             evidence = region.get('boundary_evidence', {})
             value = evidence.get('gap_estimate_px')
-            target = assessments.get(region['region_id'], {})
-            suitable = (semantic_allowed and target.get('mask_target') == 'JOINT_BOUNDARY_BAND'
-                        and target.get('suitable_for_joint_boundary_analysis') is True)
-            hypotheses = result['gemini'].get('analysis', {}).get('hypotheses', [])
-            open_scene = any(h['label'] == 'OPEN_JOINT' and h['status'] == 'POSSIBLE'
-                             and region['region_id'] in h['region_ids'] for h in hypotheses)
-            conflicting_structure = any(h['label'] in ('JOINT_DISPLACEMENT', 'PROTRUDING_LATERAL')
-                and h['status'] == 'POSSIBLE' and region['region_id'] in h['region_ids'] for h in hypotheses)
-            suitable = suitable and open_scene and not conflicting_structure
+            # Geometry diagnostics do not require an OPEN_JOINT classification.
+            # Scene identity and metrology authority remain separate from pixels.
+            suitable = evidence.get('status') == 'VISIBLE_GAP_PIXEL_CANDIDATE'
             if suitable and value is not None:
                 candidates.append({'region_id': region['region_id'], 'value': value, 'units': 'px',
                     'bbox': region['bbox'], 'geometry': evidence.get('geometry', geometry),
@@ -167,10 +193,17 @@ class Phase1Unified:
                                   else 'joint_geometry_not_reliable',
                                   'pixel_candidate': value if suitable else None,
                                   'physical_gap_mm': None, 'calibration_verified': False}
-            region['geometry']['interpretation'] = ('OPENING_CANDIDATE' if suitable else
-                'OPEN_JOINT_NOT_ESTABLISHED_DISPLACEMENT_OR_SOCKET_POSSIBLE')
+            region['geometry']['interpretation'] = ('IMAGE_BOUNDARY_CANDIDATE_DEFECT_UNDETERMINED' if suitable else
+                'INSUFFICIENT_GEOMETRIC_EVIDENCE')
             calibration = calibrated_gap(evidence if suitable else {}, image_sha256=result['image_sha256'],
                 dimensions=result['dimensions'], context=context, geometry=evidence.get('geometry', geometry))
+            if not semantic_allowed:
+                scale_reason = calibration.get('reason')
+                calibration = dict(calibration, physical_gap_mm=None,
+                    calibration_authority_verified=False,
+                    reason='AUTHENTICATED_SUITABLE_PIPE_JOINT_SCENE_REQUIRED',
+                    scale_rejection_reason=scale_reason,
+                    measurement_message=UNAVAILABLE)
             region['geometry'].update(calibration)
             region['geometry']['calibration_verified'] = calibration['calibration_authority_verified']
             if calibration['physical_gap_mm'] is not None:
@@ -178,6 +211,14 @@ class Phase1Unified:
         result['joint_measurement'] = {'status': 'PRELIMINARY_PIXEL_EVIDENCE' if candidates else 'joint_geometry_not_reliable',
                                        'candidates': candidates, 'physical_gap_mm': None,
                                        'calibration_status': 'UNVERIFIED', 'engineering_acceptance': False}
+        result['joint_measurement']['geometry_independent_of_classification'] = True
+        result['joint_measurement']['scene_status'] = scene_status
+        result['joint_measurement']['rejection_reasons'] = sorted(set(
+            reason for r in result['regions'] for reason in
+            [r['geometry'].get('reason','UNSPECIFIED'), r['geometry'].get('scale_rejection_reason')] if reason
+            if r['geometry'].get('physical_gap_mm') is None))
+        if not semantic_allowed:
+            result['joint_measurement']['rejection_reasons'].append('PIPE_JOINT_SCENE_NOT_AUTHENTICATED_OR_UNSUITABLE')
         result['primary_measurement_unit'] = 'mm'
         result['joint_measurement']['unit'] = 'mm'
         result['joint_measurement']['measurement_message'] = UNAVAILABLE
@@ -202,6 +243,8 @@ class Phase1Unified:
                 'SPECIALIST_CLASS_IDS_UNMAPPED_WHERE_UNAVAILABLE', 'NO_TARGET_CLASS_ACCURACY_ESTABLISHED']))
         result['gemini_analyses'] = analyses
         result['phase1'] = {'model_passes': passes, 'gemini_required': True,
+                           'geometry_path_complete':bool(candidates),
+                           'physical_measurement_available':result['physical_gap_mm'] is not None,
                            'functional_path_complete': all(result['components'].get(k, {}).get('status') == 'AVAILABLE'
                                for k in ('inspect_view', 'sewer_detector'))
                                and any(r['mask_status'] == 'ACTUAL_MASK_CANDIDATE' for r in result['regions'])

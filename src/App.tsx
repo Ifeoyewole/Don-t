@@ -262,7 +262,8 @@ function App() {
             return {
               ...image,
               queueStatus: 'processing',
-              progress: 5,
+              progress: 0,
+              processingStartedAt: new Date().toISOString(),
               errorMessage: undefined,
             }
           }

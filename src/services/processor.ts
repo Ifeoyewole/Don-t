@@ -69,11 +69,7 @@ function emit(event: ProcessingEvent): void {
   }
 }
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
-}
+
 
 async function runAiAssistedMeasurement(
   image: InspectionImage,
@@ -103,7 +99,7 @@ async function runAiAssistedMeasurement(
       if (!blob) throw new Error('Original image is required for unified preview')
       const evidence = await requestUnified(blob, {
         task: image.analysisMode === 'EVIDENCE_ONLY' ? 'OBJECT_SEGMENTATION' : 'JOINT_GEOMETRY',
-        geometry: options.jointType ?? null,
+        geometry: image.analysisMode === 'EVIDENCE_ONLY' ? null : options.jointType ?? null,
         ...(image.sequenceId && image.frameIndex != null ? { sequence_id: image.sequenceId, frame_index: image.frameIndex } : {}),
         context: { image_id: image.id, project_id: image.projectId, pipe_diameter_mm: pipeDiameterMm ?? null,
           operator_context: image.operatorContext ?? options.operatorContext ?? null,
@@ -189,12 +185,10 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
   await db.inspectionImages.put({
     ...image,
     queueStatus: 'processing',
+    processingStartedAt: createTimestamp(),
   })
 
-  emit({ type: 'progress', imageId, progress: 25, message: 'Preparing image' })
-  await wait(20)
-  emit({ type: 'progress', imageId, progress: 60, message: image.validationStatus === 'retake' ? 'Running enhanced CV and AI review' : 'Running CV pipeline' })
-  await wait(20)
+  emit({ type: 'progress', imageId, message: 'Sending image and awaiting cloud analysis; model loading may take time' })
 
   const pipeDiameter =
     photoOptions?.pipeDiameterMm ??
@@ -214,6 +208,7 @@ async function processImage(imageId: string, options?: ProcessOptions): Promise<
 
   const measurement = await runAiAssistedMeasurement(image, blobRecord?.blob, pipeDiameter, effectiveOptions)
 
+  emit({ type: 'progress', imageId, message: 'Saving inspection evidence' })
   const resultId = createId()
   const result: InspectionResult = {
     unifiedEvidence: measurement.unifiedEvidence,

@@ -298,7 +298,7 @@ export async function validateGuidedPhoto(blob?: Blob): Promise<GuidedPhotoValid
     if (linearJoint) {
       return {
         status: 'ready',
-        message: 'Linear joint seam detected. Enhanced CV and AI review will confirm the measurement.',
+        message: 'Possible linear seam. Scene identity, boundaries and physical scale require analysis; measurement may remain unavailable.',
         score: linearJoint.score,
       }
     }
@@ -316,7 +316,7 @@ export async function validateGuidedPhoto(blob?: Blob): Promise<GuidedPhotoValid
     if (linearJoint) {
       return {
         status: 'ready',
-        message: 'Linear joint seam detected. Enhanced CV and AI review will confirm the measurement.',
+        message: 'Possible linear seam. Scene identity, boundaries and physical scale require analysis; measurement may remain unavailable.',
         score: linearJoint.score,
       }
     }
@@ -352,7 +352,7 @@ export async function validateGuidedPhoto(blob?: Blob): Promise<GuidedPhotoValid
     if (linearJoint) {
       return {
         status: 'ready',
-        message: 'Linear joint seam detected. Enhanced CV and AI review will confirm the measurement.',
+        message: 'Possible linear seam. Scene identity, boundaries and physical scale require analysis; measurement may remain unavailable.',
         score: linearJoint.score,
       }
     }

@@ -132,10 +132,14 @@ def draw_boundaries(canvas, evidence):
     for a, b, c, d in evidence.get('text_exclusion_boxes', []):
         cv2.rectangle(canvas, (a, b), (c, d), (0, 0, 255), 1)
     for pair in evidence.get('edge_pairs', [])[::3]:
-        if pair['sam_nearby_support']:
+        if pair.get('basis') or pair.get('sam_nearby_support'):
             cv2.line(canvas, tuple(pair['a']), tuple(pair['b']), (0, 255, 255), 1)
             cv2.circle(canvas, tuple(pair['a']), 2, (255, 100, 30), -1)
             cv2.circle(canvas, tuple(pair['b']), 2, (30, 255, 100), -1)
+    pairs = evidence.get('edge_pairs', [])
+    for key, color in [('a',(255,100,30)),('b',(30,255,100))]:
+        if len(pairs)>1:
+            cv2.polylines(canvas,[np.array([p[key] for p in pairs],np.int32)],False,color,2,cv2.LINE_AA)
     for ring in evidence.get('ellipse_edges', []):
         ellipse = (tuple(ring['center_xy']), tuple(ring['axes_px']), ring['angle_deg'])
         cv2.ellipse(canvas, ellipse, (255, 0, 255), 1)

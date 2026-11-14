@@ -21,6 +21,8 @@ class RecordedOnly:
     def infer(self, payload, **kwargs):
         if hashlib.sha256(payload).hexdigest() != recorded['image_sha256']:
             raise ValueError('Replay only accepts its exact recorded original')
+        import time
+        time.sleep(float(os.getenv('JOINTINSPECT_REPLAY_DELAY_SECONDS','0')))
         result = copy.deepcopy(recorded)
         result['overlay_png_base64'] = base64.b64encode((root/'overlay.png').read_bytes()).decode()
         for region in result['regions']:
@@ -46,7 +48,7 @@ def fixture_suggestions(payload, engine, diameter, source):
     if hashlib.sha256(payload).hexdigest()!=recorded['image_sha256']:
         raise ValueError('Advisory fixture requires its exact recorded frame')
     return {'model':'OFFLINE_ADVISORY_FIXTURE_NO_VERTEX_CALL','domain_status':'PIPE_JOINT_INSPECTION',
-        'processing_allowed':True,'image_quality_usable':True,'suggested_joint_type':'CIRCULAR_OPENING',
+        'processing_allowed':True,'image_quality_usable':True,'suggested_joint_type':os.getenv('JOINTINSPECT_REPLAY_GEOMETRY','CIRCULAR_OPENING'),
         'suggested_inspection_context':'Fixture: a curved joint candidate is visible.', 'possible_gap_visible':True,
         'calibration':{'pipe_diameter_mm':diameter,'source':source,'calibration_reference_id':None,
             'verified':False,'authority':'UNVERIFIED_METADATA','suggested_notes':'Fixture: use a same-plane physical reference; the lower edge is obscured.',

@@ -24,7 +24,7 @@ export function getAuthorizedMillimetres(item: GapDisplayEvidence): number | nul
 }
 
 export function getPixelEvidence(item: GapDisplayEvidence): number | null {
-  const pixels = item.cvDebug?.gapPixels
+  const pixels = item.cvDebug?.gapPixels ?? item.unifiedEvidence?.joint_measurement.candidates[0]?.value
   return safeNonNegative(pixels) ? pixels : null
 }
 
