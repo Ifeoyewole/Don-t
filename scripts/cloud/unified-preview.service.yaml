@@ -15,7 +15,7 @@ spec:
     spec:
       serviceAccountName: joint-inspection-trainer@joint-inspection-510310.iam.gserviceaccount.com
       containerConcurrency: 1
-      timeoutSeconds: 120
+      timeoutSeconds: 210
       containers:
       - image: __IMMUTABLE_IMAGE_DIGEST__
         resources:

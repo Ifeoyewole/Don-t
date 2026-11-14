@@ -23,11 +23,14 @@ type Props = {
 }
 
 const validationTone = (image: InspectionImage) =>
-  image.validationStatus === 'retake' && image.queueStatus === 'queued' ? 'AI review needed' : image.validationStatus === 'retake' ? 'Needs retake' : 'Ready for inspection'
+  image.queueStatus === 'processing' ? 'Analysis running' : image.validationStatus === 'retake' && image.queueStatus === 'queued' ? 'AI review needed' : image.validationStatus === 'retake' ? 'Needs retake' : 'Ready for inspection'
 
-const phaseLabel = (image: InspectionImage) => {
+const phaseLabel = (image: InspectionImage, now: number) => {
   if (image.queueStatus === 'failed') return image.errorMessage ?? 'Needs replacement'
-  if (image.queueStatus === 'processing') return `Uploading ${image.progress ?? 0}%`
+  if (image.queueStatus === 'processing') {
+    const elapsed = image.processingStartedAt ? Math.max(0,Math.floor((now-Date.parse(image.processingStartedAt))/1000)) : 0
+    return `${image.errorMessage ?? 'Awaiting cloud analysis'} · ${elapsed}s elapsed`
+  }
   if (image.queueStatus === 'completed') return 'Measurement ready for review'
   return `${image.progress ?? 0}% complete`
 }
@@ -90,6 +93,13 @@ export const PhotoUploadPage = ({
   onStartInspection,
 }: Props) => {
   const [busy, setBusy] = useState(false)
+  const [now, setNow] = useState(()=>Date.now())
+  const processing = queue.some(image=>image.queueStatus==='processing')
+  useEffect(()=>{
+    if(!processing)return
+    const timer=window.setInterval(()=>setNow(Date.now()),1000)
+    return ()=>window.clearInterval(timer)
+  },[processing])
   const [previewAvailable, setPreviewAvailable] = useState(false)
   const [unifiedPreview, setUnifiedPreview] = useState(false)
   const previewModeRef = useRef(false)
@@ -361,7 +371,7 @@ export const PhotoUploadPage = ({
         <div>
           <h1>Upload Inspection Evidence</h1>
           <p className="lead">
-            Ensure each joint is clearly visible. Upload photos in order so the app can measure each gap and assign a tolerance status.
+            Upload clear joint views in order. Boundary evidence, physical measurements and defect findings are reported separately; uncertain cases remain in review.
           </p>
         </div>
         <button
@@ -649,7 +659,7 @@ export const PhotoUploadPage = ({
                       Remove
                     </button>
                     {image.queueStatus === 'completed' ? <span className="asset-check">✓</span> : null}
-                    {image.queueStatus === 'processing' ? <div className="asset-overlay">{phaseLabel(image)}</div> : null}
+                    {image.queueStatus === 'processing' ? <div className="asset-overlay">{phaseLabel(image, now)}</div> : null}
                   </div>
                   <div className="asset-body">
                     <div className="upload-title-row">
@@ -665,10 +675,10 @@ export const PhotoUploadPage = ({
                         {validationTone(image)}
                       </span>
                     </div>
-                    <div className="progress-rail">
-                      <div className="progress-fill" style={{ width: `${image.progress ?? 0}%` }} />
+                    <div className={`progress-rail ${image.queueStatus === 'processing' ? 'is-indeterminate' : ''}`} role="progressbar" aria-label={phaseLabel(image, now)} aria-valuenow={image.queueStatus === 'processing' ? undefined : image.progress ?? 0}>
+                      <div className="progress-fill" style={{ width: image.queueStatus === 'processing' ? '35%' : `${image.progress ?? 0}%` }} />
                     </div>
-                    <p>{phaseLabel(image)}</p>
+                    <p>{phaseLabel(image, now)}</p>
                     {image.validationMessage ? <p className="asset-validation-message">{image.validationMessage}</p> : null}
                     <div className="photo-context-editor" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--outline, #cbd5e1)' }}>
                       <label htmlFor={`geometry-${image.id}`} style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem' }}>

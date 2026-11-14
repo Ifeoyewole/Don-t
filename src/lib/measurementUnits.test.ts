@@ -67,3 +67,10 @@ describe('physical gap unit display', () => {
     expect(formatGapForUnit(item, 'px')).toBe('Pixel width unavailable')
   })
 })
+
+it('retains unified pixel diagnostics without authorizing millimetres', () => {
+  const item = {executionSource: 'CLOUD_RESEARCH_UNVERIFIED', measurementSource: 'fastapi',
+    unifiedEvidence: {physical_gap_mm:null, joint_measurement:{candidates:[{value:158.5,units:'px'}]}}} as GapDisplayEvidence
+  expect(formatGapForUnit(item,'px')).toContain('158.5 px')
+  expect(formatGapForUnit(item,'mm')).toContain('Measurement unavailable')
+})

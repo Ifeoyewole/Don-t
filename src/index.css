@@ -3448,3 +3448,16 @@ img {
   .report-toolbar, .report-guidance, .topbar, .desktop-sidebar, .bottom-nav { display: none !important; }
   .results-page .inspection-result-card { break-inside: auto; }
 }
+
+/* Inspection reports are documents, not thumbnail cards at any breakpoint. */
+.results-page, .results-page .inspection-results-grid,
+.results-page .inspection-result-card, .results-page .inspection-result-body { max-width: 100%; box-sizing: border-box; }
+.results-page .inspection-result-body > *, .results-page .unified-inspection-evidence { min-width: 0; max-width: 100%; }
+.results-page .inspection-result-body img { display:block; max-width:100%; height:auto; object-fit:contain; }
+.results-page .inspection-result-media img { object-fit:contain; }
+.results-page .unified-inspection-evidence table { width:100%; table-layout:fixed; border-collapse:collapse; }
+.results-page .unified-inspection-evidence th, .results-page .unified-inspection-evidence td { padding:8px; text-align:left; border-bottom:1px solid var(--outline); overflow-wrap:anywhere; }
+.progress-rail.is-indeterminate .progress-fill { animation:inspection-pending 1.8s ease-in-out infinite alternate; }
+@keyframes inspection-pending { from { transform:translateX(0); } to { transform:translateX(180%); } }
+@media(prefers-reduced-motion:reduce) { .progress-rail.is-indeterminate .progress-fill { animation:none; } }
+@media(max-width:700px) { .results-page .inspection-result-body { padding:14px; } .results-page .inspection-result-body [style*="grid-template-columns"] { grid-template-columns:minmax(0,1fr) !important; } }

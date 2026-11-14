@@ -77,6 +77,10 @@ try {
   if(reference.status()!==200 || (await reference.json()).reference_verified!==false)throw Error('Missing calibration must be a successful unverified lookup, not unavailable service')
   await page.getByText('Unified AI engineering preview',{exact:true}).waitFor()
   await page.getByRole('button', {name: /Start inspection/i}).last().click()
+  if(process.env.JOINTINSPECT_REPLAY_DELAY_SECONDS){
+    await page.getByRole('progressbar').first().waitFor()
+    if((await page.locator('body').innerText()).includes('Uploading 60%'))throw Error('Artificial upload percentage returned')
+  }
   await page.getByRole('heading', {name: 'Unified AI engineering preview'}).waitFor({timeout: 30000})
   const results = await page.evaluate(async () => {const {db} = await import('/src/db/database.ts');return db.inspectionResults.toArray()})
   if (results.length !== 1 || results[0].executionSource !== 'CLOUD_RESEARCH_UNVERIFIED' || !results[0].unifiedEvidence?.replay_only || results[0].finalGapMm !== null) throw Error('Research evidence persistence failed')
@@ -84,7 +88,16 @@ try {
     const json = await (await exportService.exportJson('e2e-project')).text();const pdf=await exportService.exportPdf('e2e-project');const zip=await exportService.exportEvidenceZip('e2e-project');
     return {json:JSON.parse(json), pdfBytes:pdf.size, zipBytes:zip.size} })
   if (!exports.json.results[0].unifiedEvidence || exports.pdfBytes < 1000 || exports.zipBytes < 1000) throw Error('Unified exports lost evidence')
-  for (const width of [1440, 390]) {await page.setViewportSize({width, height:1000});await page.screenshot({path:path.join(output, `site-${width}.png`),fullPage:true})}
+  for (const width of [1440, 980, 390]) {
+    await page.setViewportSize({width,height:1000})
+    const fits=await page.evaluate(()=>{
+      const card=document.querySelector('.inspection-result-card')?.getBoundingClientRect()
+      const grid=document.querySelector('.inspection-results-grid')?.getBoundingClientRect()
+      return Boolean(card&&grid&&card.width>=grid.width*.9&&document.documentElement.scrollWidth<=innerWidth+1)
+    })
+    if(!fits)throw Error('Full report width or viewport overflow at '+width)
+    await page.screenshot({path:path.join(output,`site-${width}.png`),fullPage:true})
+  }
   await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({mode:'RECORDED_REAL_ARTIFACT_HTTP_REPLAY_NOT_LIVE_INFERENCE', anonymousStatus, userSignInRequired:false, retiredOperationsStatus:410, editableAdviceVerified:true, calibrationLookupStatus:200,
     persistedResults:results.length, unifiedImageSha:results[0].unifiedEvidence.image_sha256, pdfBytes:exports.pdfBytes, zipBytes:exports.zipBytes, browserErrors:errors}, null, 2))
   if (errors.length) throw Error('Browser errors: '+errors.join(';'))

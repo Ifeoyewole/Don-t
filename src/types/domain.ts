@@ -273,6 +273,7 @@ export interface InspectionImage {
   createdAt: string
   previewUrl?: string
   progress?: number
+  processingStartedAt?: string
   errorMessage?: string
   validationStatus?: GuidedPhotoStatus
   validationMessage?: string

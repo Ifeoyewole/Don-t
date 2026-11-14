@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jointinspect-shell-v1'
+const CACHE_NAME = 'jointinspect-shell-v2'
 const APP_SHELL = ['/', '/index.html', '/favicon.svg', '/logo-jointinspect.svg', '/icons.svg']
 
 self.addEventListener('install', (event) => {
@@ -12,7 +12,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
+          if (key.startsWith('jointinspect-shell-') && key !== CACHE_NAME) {
             return caches.delete(key)
           }
           return Promise.resolve(false)
@@ -29,6 +29,8 @@ self.addEventListener('fetch', (event) => {
   }
 
   const url = new URL(request.url)
+  // Health, capability and authentication responses must always reach the server.
+  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)

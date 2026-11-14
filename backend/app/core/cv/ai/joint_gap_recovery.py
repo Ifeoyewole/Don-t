@@ -34,8 +34,21 @@ def text_exclusion_candidates(image):
         group = next((c for c in clusters if (x, y, cw, ch) in c), [])
         if len(group) < 4:
             continue
+        heights = np.array([g[3] for g in group],float)
+        bottoms = np.array([g[1]+g[3] for g in group],float)
+        font_height = float(np.median(heights))
+        # Texture fragments are not captions merely because they occur at a border.
+        if (np.median(np.abs(heights-font_height)) > .2*font_height or
+                np.median(np.abs(bottoms-np.median(bottoms))) > .2*font_height):
+            continue
         a = max(0, min(g[0] for g in group)-4); b = max(0, min(g[1] for g in group)-4)
         c = min(w, max(g[0]+g[2] for g in group)+4); d = min(h, max(g[1]+g[3] for g in group)+4)
+        local = hsv[b:d,a:c,2]
+        strokes = bright[b:d,a:c]>0
+        if (not np.any(strokes) or not np.any(~strokes) or
+                float(np.median(local[strokes]))-float(np.median(local[~strokes])) < 65 or
+                np.percentile(local[~strokes],75)-np.percentile(local[~strokes],25) > 35):
+            continue
         exclusion[b:d, a:c] = 255
         if [a, b, c, d] not in boxes: boxes.append([a, b, c, d])
     # Short codes (e.g. a three-letter CCTV caption) need a neighbouring
