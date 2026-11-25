@@ -1,3 +1,4 @@
+import { previewFailure } from './previewErrors'
 import type { CalibrationProfile } from '../types/domain'
 
 export interface CalibrationReferenceStatus {
@@ -16,6 +17,7 @@ export async function checkCalibrationReference(profile: CalibrationProfile, uni
   const response = await fetch(unifiedPreview ? '/api/unified?action=calibration' : '/api/v1/cv/calibration/check-reference', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(15000),
     body: JSON.stringify({
       reference_id: ref,
       project_id: profile.project_id || profile.projectId,
@@ -24,7 +26,7 @@ export async function checkCalibrationReference(profile: CalibrationProfile, uni
       camera_id: profile.camera_id || profile.cameraId || null,
     }),
   })
-  if (!response.ok) throw new Error('Calibration verification service is unavailable. Millimetres remain unverified.')
+  if (!response.ok) throw new Error(await previewFailure(response))
   const data: CalibrationReferenceStatus = await response.json()
   if (typeof data.reference_verified !== 'boolean' ||
       !['REFERENCE_MATCHED', 'CALIBRATION_REQUIRED'].includes(data.status) ||

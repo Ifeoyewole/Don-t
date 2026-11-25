@@ -1,3 +1,4 @@
+import type { InspectionFeedback } from '../types/feedback'
 import Dexie, { type Table } from 'dexie'
 import type {
   InspectionBlob,
@@ -9,6 +10,8 @@ import type {
 import { normalizeLegacyInspectionResult } from './migrations'
 
 export class PipeInspectionDatabase extends Dexie {
+  feedbackInterpretations!: Table<{feedbackId:string;result:unknown;createdAt:string},string>
+  inspectionFeedback!: Table<InspectionFeedback,string>
   projects!: Table<Project, string>
   manholes!: Table<Manhole, string>
   inspectionImages!: Table<InspectionImage, string>
@@ -42,6 +45,8 @@ export class PipeInspectionDatabase extends Dexie {
     }).upgrade((transaction) => transaction.table('inspectionResults').toCollection().modify((record) => {
       Object.assign(record, normalizeLegacyInspectionResult(record))
     }))
+    this.version(4).stores({inspectionFeedback:'id, inspectionId, imageId, createdAt, [inspectionId+revision]',feedbackInterpretations:'feedbackId, createdAt'})
+
   }
 }
 

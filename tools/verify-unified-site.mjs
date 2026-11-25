@@ -89,6 +89,23 @@ try {
     const json = await (await exportService.exportJson('e2e-project')).text();const pdf=await exportService.exportPdf('e2e-project');const zip=await exportService.exportEvidenceZip('e2e-project');
     return {json:JSON.parse(json), pdfBytes:pdf.size, zipBytes:zip.size} })
   if (!exports.json.results[0].unifiedEvidence || exports.pdfBytes < 1000 || exports.zipBytes < 1000) throw Error('Unified exports lost evidence')
+  if(exports.json.optionalFeedback.length!==0)throw Error('Inspection or export required feedback')
+  await page.getByText('Optional engineer feedback',{exact:false}).first().click()
+  await page.getByLabel('Observation or boundary correction').fill('Boundary needs checking against the physical edge.')
+  await page.getByLabel('Reported condition').selectOption('UNCERTAIN')
+  await page.getByLabel('Site-measured gap (mm), optional').fill('3.5')
+  await page.getByLabel('Measurement method or source').fill('Browser test operator report, not verified ground truth')
+  await page.getByRole('button',{name:'Save optional feedback',exact:true}).click()
+  await page.getByText('Optional feedback saved on this device.',{exact:false}).waitFor()
+  await page.getByLabel('Observation or boundary correction').fill('Second revision; preserve the first.')
+  await page.getByRole('button',{name:'Save optional feedback',exact:true}).click()
+  await page.getByText('Revision 2',{exact:false}).waitFor()
+  const feedback=await page.evaluate(async()=>{const {db}=await import('/src/db/database.ts');return {rows:await db.inspectionFeedback.toArray(),results:await db.inspectionResults.toArray()}})
+  if(feedback.rows.length!==2||feedback.rows.some(r=>r.trainingEligible!==false)||feedback.results[0].finalGapMm!==null)throw Error('Optional feedback altered prediction or training eligibility')
+  await page.getByRole('button',{name:'Interpret saved feedback with Gemini (optional)',exact:true}).click()
+  await page.getByText('Interpretation saved separately.',{exact:false}).waitFor()
+  const reviewedExport=await page.evaluate(async()=>{const {exportService}=await import('/src/services/exportService.ts');return {json:JSON.parse(await (await exportService.exportJson('e2e-project')).text()),pdf:(await exportService.exportPdf('e2e-project')).size}})
+  if(reviewedExport.json.optionalFeedback.length!==2||reviewedExport.json.feedbackInterpretations.length!==1||reviewedExport.pdf<1000)throw Error('Feedback missing from export')
   for (const width of [1440, 980, 390]) {
     await page.setViewportSize({width,height:1000})
     const fits=await page.evaluate(()=>{

@@ -1,4 +1,4 @@
-/** No-sign-in PREVIEW website -> private IAM-authenticated, quota-metered worker. */
+/** No-sign-in PREVIEW website -> private IAM-authenticated, budget-metered worker. */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getCloudRunIdToken } from './_lib/gcp-oidc.js'
 import { checkRateLimit } from './_lib/rate-limiter.js'
@@ -15,7 +15,7 @@ export default async function unified(req: IncomingMessage, res: ServerResponse)
   const url = process.env.UNIFIED_PREVIEW_URL?.replace(/\/$/, '')
   if (!url || !/^https:\/\/[a-z0-9-]+\.[a-z0-9.-]*run\.app$/.test(url)) return send(503, { detail: 'Private unified worker is not configured', available: false })
   const action = new URL(req.url || '/api/unified','https://localhost').searchParams.get('action') || 'inspect'
-  const routes: Record<string,string> = {inspect:'unified',suggestions:'context-suggestions',calibration:'check-reference'}
+  const routes: Record<string,string> = {inspect:'unified',suggestions:'context-suggestions',calibration:'check-reference',review:'review-interpretation'}
   if (!routes[action]) return send(404,{detail:'Unknown inspection operation'})
   if (req.method === 'GET') return send(200, { available: true, mode: 'PREVIEW', user_sign_in_required: false, max_file_bytes: 3*1024*1024 })
   const origin = req.headers.origin
@@ -35,7 +35,7 @@ export default async function unified(req: IncomingMessage, res: ServerResponse)
       method: 'POST', headers: { Authorization: 'Bearer '+token, 'Content-Type': contentType },
       body: new Uint8Array(bytes), signal: AbortSignal.timeout(240_000), redirect: 'error',
     })
-    if (!response.ok) return send(response.status, { detail: 'Inspection service or research spending allowance unavailable. No automatic retry.' })
+    if (!response.ok) return send(response.status, { code: `UPSTREAM_${response.status}`, detail: 'Inspection operation failed. No automatic retry.', operation: action })
     const data = await response.json()
     return send(200, data)
   } catch (error) {

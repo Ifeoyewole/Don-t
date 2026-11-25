@@ -1,3 +1,6 @@
+import { formatGapForUnit } from '../lib/measurementUnits'
+import { inspectionNarrative } from '../lib/inspectionNarrative'
+import type { InspectionFeedback } from '../types/feedback'
 import JSZip from 'jszip'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { db } from '../db'
@@ -15,6 +18,8 @@ import { getPipeSpec } from '../utils'
 const DISCLAIMER = 'Guidance only – not a formal adoption assessment.'
 
 interface ExportProjectData {
+  optionalFeedback: InspectionFeedback[]
+  feedbackInterpretations: Array<{feedbackId:string;result:unknown;createdAt:string}>
   project: Project
   manholes: Manhole[]
   inspectionImages: InspectionImage[]
@@ -56,7 +61,10 @@ async function loadProjectExportData(projectId: string): Promise<ExportProjectDa
     }
   }
 
+  const optionalFeedback=await db.inspectionFeedback.where('inspectionId').anyOf(inspectionResults.map(r=>r.id)).toArray()
+  const feedbackInterpretations=await db.feedbackInterpretations.bulkGet(optionalFeedback.map(r=>r.id))
   return {
+    optionalFeedback, feedbackInterpretations:feedbackInterpretations.filter((r):r is NonNullable<typeof r>=>Boolean(r)),
     project,
     manholes,
     inspectionImages,
@@ -144,7 +152,17 @@ async function createPdfBlob(data: ExportProjectData): Promise<Blob> {
   })
   y -= 20
 
-  for (const result of buildExportResultRecords(data).slice(0, 25)) {
+  const paragraph=(value:string)=>{
+    const words=value.replace(/[^\x20-\x7e]/g,'?').split(/\s+/);let line=''
+    for(const word of [...words,'\n']){
+      if(word==='\n'||font.widthOfTextAtSize(`${line} ${word}`,10)>485){
+        if(y<65){page=pdf.addPage([595,842]);y=800}
+        page.drawText(line,{x:left,y,size:10,font});y-=15;line=''
+      }
+      if(word!=='\n')line+=(line?' ':'')+word
+    }
+  }
+  for (const result of buildExportResultRecords(data)) {
     const text = [
       `Project name: ${result.projectName}`,
       `Manhole ID: ${result.manholeId}`,
@@ -156,14 +174,8 @@ async function createPdfBlob(data: ExportProjectData): Promise<Blob> {
       `Gap status: ${result.gapStatus}`,
       `User notes: ${result.userNotes || 'None'}`,
     ].join(' | ')
-    page.drawText(text, {
-      x: left,
-      y,
-      size: 10,
-      font,
-      color: rgb(0.15, 0.15, 0.15),
-    })
-    y -= 14
+    paragraph(text)
+    y -= 10
 
     if (y < 70) {
       page = pdf.addPage([595, 842])
@@ -184,8 +196,8 @@ async function createPdfBlob(data: ExportProjectData): Promise<Blob> {
     if (!evidence) continue
     page = pdf.addPage([595, 842]); y = 800
     const plain = (value: string) => value.replace(/[^\x20-\x7e]/g, '?')
-    const paragraphs = [`Unified engineering preview - ${result.jointLabel}`, evidence.summary,
-      `Geometry: ${evidence.joint_measurement.status}. Physical gap: unavailable.`,
+    const paragraphs = [`Unified engineering preview - ${result.jointLabel}`, inspectionNarrative(evidence), evidence.summary,
+      `Geometry: ${evidence.joint_measurement.status}. ${formatGapForUnit(result,'mm')}.`,
       `Gemini: ${evidence.gemini.model ?? 'unreported'} - ${evidence.gemini.status}`,
       ...evidence.preliminary_findings.map(f => `${f.label}: ${f.explanation ?? f.status}`),
       ...evidence.disagreements_and_limits]
@@ -206,6 +218,11 @@ async function createPdfBlob(data: ExportProjectData): Promise<Blob> {
       if (y-size.height < 60) { page = pdf.addPage([595, 842]); y = 800 }
       page.drawImage(image, { x: left, y: y-size.height, width: size.width, height: size.height })
     }
+  }
+  if(data.optionalFeedback.length){
+    page=pdf.addPage([595,842]);y=800
+    paragraph('Optional operator feedback - unverified reports, not model predictions or training approvals')
+    for(const row of data.optionalFeedback){paragraph(`Inspection ${row.inspectionId}; revision ${row.revision}; ${row.defect||'condition not assessed'}; site measurement ${row.siteMeasuredGapMm==null?'not supplied':String(row.siteMeasuredGapMm)+' mm (operator reported)'}; method ${row.measurementMethod||'not supplied'}. ${row.notes}`);y-=10}
   }
   page.drawText(DISCLAIMER, {
     x: left,
@@ -228,6 +245,8 @@ export const exportService = {
       {
         disclaimer: data.disclaimer,
         results: buildExportResultRecords(data),
+        optionalFeedback:data.optionalFeedback,
+        feedbackInterpretations:data.feedbackInterpretations,
       },
       null,
       2,

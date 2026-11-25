@@ -57,6 +57,8 @@ async def unified(file: UploadFile = File(...), options: str = Form('{}'),
     if len(payload) > 8*1024*1024:
         raise HTTPException(413, 'Research image exceeds 8 MiB')
     try:
+        from backend.app.core.cv.ai.research_sewer_fusion import decode
+        decode(payload)  # Reject unsupported images before any spending reservation.
         cache_blob = None
         if os.getenv('JOINTINSPECT_RESEARCH_IAM_ONLY') == 'true':
             from scripts.cloud.engineering_preview_budget import reserve
@@ -112,3 +114,23 @@ async def check_reference(request: CalibrationReferenceCheck,
     await authorize(authorization)
     from backend.app.api.v1.endpoints.calibration import check_calibration_reference
     return await check_calibration_reference(request)
+
+
+@router.post('/sewer-research/review-interpretation')
+async def review_interpretation(file: UploadFile = File(...), review: str = Form(...),
+                                authorization: str | None = Header(default=None)):
+    await authorize(authorization)
+    if len(review)>8192:raise HTTPException(413,'Review exceeds limit')
+    payload=await file.read(3*1024*1024+1)
+    if len(payload)>3*1024*1024:raise HTTPException(413,'Review image exceeds limit')
+    try:
+        from backend.app.core.cv.ai.review_interpretation import interpret
+        from backend.app.core.cv.ai.research_sewer_runtime import cloud_reconciler
+        from backend.app.core.cv.ai.research_sewer_fusion import decode
+        decode(payload)
+        data=json.loads(review)
+        engine=await run_in_threadpool(cloud_reconciler)
+        return await run_in_threadpool(interpret,payload,data,engine)
+    except PreviewBudgetDenied:raise HTTPException(429,'Research allowance unavailable; no automatic retry')
+    except ValueError:raise HTTPException(422,'Review or interpretation could not be validated')
+    except Exception:raise HTTPException(503,'Optional review interpretation unavailable; inspection preserved')

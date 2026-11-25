@@ -57,3 +57,15 @@ def fixture_suggestions(payload, engine, diameter, source):
 
 runtime.cloud_reconciler=lambda:object()
 advisory.suggest=fixture_suggestions
+
+
+# Explicit offline fixture tests review transport, not Vertex quality.
+import backend.app.core.cv.ai.review_interpretation as review_module
+def fixture_review(payload,review,engine):
+    if hashlib.sha256(payload).hexdigest()!=recorded['image_sha256']:
+        raise ValueError('Review fixture requires original bytes')
+    return {'image_sha256':recorded['image_sha256'],'review_revision':review.get('revision'),
+        'model':'OFFLINE_REVIEW_FIXTURE_NO_VERTEX_CALL','authoritative':False,'training_eligible':False,
+        'interpretation':{'proposed_label':'GEOMETRY_UNCERTAIN','explanation':'Explicit offline fixture: verify the reported boundaries.',
+        'boundary_guidance':'Fixture guidance, not a new model finding.','needs_clarification':True}}
+review_module.interpret=fixture_review

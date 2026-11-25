@@ -1,9 +1,11 @@
+import { inspectionNarrative } from '../lib/inspectionNarrative'
 import type { UnifiedEvidence } from '../types/unified'
 
 export function UnifiedInspectionEvidence({ evidence }: { evidence: UnifiedEvidence }) {
   return <section className="unified-inspection-evidence">
     <h3>Unified AI engineering preview</h3>
-    <p>{evidence.summary}</p>
+    <p className="inspection-result-narrative">{inspectionNarrative(evidence)}</p>
+    <details><summary>Gemini scene explanation</summary><p>{evidence.summary}</p></details>
     <p><strong>{evidence.physical_gap_mm != null ? `${evidence.physical_gap_mm.toFixed(2)} mm — calibrated research estimate` : 'Measurement unavailable — calibration or reliable joint boundaries required'}</strong></p>
     <p>Calibration: {evidence.joint_measurement.calibration_status ?? 'UNVERIFIED'} · {evidence.joint_measurement.status}</p>
     {evidence.overlay_png_base64 && <img className="unified-evidence-overlay" src={`data:image/png;base64,${evidence.overlay_png_base64}`} alt="Unified inspection segmentation and joint-edge evidence" />}

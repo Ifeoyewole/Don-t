@@ -1,3 +1,4 @@
+import { validatePreviewImage } from '../lib/previewErrors'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
 import { requestInspectionContextSuggestions } from '../lib/contextSuggestions'
@@ -254,7 +255,7 @@ export const PhotoUploadPage = ({
     const controller = new AbortController()
     suggestionControllers.current.set(image.id, controller)
     await persistPhotoContext(image.id, { contextSuggestionStatus: 'pending' }, 'system')
-    const timeout = window.setTimeout(() => controller.abort('timeout'), 120000)
+    const timeout = window.setTimeout(() => controller.abort('timeout'), 220000)
     try {
       const preview = await previewCapability.current?.catch(()=>false) ?? previewModeRef.current
       const result = await requestInspectionContextSuggestions(photo, controller.signal, manholePipeDiameterMm, preview)
@@ -294,6 +295,9 @@ export const PhotoUploadPage = ({
     setError('')
     try {
       const selected = Array.from(files)
+      if(await previewCapability.current?.catch(()=>false)) {
+        for(const file of selected)await validatePreviewImage(file)
+      }
       const added = await onAddFiles(selected)
       if (online) {
         // Two image-only requests at a time, to limit network and Vertex usage.
@@ -407,7 +411,7 @@ export const PhotoUploadPage = ({
                 ⌁
               </div>
               <strong>Drag photos here</strong>
-              <span>Or tap to browse photos. Supported formats: JPG, PNG, WEBP (max 15 MB).</span>
+              <span>Or tap to browse photos. Supported formats: JPG, PNG, WEBP ({unifiedPreview ? 'max 3 MiB / 16 MP' : 'max 15 MB'}).</span>
               <button className="button button-secondary" type="button" onClick={() => inputRef.current?.click()} disabled={busy}>
                 Browse Photos
               </button>
@@ -712,7 +716,7 @@ export const PhotoUploadPage = ({
                       </select>
                       <p style={{ fontSize: '0.72rem', marginTop: '0.3rem' }}>
                         {image.contextSuggestionStatus === 'pending' ? 'Gemini is analyzing this photo…' :
-                          image.contextSuggestionStatus === 'ready' ? `AI suggestion: ${image.contextSuggestionModel ?? 'visual model'} — review before trusting.` :
+                          image.contextSuggestionStatus === 'ready' ? `AI suggestion: ${image.contextSuggestionModel ?? 'visual model'} — editable suggestion; engineering review is optional.` :
                             image.contextSuggestionMessage ?? 'Select a supported gap geometry or keep evidence for manual review.'}
                       </p>
                       {image.suggestedInspectionContext && (

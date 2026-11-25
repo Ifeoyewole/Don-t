@@ -1,3 +1,4 @@
+import { previewFailure, validatePreviewImage } from './previewErrors'
 import type { JointGeometryType } from '../types/domain'
 
 /** Advisory-only contract from the existing backend context_suggestions endpoint. */
@@ -76,6 +77,7 @@ export async function requestInspectionContextSuggestions(
   manholeDiameterMm?: number,
   unifiedPreview = false,
 ): Promise<InspectionContextSuggestion> {
+  if(unifiedPreview)await validatePreviewImage(photo)
   const formData = new FormData()
   formData.append('file', photo, photo.name)
   if (manholeDiameterMm && Number.isFinite(manholeDiameterMm)) {
@@ -88,7 +90,7 @@ export async function requestInspectionContextSuggestions(
     signal,
   })
   if (!response.ok) {
-    throw new Error(`Gemini inspection suggestions unavailable (HTTP ${response.status}). Manual entry remains available.`)
+    throw new Error(await previewFailure(response))
   }
   return validateInspectionContextSuggestion(await response.json(), manholeDiameterMm)
 }

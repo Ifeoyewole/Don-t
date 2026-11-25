@@ -229,7 +229,8 @@ def test_private_worker_requires_iam_before_spending_and_never_initializes_model
     monkeypatch.setattr(endpoint,'cloud_phase1_service',lambda:calls.append('MODEL_MUST_NOT_LOAD'))
     def denied(*args):calls.append('budget');raise PreviewBudgetDenied('Cumulative research allowance exhausted')
     monkeypatch.setattr(budget,'reserve',denied)
-    client=TestClient(app);url='/api/v1/cv/sewer-research/unified';files={'file':('frame.png',b'synthetic')}
+    from backend.tests.test_phase1_unified import payload
+    client=TestClient(app);url='/api/v1/cv/sewer-research/unified';files={'file':('frame.png',payload())}
     assert client.post(url,files=files).status_code==401
     monkeypatch.setattr(google.oauth2.id_token,'verify_oauth2_token',lambda *args:{'email':'wrong@example.test','email_verified':True})
     assert client.post(url,files=files,headers={'Authorization':'Bearer synthetic'}).status_code==401
