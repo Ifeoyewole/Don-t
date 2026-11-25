@@ -64,3 +64,9 @@ Reproduce with:
 
 Genuine physical scale and independent site/boundary references remain necessary
 for accuracy comparisons. Camera resolution and DPI alone are not calibration.
+
+Phone EXIF orientation is applied consistently to research decoding so displayed
+photos, segmentation and geometry share the oriented-original coordinate system.
+Original bytes/hashes are unchanged. Existing calibration still must match the
+resulting dimensions and image geometry; a rotated image is not an implicit
+calibration transfer.

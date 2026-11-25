@@ -15,7 +15,7 @@ from time import perf_counter
 
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 from backend.app.core.cv.ai.research_sewer_detector import overlap
 from backend.app.core.cv.ai.research_inspect_view_sam2_fusion import combine_inspect_view_and_sam2
@@ -37,7 +37,7 @@ def decode(payload):
             if image.width*image.height > 16_000_000:
                 raise ValueError('Image dimensions exceed research limit')
             image.load()
-            return cv2.cvtColor(np.array(image.convert('RGB')), cv2.COLOR_RGB2BGR)
+            return cv2.cvtColor(np.array(ImageOps.exif_transpose(image).convert('RGB')), cv2.COLOR_RGB2BGR)
     except (OSError, Image.DecompressionBombError) as exc:
         raise ValueError('Image cannot be decoded or exceeds safe dimensions') from exc
 

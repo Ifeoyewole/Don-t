@@ -49,3 +49,14 @@ def test_identical_feedback_revisions_do_not_duplicate_paid_calls(monkeypatch):
     first=interpret(payload(),{'notes':'same correction','revision':1},vertex)
     second=interpret(payload(),{'notes':'same correction','revision':2},vertex)
     assert len(calls)==1 and first['review_revision']==1 and second['review_revision']==2
+
+
+def test_phone_exif_orientation_matches_display_without_changing_original_bytes():
+    import io,hashlib
+    from PIL import Image
+    from backend.app.core.cv.ai.research_sewer_fusion import decode
+    image=Image.new('RGB',(40,80),'red');exif=Image.Exif();exif[274]=6
+    stream=io.BytesIO();image.save(stream,format='JPEG',exif=exif)
+    payload=stream.getvalue();before=hashlib.sha256(payload).hexdigest()
+    assert decode(payload).shape[:2]==(40,80)
+    assert hashlib.sha256(payload).hexdigest()==before
