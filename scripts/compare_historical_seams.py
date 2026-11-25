@@ -25,9 +25,9 @@ for case,g,d in [('concrete900','VERTICAL_SEAM',900),('pipe150','HORIZONTAL_SEAM
   try:
    source=subprocess.check_output(['git','show',sha+':backend/app/core/cv/seam_detector.py'],text=True)
    module=types.ModuleType('historical_seam');exec(compile(source,'historical_seam','exec'),module.__dict__)
-   args={'image_bgr':im,'joint_type':JointType(g)}
-   if 'roi_bbox' in inspect.signature(module.measure_seam_gap).parameters:args['roi_bbox']=(0,0,w,h)
-   result=module.measure_seam_gap(**args);row.update(status='RETURNED',pixels=result.mean_gap_px)
+   call_args={'image_bgr':im,'joint_type':JointType(g)}
+   if 'roi_bbox' in inspect.signature(module.measure_seam_gap).parameters:call_args['roi_bbox']=(0,0,w,h)
+   result=module.measure_seam_gap(**call_args);row.update(status='RETURNED',pixels=result.mean_gap_px)
   except Exception as e:row.update(status='REJECTED_OR_INCOMPATIBLE',reason=str(e)[:300])
   out.append(row)
  rough=profile_rough_seam(im,g,(0,0,w,h));improved=measure_image_seam(im,g)
