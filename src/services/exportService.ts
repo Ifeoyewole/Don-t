@@ -1,3 +1,4 @@
+import { formatGapForUnit } from '../lib/measurementUnits'
 import { inspectionNarrative } from '../lib/inspectionNarrative'
 import type { InspectionFeedback } from '../types/feedback'
 import JSZip from 'jszip'
@@ -196,7 +197,7 @@ async function createPdfBlob(data: ExportProjectData): Promise<Blob> {
     page = pdf.addPage([595, 842]); y = 800
     const plain = (value: string) => value.replace(/[^\x20-\x7e]/g, '?')
     const paragraphs = [`Unified engineering preview - ${result.jointLabel}`, inspectionNarrative(evidence), evidence.summary,
-      `Geometry: ${evidence.joint_measurement.status}. Physical gap: ${evidence.physical_gap_mm == null ? "unavailable" : String(evidence.physical_gap_mm)+" mm (research estimate)"}.`,
+      `Geometry: ${evidence.joint_measurement.status}. ${formatGapForUnit(result,'mm')}.`,
       `Gemini: ${evidence.gemini.model ?? 'unreported'} - ${evidence.gemini.status}`,
       ...evidence.preliminary_findings.map(f => `${f.label}: ${f.explanation ?? f.status}`),
       ...evidence.disagreements_and_limits]
