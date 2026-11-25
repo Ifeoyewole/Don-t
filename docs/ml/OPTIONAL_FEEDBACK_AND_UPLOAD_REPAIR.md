@@ -51,7 +51,8 @@ by that description; the rough/dark-boundary methods are OpenCV algorithms.
 The comparison script evaluates identical original images, orientations and
 full-frame areas. Historical code is executed using current dependencies, so
 this is not an exact reproduction of its deployed runtime. On the available900mm
-original: August code returned no pixel value, November seam code rejected,
+original: August code emitted an unverified860.58mm from a nominal-diameter scale
+(about596.64px, recovered from its debug fields), November seam code rejected,
 rough profiling returned161.5px and local normals158.577px. This supports keeping
 the current useful diagnostic path, but does not establish which version is
 physically more accurate. The original150mm image is unavailable in the resumed
