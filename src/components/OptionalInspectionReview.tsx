@@ -20,7 +20,7 @@ export function OptionalInspectionReview({inspectionId}:{inspectionId:string}){
    const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await original.blob.arrayBuffer()))].map(v=>v.toString(16).padStart(2,'0')).join('')
    if(row.imageSha256 && row.imageSha256!==digest)throw Error('Original image identity changed. Feedback remains saved; interpretation was not submitted.')
    const form=new FormData();form.append('file',original.blob,'inspection.jpg');form.append('review',JSON.stringify({notes:row.notes,defect:row.defect,siteMeasuredGapMm:row.siteMeasuredGapMm,measurementMethod:row.measurementMethod,revision:row.revision}))
-   const response=await fetch('/api/unified?action=review',{method:'POST',body:form,signal:AbortSignal.timeout(180000)})
+   const response=await fetch('/api/unified?action=review',{method:'POST',body:form,signal:AbortSignal.timeout(220000)})
    if(!response.ok)throw Error(await previewFailure(response))
    const result=await response.json()
    if(result.image_sha256!==digest||result.review_revision!==row.revision||result.authoritative!==false||result.training_eligible!==false||typeof result.interpretation?.explanation!=='string')throw Error('Invalid advisory review response.')
