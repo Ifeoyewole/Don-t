@@ -32,11 +32,15 @@ def png(array):
 def decode(payload):
     if not isinstance(payload, bytes) or not payload or len(payload) > 8*1024*1024:
         raise ValueError('Nonempty image up to 8 MiB required')
-    with Image.open(io.BytesIO(payload)) as image:
-        if image.width*image.height > 16_000_000:
-            raise ValueError('Image dimensions exceed research limit')
-        image.load()
-        return cv2.cvtColor(np.array(image.convert('RGB')), cv2.COLOR_RGB2BGR)
+    try:
+        with Image.open(io.BytesIO(payload)) as image:
+            if image.width*image.height > 16_000_000:
+                raise ValueError('Image dimensions exceed research limit')
+            image.load()
+            return cv2.cvtColor(np.array(image.convert('RGB')), cv2.COLOR_RGB2BGR)
+    except (OSError, Image.DecompressionBombError) as exc:
+        raise ValueError('Image cannot be decoded or exceeds safe dimensions') from exc
+
 
 
 class RegionTracker:

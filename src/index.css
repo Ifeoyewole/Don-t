@@ -3461,3 +3461,8 @@ img {
 @keyframes inspection-pending { from { transform:translateX(0); } to { transform:translateX(180%); } }
 @media(prefers-reduced-motion:reduce) { .progress-rail.is-indeterminate .progress-fill { animation:none; } }
 @media(max-width:700px) { .results-page .inspection-result-body { padding:14px; } .results-page .inspection-result-body [style*="grid-template-columns"] { grid-template-columns:minmax(0,1fr) !important; } }
+.optional-inspection-review { padding:16px; border:1px solid var(--outline); border-radius:12px; }
+.optional-inspection-review summary { cursor:pointer; font-weight:700; }
+.optional-inspection-review .field { display:grid; gap:6px; margin:12px 0; }
+.optional-inspection-review input,.optional-inspection-review select,.optional-inspection-review textarea { width:100%; min-width:0; max-width:100%; box-sizing:border-box; padding:10px; }
+.inspection-result-narrative { line-height:1.7; padding:16px; border-left:4px solid var(--primary); background:var(--surface); }

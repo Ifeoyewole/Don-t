@@ -1,3 +1,4 @@
+import { OptionalInspectionReview } from '../components/OptionalInspectionReview'
 import { InspectionReadiness } from '../components/InspectionReadiness'
 import { UnifiedInspectionEvidence } from '../components/UnifiedInspectionEvidence'
 import { useEffect, useState } from 'react'
@@ -497,8 +498,8 @@ const ResultCard = ({
         </div>
 
         <div className="inspection-note-block">
-          <span>Inspector Notes</span>
-          <p>{item.notes || 'Awaiting inspector note for this joint.'}</p>
+          <span>Inspector notes (optional)</span>
+          <p>{item.notes || 'No optional note recorded.'}</p>
         </div>
 
         <div className="inspection-meta-row">
@@ -506,9 +507,10 @@ const ResultCard = ({
           <span>{item.unifiedEvidence ? 'Independent model evidence; no fused confidence' : `${Math.round((item.confidence ?? 0) * 100)}% confidence`}</span>
         </div>
 
+        <OptionalInspectionReview inspectionId={item.id} />
         <div className="inspection-cta-row">
           <button className="button button-secondary card-action-button" type="button" onClick={() => setOpenControls((current) => !current)}>
-            {statusActionLabel(item.status)}
+            {item.unifiedEvidence ? 'Manual override (optional)' : statusActionLabel(item.status)}
           </button>
           <button className="button button-ghost" type="button" onClick={() => void onRemeasure(item.id)} disabled={busy}>
             Re-measure
@@ -517,10 +519,10 @@ const ResultCard = ({
 
         {openControls ? (
           <div className="inspection-controls-panel">
-            <label className="field">
-              <span>Inspector Note</span>
+            {!item.unifiedEvidence && <label className="field">
+              <span>Inspector Note (optional)</span>
               <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={4} />
-            </label>
+            </label>}
 
             <div className="override-grid">
               <label className="field">
@@ -543,9 +545,9 @@ const ResultCard = ({
             </div>
 
             <div className="action-row">
-              <button className="button button-secondary" type="button" onClick={() => void handleSaveNote()} disabled={busy}>
+              {!item.unifiedEvidence && <button className="button button-secondary" type="button" onClick={() => void handleSaveNote()} disabled={busy}>
                 Save Note
-              </button>
+              </button>}
               <button className="button button-primary" type="button" onClick={() => void handleOverride()} disabled={busy}>
                 Apply Override
               </button>

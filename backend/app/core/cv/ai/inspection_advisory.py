@@ -70,7 +70,7 @@ def suggest(payload, engine, diameter=None, metadata_source='MANHOLE_METADATA'):
               'generationConfig':{'responseMimeType':'application/json','responseSchema':vertex_response_schema(Advisory),
                                   'temperature':.1,'maxOutputTokens':8192}}
         raw,usage=engine.generate_authorized_json(body)
-        visual=Advisory.model_validate(raw).model_dump()
+        visual=validate_visual(raw,width,height)
         cached={'image_sha256':digest,'contract':contract(),'model':MODEL,'visual':visual,'usage':usage}
         cached['signature']=hmac.new(engine.secret,canonical(cached),hashlib.sha256).hexdigest()
         if not engine.store.create('suggestions/'+key+'.json',cached):raise ValueError('Suggestion cache conflict')
@@ -79,13 +79,8 @@ def suggest(payload, engine, diameter=None, metadata_source='MANHOLE_METADATA'):
             or not hmac.compare_digest(str(cached.get('signature','')),hmac.new(engine.secret,canonical(unsigned),hashlib.sha256).hexdigest())):
         raise ValueError('Suggestion signature or original image identity mismatch')
     visual=Advisory.model_validate(cached['visual']).model_dump()
+    visual=validate_visual(visual,width,height)
     box=visual['reference_bbox']
-    if box and (len(box)!=4 or not 0<=box[0]<box[2]<=width or not 0<=box[1]<box[3]<=height):
-        raise ValueError('Reference proposal outside original image')
-    if visual['reference_kind']=='NONE' and box:raise ValueError('Absent reference cannot have an ROI')
-    text=' '.join([visual['inspection_context'],visual['calibration_guidance'],*visual['limitations']])
-    if re.search(r'\b\d+(?:\.\d+)?\s*(mm|millimet(?:er|re)s?)\b|\b(?:status|verdict|result)\s*(?:is|=|:)?\s*(PASS|FAIL)\b',text,re.I):
-        raise ValueError('Gemini suggestions cannot supply physical measurements or engineering verdicts')
     allowed=visual['pipe_visible'] and visual['domain_status'] in ('PIPE_JOINT_INSPECTION','PIPE_INTERIOR_NO_JOINT')
     return {'model':MODEL,'image_sha256':digest,'domain_status':visual['domain_status'],
         'processing_allowed':allowed,'image_quality_usable':visual['quality_usable'],
@@ -97,3 +92,15 @@ def suggest(payload, engine, diameter=None, metadata_source='MANHOLE_METADATA'):
                       'suggested_notes':visual['calibration_guidance'],
                       'reference_kind':visual['reference_kind'],'reference_bbox':box},
         'review_required':True,'reason':'; '.join(visual['limitations']) or 'Editable image-specific Gemini suggestions; physical scale remains unverified.'}
+
+
+def validate_visual(raw,width,height):
+    visual=Advisory.model_validate(raw).model_dump()
+    box=visual['reference_bbox']
+    if box and (len(box)!=4 or not 0<=box[0]<box[2]<=width or not 0<=box[1]<box[3]<=height):
+        raise ValueError('Reference proposal outside original image')
+    if visual['reference_kind']=='NONE' and box:raise ValueError('Absent reference cannot have an ROI')
+    text=' '.join([visual['inspection_context'],visual['calibration_guidance'],*visual['limitations']])
+    if re.search(r'\b\d+(?:\.\d+)?\s*(mm|millimet(?:er|re)s?)\b|\b(?:status|verdict|result)\s*(?:is|=|:)?\s*(PASS|FAIL)\b',text,re.I):
+        raise ValueError('Gemini suggestions cannot supply physical measurements or engineering verdicts')
+    return visual
