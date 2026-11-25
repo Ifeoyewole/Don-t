@@ -16,6 +16,23 @@ export async function previewFailure(response: Response): Promise<string> {
 export async function validatePreviewImage(photo: Blob): Promise<void> {
   if(photo.size>3*1024*1024)throw Error('Preview images must be at most 3 MiB; the original was not submitted.')
   if(photo.type && !['image/jpeg','image/png','image/webp'].includes(photo.type))throw Error('Use a JPG, PNG or WEBP original for this preview.')
+  // Read dimensions before allocating a potentially huge phone-image bitmap.
+  const header=new DataView(await photo.arrayBuffer())
+  let dimensions:[number,number]|undefined
+  if(header.byteLength>=24&&header.getUint32(0)===0x89504e47)dimensions=[header.getUint32(16),header.getUint32(20)]
+  else if(header.byteLength>=4&&header.getUint16(0)===0xffd8){
+    for(let i=2;i+9<=header.byteLength;){
+      if(header.getUint8(i)!==255){i++;continue}
+      const marker=header.getUint8(i+1)
+      if(marker===255){i++;continue}
+      if(marker===0xda||marker===0xd9)break
+      const length=header.getUint16(i+2)
+      if(length<2||i+2+length>header.byteLength)break
+      if([0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf].includes(marker)){dimensions=[header.getUint16(i+7),header.getUint16(i+5)];break}
+      i+=2+length
+    }
+  }
+  if(dimensions&&dimensions[0]*dimensions[1]>16_000_000)throw Error('Preview images must be at most 16 megapixels. The original was not decoded or submitted.')
   let image:{width:number;height:number;close:()=>void}
   try{
     if(typeof createImageBitmap==='function')image=await createImageBitmap(photo)
